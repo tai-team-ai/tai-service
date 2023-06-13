@@ -2,7 +2,7 @@ import pytest
 from aws_cdk import App
 from aws_cdk.assertions import Template
 
-from tai_service.main import MyStack
+from tai_service.api.main import MyStack
 
 @pytest.fixture(scope='module')
 def template():

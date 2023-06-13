@@ -1,6 +1,6 @@
 import os
 from aws_cdk import App, Environment
-from tai_service.main import MyStack
+from tai_service.api.main import MyStack
 
 # for development, use account/region from cdk cli
 dev_env = Environment(
