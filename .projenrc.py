@@ -1,5 +1,6 @@
 from projen.awscdk import AwsCdkPythonApp
 
+
 project = AwsCdkPythonApp(
     author_email="jacobpetterle+aiforu@gmail.com",
     author_name="Jacob Petterle",
