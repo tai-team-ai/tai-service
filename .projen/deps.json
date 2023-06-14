@@ -16,6 +16,10 @@
       "type": "runtime"
     },
     {
+      "name": "loguru",
+      "type": "runtime"
+    },
+    {
       "name": "pydantic",
       "type": "runtime"
     },
