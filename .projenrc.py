@@ -7,6 +7,9 @@ project = AwsCdkPythonApp(
     module_name="tai_service",
     name="tai-service",
     version="0.1.0",
+    deps=[
+        "pydantic",
+    ]
 )
 
 project.synth()
