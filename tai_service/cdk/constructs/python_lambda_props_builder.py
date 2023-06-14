@@ -1,6 +1,9 @@
 """Define Lambda properties builder."""
+import copy
+from os import chmod
 from pathlib import Path
 import shutil
+import tempfile
 from typing import Optional, Union
 from constructs import Construct
 from pydantic import BaseModel, Field, root_validator, validator, BaseSettings
@@ -9,13 +12,15 @@ from aws_cdk import (
     Duration,
     Size as StorageSize,
     aws_lambda as _lambda,
+    DockerImage,
 )
+from loguru import logger
 
 from tai_service.cdk.constructs.construct_helpers import get_vpc, sanitize_name
 
-LAMBDA_RUNTIME_ENVIRONMENT_TYPES = Union[BaseSettings]
+LAMBDA_RUNTIME_ENVIRONMENT_TYPES = BaseSettings # add more settings models here with a Union Clause
 
-TEMP_BUILD_DIR = Path("/tmp/build")
+TEMP_BUILD_DIR = Path("/tmp/lambda-build")
 MAX_LENGTH_FOR_FUNCTION_NAME = 64
 
 class PythonLambdaPropsBuilderConfigModel(BaseModel):
@@ -120,7 +125,17 @@ class PythonLambdaPropsBuilder:
             "handler": f"{config.handler_module_name}.{config.handler_name}",
             "runtime": _lambda.Runtime.PYTHON_3_10,
             "environment": config.runtime_environment.dict(by_alias=True),
+            "layers": [],
         }
+
+    @property
+    def lambda_props(self) -> dict:
+        """Return the Lambda properties."""
+        function_props = copy.deepcopy(self._function_props_dict)
+        build_context_path = str(self._build_context_folder.resolve())
+        function_props["code"] = _lambda.Code.from_asset(build_context_path)
+        lambda_props = _lambda.FunctionProps(**function_props)
+        return lambda_props
 
     def _initialize_build_folder(self) -> None:
         if self._build_context_folder.exists():
@@ -136,12 +151,63 @@ class PythonLambdaPropsBuilder:
         if config.requirements_file_path:
             self._create_layer_with_requirements_file()
         if config.vpc:
-            self._add_lambda_to_vpc()
+            self._function_props_dict["vpc"] = config.vpc
+            if config.subnet_selection:
+                self._function_props_dict["vpc_subnets"] = config.subnet_selection
         if config.security_groups:
-            self._add_security_groups_to_lambda()
+            self._function_props_dict["security_groups"] = config.security_groups
         if config.timeout:
             self._function_props_dict["timeout"] = config.timeout
         if config.memory_size:
             self._function_props_dict["memory_size"] = config.memory_size
         if config.ephemeral_storage_size:
             self._function_props_dict["ephemeral_storage_size"] = config.ephemeral_storage_size
+
+    def _create_layer_with_zip_asset(self) -> None:
+        config = self._config
+        layer_name = f"{config.function_name}-{config.zip_file_path.stem}"
+        layer_zip_file_path = str(config.zip_file_path.resolve())
+        layer = _lambda.LayerVersion(
+            self._scope,
+            layer_name,
+            code=_lambda.Code.from_asset(layer_zip_file_path),
+        )
+        self._add_layer(layer)
+
+    def _copy_files_into_handler_dir(self) -> None:
+        with tempfile.TemporaryDirectory(prefix=TEMP_BUILD_DIR) as build_context:
+            chmod(build_context, 0o0755)
+            for path in self._config.files_to_copy_into_handler_dir:
+                destination = Path(build_context) / path.name
+                if path.is_file():
+                    shutil.copy2(object, destination)
+                elif path.is_dir():
+                    shutil.copytree(object, destination)
+                else:
+                    logger.warning(f"Unable to copy {path} into handler directory. Not a file or directory.")
+            shutil.copytree(build_context, self._build_context_folder, dirs_exist_ok=True)
+
+    def _create_layer_with_requirements_file(self) -> None:
+        config = self._config
+        with tempfile.TemporaryDirectory(prefix=TEMP_BUILD_DIR) as build_context:
+            chmod(build_context, 0o0755)
+            shutil.copy(config.requirements_file_path, build_context)
+            runtime: _lambda.Runtime = self._function_props_dict["runtime"]
+            image_obj: DockerImage = runtime.bundling_image
+            bundling_options = _lambda.BundlingOptions(
+                image=image_obj,
+                command=["bash", "-c", "pip install -r requirements.txt -t /asset-output"],
+                user="root",
+            )
+            code_asset = _lambda.Code.from_asset(build_context, bundling=bundling_options)
+            layer = _lambda.LayerVersion(
+                self._scope,
+                f"{config.function_name}-{config.requirements_file_path.stem}",
+                code=code_asset,
+                compatible_runtimes=[runtime],
+            )
+            self._add_layer(layer)
+
+    def _add_layer(self, layer: _lambda.ILayerVersion) -> None:
+        layers = self._function_props_dict["layers"]
+        layers.append(layer)
