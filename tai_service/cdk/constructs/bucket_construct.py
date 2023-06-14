@@ -65,7 +65,7 @@ class VersionedPrivateBucket(Construct):
         self,
         scope: Construct,
         construct_id: str,
-        config: PrivateBucketConfigModel,
+        config: VersionedPrivateBucketConfigModel,
         **kwargs,
     ) -> None:
         """Initialize the construct."""
