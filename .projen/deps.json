@@ -1,6 +1,14 @@
 {
   "dependencies": [
     {
+      "name": "aws-lambda-powertools",
+      "type": "devenv"
+    },
+    {
+      "name": "aws-lambda-typing",
+      "type": "devenv"
+    },
+    {
       "name": "projen",
       "version": "0.71.94",
       "type": "devenv"
@@ -8,6 +16,10 @@
     {
       "name": "aws-cdk-lib",
       "version": "^2.1.0",
+      "type": "runtime"
+    },
+    {
+      "name": "boto3",
       "type": "runtime"
     },
     {
@@ -21,6 +33,14 @@
     },
     {
       "name": "pydantic",
+      "type": "runtime"
+    },
+    {
+      "name": "pymongo",
+      "type": "runtime"
+    },
+    {
+      "name": "requests",
       "type": "runtime"
     },
     {
