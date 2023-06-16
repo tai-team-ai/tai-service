@@ -97,8 +97,6 @@ def _get_mongo_client(user_name: str, password: str) -> pymongo.MongoClient:
     return mongo_client
 
 
-
-
 def _send_cloud_formation_response(
     event: CloudFormationCustomResourceEvent,
     context: LambdaContext,
@@ -164,7 +162,7 @@ def _run_operation_with_retry(operation: callable, *args, **kwargs) -> None:
 
 def _create_user(db: Database, secret_name: str) -> None:
     use_credentials = _get_secret(secret_name)
-    user_name = use_credentials[SETTINGS["user_name_key"]] # TODO add user name key to settings
+    user_name = SETTINGS["user_name_key"] # TODO add user name key to settings
     password = use_credentials[SETTINGS["password_key"]] # TODO add password key to settings
     logger.info(f"Creating user: {user_name}")
     db.command({

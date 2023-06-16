@@ -70,6 +70,11 @@ class ElasticDocumentDBConfigModel(BaseModel):
         description=f"The maintenance window for the cluster. Format: {VALID_MAINTENANCE_WINDOW_PATTERN}",
         regex=VALID_MAINTENANCE_WINDOW_PATTERN,
     )
+    database_password_secret_arn: str = Field(
+        ...,
+        description="The name of the secret to create for the database.",
+        regex=VALID_SECRET_ARN_PATTERN,
+    )
     vpc: Union[ec2.IVpc, str] = Field(
         ...,
         description="The VPC to use for the cluster.",
@@ -85,11 +90,6 @@ class ElasticDocumentDBConfigModel(BaseModel):
     tags: Optional[dict[str, str]] = Field(
         default=None,
         description="The tags to apply to the cluster.",
-    )
-    database_secret_arn: str = Field(
-        ...,
-        description="The name of the secret to create for the database.",
-        regex=VALID_SECRET_ARN_PATTERN,
     )
 
     class Config:
