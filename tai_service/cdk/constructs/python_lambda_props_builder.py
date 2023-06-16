@@ -13,10 +13,11 @@ from aws_cdk import (
     Size as StorageSize,
     aws_lambda as _lambda,
     DockerImage,
+    BundlingOptions,
 )
 from loguru import logger
 
-from tai_service.cdk.constructs.construct_helpers import get_vpc, sanitize_name
+from tai_service.cdk.constructs.construct_helpers import get_vpc, sanitize_name, validate_vpc
 
 LAMBDA_RUNTIME_ENVIRONMENT_TYPES = BaseSettings # add more settings models here with a Union Clause
 
@@ -54,7 +55,7 @@ class PythonLambdaPropsBuilderConfigModel(BaseModel):
         default=None,
         description="The path to the requirements file for the Lambda function.",
     )
-    vpc: Optional[ec2.IVpc] = Field(
+    vpc: Optional[Union[ec2.IVpc, str]] = Field(
         default=None,
         description="The VPC to run the Lambda function in.",
     )
@@ -100,14 +101,15 @@ class PythonLambdaPropsBuilderConfigModel(BaseModel):
             raise ValueError("Must provide a VPC if providing a subnet selection")
         return values
 
-    @validator("vpc", pre=True)
-    def validate_vpc(cls, vpc) -> Optional[ec2.IVpc]:
-        return get_vpc(vpc)
-
     @validator("function_name")
     def sanitize_function_name(cls, function_name) -> str:
         """Sanitize the function name."""
         return sanitize_name(function_name, MAX_LENGTH_FOR_FUNCTION_NAME)
+
+    @validator("vpc")
+    def validate_vpc(cls, vpc) -> Optional[Union[ec2.IVpc, str]]:
+        """Validate the VPC."""
+        return validate_vpc(vpc)
 
 
 class PythonLambdaPropsBuilder:
@@ -116,6 +118,7 @@ class PythonLambdaPropsBuilder:
     def __init__(self, scope: Construct, config: PythonLambdaPropsBuilderConfigModel) -> None:
         """Initialize the builder."""
         self._scope = scope
+        config.vpc = get_vpc(scope, config.vpc)
         self._config = config
         self._build_context_folder = Path(f".build-{config.code_path.name}-{config.function_name}")
         self._initialize_build_folder()
@@ -194,7 +197,7 @@ class PythonLambdaPropsBuilder:
             shutil.copy(config.requirements_file_path, build_context)
             runtime: _lambda.Runtime = self._function_props_dict["runtime"]
             image_obj: DockerImage = runtime.bundling_image
-            bundling_options = _lambda.BundlingOptions(
+            bundling_options = BundlingOptions(
                 image=image_obj,
                 command=["bash", "-c", "pip install -r requirements.txt -t /asset-output"],
                 user="root",
