@@ -140,6 +140,12 @@ class PythonLambdaPropsBuilder:
         lambda_props = _lambda.FunctionProps(**function_props)
         return lambda_props
 
+    @staticmethod
+    def get_lambda_function(scope: Construct, construct_id: str, config: PythonLambdaPropsBuilderConfigModel) -> _lambda.Function:
+        """Return the Lambda function."""
+        builder = PythonLambdaPropsBuilder(scope, config)
+        return _lambda.Function(scope, construct_id, **builder.lambda_props)
+
     def _initialize_build_folder(self) -> None:
         if self._build_context_folder.exists():
             shutil.rmtree(self._build_context_folder)

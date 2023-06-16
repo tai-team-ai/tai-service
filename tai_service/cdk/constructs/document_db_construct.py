@@ -8,8 +8,12 @@ from aws_cdk import (
     aws_ec2 as ec2,
     aws_docdbelastic as docdb_elastic,
     aws_docdb as docdb,
+    aws_iam as iam,
+    Environment,
+    CustomResource,
 )
 from tai_service.cdk.constructs.construct_helpers import validate_vpc
+from tai_service.cdk.constructs.python_lambda_props_builder import PythonLambdaPropsBuilder, PythonLambdaPropsBuilderConfigModel
 
 # This schema is defined by aws documentation for AWS Elastic DocumentDB
 # (https://docs.aws.amazon.com/cdk/api/v2/python/aws_cdk.aws_docdbelastic/CfnCluster.html)
@@ -20,7 +24,7 @@ VALID_SHARD_COUNT_RANGE = range(1, 33)
 VALID_DAYS_OF_THE_WEEK = r'(Mon|Tue|Wed|Thu|Fri|Sat|Sun)'
 # Format: ddd:hh24:mi-ddd:hh24:mi
 VALID_MAINTENANCE_WINDOW_PATTERN =  fr'^{VALID_DAYS_OF_THE_WEEK}\:([01]\d|2[0-3])\:[0-5]\d\-([A-Z][a-z]{2})\:([01]\d|2[0-3])\:[0-5]\d$'
-
+VALID_SECRET_ARN_PATTERN = r'^arn:aws:secretsmanager:[a-z]{2}-[a-z]{4,9}-\d{1}:\d{12}:secret:[a-zA-Z0-9_-]{1,64}\/[a-zA-Z0-9_-]{1,64}\/[a-zA-Z0-9_-]{1,64}$'
 
 class AuthType(str, Enum):
     """Define the authentication type for the DocumentDB cluster."""
@@ -82,6 +86,11 @@ class ElasticDocumentDBConfigModel(BaseModel):
         default=None,
         description="The tags to apply to the cluster.",
     )
+    database_secret_arn: str = Field(
+        ...,
+        description="The name of the secret to create for the database.",
+        regex=VALID_SECRET_ARN_PATTERN,
+    )
 
     class Config:
         """Define the Pydantic model configuration."""
@@ -112,16 +121,20 @@ class DocumentDatabase(Construct):
         self,
         scope: Construct,
         construct_id: str,
-        config: Union[DocumentDBConfigModel, ElasticDocumentDBConfigModel],
+        db_config: Union[DocumentDBConfigModel, ElasticDocumentDBConfigModel],
+        lambda_config: PythonLambdaPropsBuilderConfigModel,
         **kwargs,
     ) -> None:
         """Initialize the DocumentDB construct."""
         super().__init__(scope, construct_id, **kwargs)
-        self._namer = lambda x: f"{config.cluster_name}-{x}"
-        self._config = config
+        self._namer = lambda x: f"{db_config.cluster_name}-{x}"
+        self._config = db_config
+        self._lambda_config = lambda_config
         self.security_group = self._create_security_group()
         self._config.security_groups.append(self.security_group)
         self.db_cluster = self._create_cluster()
+        self.custom_resource = self._create_custom_resource()
+        self.custom_resource.node.add_dependency(self.db_cluster)
 
     def _create_security_group(self) -> ec2.SecurityGroup:
         """Create the security groups for the cluster."""
@@ -167,3 +180,23 @@ class DocumentDatabase(Construct):
             tags=self._config.tags,
         )
         return cluster
+
+    def _create_custom_resource(self) -> CustomResource:
+        lambda_function = PythonLambdaPropsBuilder.get_lambda_function(
+            self,
+            construct_id=self._namer("custom-resource-db-initializer-lambda"),
+            config=self._lambda_config,
+        )
+        lambda_function.add_to_role_policy(
+            statement=iam.PolicyStatement(
+                actions=["secretsmanager:GetSecretValue"],
+                effect=iam.Effect.ALLOW,
+                resources=[self._config.database_secret_arn],
+            )
+        )
+        custom_resource = CustomResource(
+            self,
+            id=self._namer("custom-resource"),
+            service_token=lambda_function.function_arn,
+        )
+        return custom_resource
