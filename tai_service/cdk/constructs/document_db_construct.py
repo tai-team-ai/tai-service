@@ -147,7 +147,7 @@ class DocumentDatabase(Construct):
             return self._create_standard_cluster()
         return self._create_elastic_cluster()
 
-    def _create_standard_cluster() -> docdb.DatabaseCluster:
+    def _create_standard_cluster(self) -> docdb.DatabaseCluster:
         raise NotImplementedError("Standard clusters are not yet supported.")
 
     def _create_elastic_cluster(self) -> docdb_elastic.CfnCluster:
