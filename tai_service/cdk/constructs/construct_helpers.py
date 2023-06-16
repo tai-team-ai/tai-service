@@ -54,6 +54,17 @@ def get_vpc(scope: Construct, vpc: Optional[Union[str, ec2.IVpc]]) -> Optional[e
         return vpc
     raise ValueError(f"VPC must be a VPC ID or an object that implements the VPC protocol. You provided: {vpc}")
 
+def validate_vpc(vpc) -> Optional[Union[ec2.IVpc, str]]:
+    if vpc:
+        is_valid_vpc_id = isinstance(vpc, str) and vpc.startswith("vpc-")
+        if is_valid_vpc_id or implements_vpc_protocol(vpc):
+            return vpc
+        elif isinstance(vpc, str):
+            raise ValueError(f"Invalid VPC ID: {vpc}. Valid VPC IDs start with 'vpc-'")
+        else:
+            raise ValueError(f"Invalid VPC: {vpc}. Must be a string or implement protocol IVpc")
+    return None
+
 def sanitize_name(name: str, truncation_length: int = 63) -> str:
     """Return a sanitized name."""
     name = re.sub(r"[^a-zA-Z0-9-]", "-", name)
