@@ -103,7 +103,6 @@ class ElasticDocumentDBConfigModel(BaseModel):
 
 class DocumentDBConfigModel(BaseModel):
     """Define the configuration for the DocumentDB construct."""
-    pass
 
 
 class DocumentDatabase(Construct):
@@ -112,12 +111,12 @@ class DocumentDatabase(Construct):
     def __init__(
         self,
         scope: Construct,
-        id: str,
+        construct_id: str,
         config: Union[DocumentDBConfigModel, ElasticDocumentDBConfigModel],
         **kwargs,
     ) -> None:
         """Initialize the DocumentDB construct."""
-        super().__init__(scope, id, **kwargs)
+        super().__init__(scope, construct_id, **kwargs)
         self._namer = lambda x: f"{config.cluster_name}-{x}"
         self._config = config
         self.security_group = self._create_security_group()
