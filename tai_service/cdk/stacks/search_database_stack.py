@@ -6,12 +6,12 @@ from aws_cdk import (
     Duration,
     Size as StorageSize,
 )
-from ..stack_helpers import retrieve_secret, get_secret_arn_from_name
-from ..stack_config_models import StackConfigBaseModel
 from tai_service.schemas import (
     AdminDocumentDBSettings,
     BasePineconeDBSettings,
 )
+from ..stack_helpers import retrieve_secret, get_secret_arn_from_name
+from ..stack_config_models import StackConfigBaseModel
 from ..constructs.document_db_construct import (
     DocumentDatabase,
     ElasticDocumentDBConfigModel,
@@ -20,6 +20,8 @@ from ..constructs.pinecone_db_construct import PineconeDatabase
 from ..constructs.python_lambda_props_builder import (
     PythonLambdaPropsBuilderConfigModel,
 )
+
+MINIMUM_SUBNETS_FOR_DOCUMENT_DB = 3
 
 
 class SearchServiceDatabase(Stack):
@@ -46,12 +48,40 @@ class SearchServiceDatabase(Stack):
         self._cdk_directory = Path(__file__).parent.parent
         self._custom_resource_dir = self._cdk_directory / "constructs/customresources"
         self.vpc = self._create_vpc()
-        self._subnet_type = ec2.SubnetType.PRIVATE_ISOLATED
+        self._subnet_type_for_doc_db = ec2.SubnetType.PUBLIC
         self.document_db = self._get_document_db(doc_db_settings=doc_db_settings)
-        self.pinecone_db = self._get_pinecone_db()
+        self.pinecone_db = self._get_pinecone_db(pinecone_db_settings=pinecone_db_settings)
 
     def _create_vpc(self) -> ec2.Vpc:
-        pass
+        # need to create enough subnets for the document db at a minimum
+        subnet_configuration = []
+        for i in range(MINIMUM_SUBNETS_FOR_DOCUMENT_DB):
+            subnet_configuration.append(
+                ec2.SubnetConfiguration(
+                    name=self._namer(f"subnet-{i}"),
+                    subnet_type=self._subnet_type_for_doc_db,
+                )
+            )
+        subnet_configuration.append(
+            ec2.SubnetConfiguration(
+                name=self._namer("subnet-private"),
+                subnet_type=ec2.SubnetType.PRIVATE_WITH_EGRESS,
+            )
+        )
+        subnet_configuration.append(
+            ec2.SubnetConfiguration(
+                name=self._namer("subnet-isolated"),
+                subnet_type=ec2.SubnetType.PRIVATE_ISOLATED,
+            )
+        )
+        vpc = ec2.Vpc(
+            scope=self,
+            id=self._namer("vpc"),
+            vpc_name=self._namer("vpc"),
+            max_azs=MINIMUM_SUBNETS_FOR_DOCUMENT_DB,
+            nat_gateways=0,
+        )
+        return vpc
 
     def _get_document_db(self, doc_db_settings: AdminDocumentDBSettings) -> DocumentDatabase:
         db_password = retrieve_secret(
@@ -63,7 +93,7 @@ class SearchServiceDatabase(Stack):
             admin_username=doc_db_settings.admin_user_name,
             admin_password=db_password,
             vpc=self.vpc,
-            subnet_type=self._subnet_type,
+            subnet_type=self._subnet_type_for_doc_db,
             tags=self._config.tags,
         )
         db_custom_resource_dir = self._custom_resource_dir / "document_db"
@@ -78,7 +108,9 @@ class SearchServiceDatabase(Stack):
             files_to_copy_into_handler_dir=[
                 self._cdk_directory.parent / "schemas.py",
                 self._custom_resource_dir / "custom_resource_interface.py",
-            ]
+            ],
+            vpc=self.vpc,
+            subnet_type=self._subnet_type_for_doc_db,
             **self._get_global_custom_resource_lambda_config(),
         )
         db = DocumentDatabase(
@@ -119,8 +151,6 @@ class SearchServiceDatabase(Stack):
 
     def _get_global_custom_resource_lambda_config(self) -> dict:
         config = {
-            'vpc': self.vpc,
-            'subnet_selection': self.vpc.select_subnets(subnet_type=self._subnet_type),
             'timeout': Duration.minutes(3),
             'memory_size': 128,
             'ephemeral_storage_size': StorageSize.mebibytes(512),
