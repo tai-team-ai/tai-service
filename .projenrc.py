@@ -13,6 +13,7 @@ project = AwsCdkPythonApp(
         "boto3",
         "requests",
         "pymongo",
+        "pygit2",
     ],
     dev_deps=[
         "aws-lambda-powertools",

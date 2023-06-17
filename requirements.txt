@@ -4,5 +4,6 @@ boto3
 constructs>=10.0.5, <11.0.0
 loguru
 pydantic
+pygit2
 pymongo
 requests

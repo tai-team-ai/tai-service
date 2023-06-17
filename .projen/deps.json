@@ -36,6 +36,10 @@
       "type": "runtime"
     },
     {
+      "name": "pygit2",
+      "type": "runtime"
+    },
+    {
       "name": "pymongo",
       "type": "runtime"
     },

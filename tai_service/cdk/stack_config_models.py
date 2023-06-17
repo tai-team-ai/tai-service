@@ -1,6 +1,13 @@
 from enum import Enum
+import os
+import re
+from typing import Optional
 
-from pydantic import BaseSettings, Field
+from pydantic import BaseModel, BaseSettings, Field, validator, Extra
+from pygit2 import Repository
+from aws_cdk import (
+    Environment,
+)
 
 
 class AWSRegion(str, Enum):
@@ -12,7 +19,7 @@ class AWSRegion(str, Enum):
     US_WEST_2 = "us-west-2"
 
 
-class AWSDeploymentEnvironment(str, Enum):
+class DeploymentType(str, Enum):
     """Define deployment environments."""
 
     DEV = "dev"
@@ -32,9 +39,113 @@ class AWSDeploymentSettings(BaseSettings):
         env="AWS_REGION",
         description="The AWS region to deploy to.",
     )
-    aws_deployment_environment: AWSDeploymentEnvironment = Field(
-        default=AWSDeploymentEnvironment.DEV,
-        env="AWS_DEPLOYMENT_ENVIRONMENT",
-        description="The AWS deployment environment. These are used to isolate stacks from various environments.",
+    aws_environment: Optional[Environment] = Field(
+        default=None,
+        env="AWS_ENVIRONMENT",
+        description="The AWS environment to deploy to.",
     )
-    
+    deployment_type: DeploymentType = Field(
+        default=DeploymentType.DEV,
+        env="DEPLOYMENT_TYPE",
+        description="The deployment type. This is used to isolate stacks from various environments.",
+    )
+    aws_access_key_id: str = Field(
+        default=None,
+        env="AWS_ACCESS_KEY_ID",
+        description="The AWS access key ID to use for deployment.",
+    )
+    aws_secret_access_key: str = Field(
+        default=None,
+        env="AWS_SECRET_ACCESS_KEY",
+        description="The AWS secret access key to use for deployment.",
+    )
+
+    class Config:
+        """Define configuration for AWS deployment settings."""
+
+        env_file = ".env"
+        env_file_encoding = "utf-8"
+        allow_population_by_field_name = True
+
+    @validator("aws_environment")
+    def initialize_environment(cls, env: Optional[Environment], values: dict) -> Environment:
+        """Initialize the AWS environment."""
+        if env is None:
+            return Environment(
+                account=values["aws_deployment_account_id"],
+                region=values["aws_region"],
+            )
+        return env
+
+    @validator("staging_stack_suffix")
+    def initialize_staging_stack_suffix(cls, suffix: str) -> str:
+        """Initialize the staging stack suffix."""
+        if suffix:
+            return suffix
+        return ""
+
+class StackConfigBaseModel(BaseModel):
+    """Define the base model for stack configuration."""
+
+    stack_id: str = Field(
+        ...,
+        description="The ID of the stack.",
+    )
+    resource_name: str = Field(
+        ...,
+        description="The name of the resource that the stack is creating.",
+    )
+    deployment_settings: AWSDeploymentSettings = Field(
+        ...,
+        description="The AWS deployment settings.",
+    )
+    termination_protection: bool = Field(
+        default=True,
+        description="Whether or not to enable termination protection for the stack.",
+    )
+    duplicate_stack_for_development: bool = Field(
+        default=True,
+        description="""
+            Whether or not to duplicate the stack for development. This will rename all 
+            resources to include the staging stack suffix.
+        """,
+    )
+    tags: dict = Field(
+        default_factory=dict,
+        description="The tags to apply to the stack.",
+    )
+
+    class Config:
+        """Define configuration for stack configuration."""
+
+        arbitrary_types_allowed = True
+        validate_assignment = True
+        extra = Extra.forbid
+
+    @validator("resource_name", "stack_id")
+    def add_suffix_to_names(cls, name: str, values: dict) -> str:
+        """Add the staging stack suffix to the resource name."""
+        branch_name = Repository(os.getcwd()).head.shorthand
+        branch_name = re.sub(r"[^a-zA-Z0-9]", '-', branch_name)
+        is_main = branch_name == "main" or branch_name == "master" or \
+            branch_name == "production" or branch_name == "prod" or branch_name == "dev"
+        if is_main or not values["duplicate_stack_for_development"]:
+            return name
+        return f"{name}-{branch_name}"
+
+    @validator("termination_protection")
+    def validate_on_if_prod(cls, termination_protection: bool, values: dict) -> bool:
+        """Validate that termination protection is enabled if the deployment type is prod."""
+        settings: AWSDeploymentSettings = values["deployment_settings"]
+        if settings.deployment_type == DeploymentType.PROD:
+            assert termination_protection is True, "Termination protection must be enabled for prod deployments."
+        return termination_protection
+
+    @validator("tags")
+    def tags_include_blame_tag(cls, tags: dict) -> dict:
+        """Include the blame tag in the tags."""
+        for key in tags.keys():
+            if key == "blame":
+                return tags
+        raise ValueError("A blame tag must be included in the tags.")
+
