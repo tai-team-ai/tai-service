@@ -11,14 +11,10 @@ import pinecone
 # first imports are for local development, second imports are for deployment
 try:
     from ..custom_resource_interface import CustomResourceInterface
-    from tai_service.schemas import (
-        BasePydanticSettings,
-    )
+    from tai_service.schemas import BasePineconeDBSettings
 except ImportError:
     from custom_resource_interface import CustomResourceInterface
-    from schemas import (
-        BasePydanticSettings,
-    )
+    from schemas import BasePineconeDBSettings
 
 
 class MetaDataConfig(TypedDict):
@@ -94,24 +90,9 @@ class PineconeIndexSettings(BaseModel):
     )
 
 
-class PineconeDBSettings(BasePydanticSettings):
+class PineconeDBSettings(BasePineconeDBSettings):
     """Define the settings for the PineconeDBSetupLambda."""
 
-    pinecone_api_key_secret_name: str = Field(
-        ...,
-        env="PINECONE_API_KEY_SECRET_NAME",
-        description="The name of the secret containing the Pinecone API key.",
-    )
-    pinecone_environment: str = Field(
-        ...,
-        env="PINECONE_ENVIRONMENT",
-        description="The environment to use for the Pinecone project.",
-    )
-    pinecone_project_name: str = Field(
-        ...,
-        env="PINECONE_PROJECT_NAME",
-        description="The name of the Pinecone project.",
-    )
     pinecone_indexes: List[PineconeIndexSettings] = Field(
         ...,
         max_items=2,
@@ -147,7 +128,6 @@ class PineconeDBSetupCustomResource(CustomResourceInterface):
         pinecone.init(
             api_key=password,
             environment=settings.pinecone_environment,
-            project_name=settings.pinecone_project_name,
         )
 
     def _create_database(self) -> None:

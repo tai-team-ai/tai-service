@@ -84,3 +84,18 @@ class ReadWriteDocumentDBSettings(BaseDocumentDBSettings):
         env="READ_WRITE_USER_PASSWORD_SECRET_NAME",
         description="The name of the secret containing the read/write user password.",
     )
+
+
+class BasePineconeDBSettings(BasePydanticSettings):
+    """Define the settings for initializing the Pinecone database."""
+
+    pinecone_api_key_secret_name: str = Field(
+        ...,
+        env="PINECONE_API_KEY_SECRET_NAME",
+        description="The name of the secret containing the Pinecone API key.",
+    )
+    pinecone_environment: str = Field(
+        ...,
+        env="PINECONE_ENVIRONMENT",
+        description="The environment to use for the Pinecone project.",
+    )
