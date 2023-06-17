@@ -24,7 +24,7 @@ from ..constructs.python_lambda_props_builder import (
 MINIMUM_SUBNETS_FOR_DOCUMENT_DB = 3
 
 
-class SearchServiceDatabase(Stack):
+class SearchServiceDatabases(Stack):
     """Define the search database stack."""
 
     def __init__(

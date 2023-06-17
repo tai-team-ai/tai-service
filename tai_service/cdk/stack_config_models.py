@@ -3,6 +3,7 @@ import os
 import re
 from typing import Optional
 
+from loguru import logger
 from pydantic import BaseModel, BaseSettings, Field, validator, Extra
 from pygit2 import Repository
 from aws_cdk import (
@@ -162,3 +163,14 @@ class StackConfigBaseModel(BaseModel):
             if key == "blame":
                 return tags
         raise ValueError("A blame tag must be included in the tags.")
+
+    @validator("termination_protection")
+    def ensure_termination_protection_for_prod(cls, termination_protection: bool, values: dict) -> bool:
+        """Ensure termination protection is enabled for production deployments."""
+        if values["deployment_type"] == DeploymentType.PROD:
+            if not termination_protection:
+                logger.warning(
+                    "Termination protection is disabled. Enabling termination protection for production deployment."
+                )
+            return True
+        return termination_protection

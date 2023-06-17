@@ -1,15 +1,34 @@
-import os
-from aws_cdk import App, Environment
-from tai_service.api.main import MyStack
-
-# for development, use account/region from cdk cli
-dev_env = Environment(
-  account=os.getenv('CDK_DEFAULT_ACCOUNT'),
-  region=os.getenv('CDK_DEFAULT_REGION')
+from tai_service.cdk.stacks.search_database_stack import SearchServiceDatabases
+from tai_service.cdk.stack_config_models import (
+    StackConfigBaseModel,
+    AWSDeploymentSettings,
 )
 
-app = App()
-MyStack(app, "tai-service-dev", env=dev_env)
-# MyStack(app, "tai-service-prod", env=prod_env)
 
-app.synth()
+
+AWS_DEPLOYMENT_SETTINGS = AWSDeploymentSettings()
+
+base_stack_config = StackConfigBaseModel(
+	stack_id="search-service-databases",
+	stack_name="search-service-databases",
+	description="Stack for the search service databases. This stack contains the document " \
+    	"database and the pinecone database used by the tai search service.",
+    deployment_settings=AWS_DEPLOYMENT_SETTINGS,
+    duplicate_stack_for_development=True,
+    termination_protection=False,
+    tags={
+        'blame': 'jacob',
+    }
+)
+
+doc_db_settings = 
+
+
+search_service_databases = SearchServiceDatabases(
+	config=base_stack_config,
+	doc_db_settings=doc_db_settings,
+	pinecone_db_settings=pinecone_db_settings,
+)
+
+
+
