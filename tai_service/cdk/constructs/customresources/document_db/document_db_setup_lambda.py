@@ -1,17 +1,17 @@
 """Define the Lambda function for initializing the database."""
 from enum import Enum
 import json
-import time
-import requests
 from loguru import logger
 from aws_lambda_powertools.utilities.typing import LambdaContext
 from aws_lambda_typing.events import CloudFormationCustomResourceEvent
-import boto3
-from botocore.config import Config as BotoConfig
 import pymongo
 from pymongo.database import Database
 from pydantic import BaseModel
-from .custom_resource_interface import CustomResourceInterface, Status
+# first imports are for local development, second imports are for deployment
+try:
+    from ..custom_resource_interface import CustomResourceInterface
+except ImportError:
+    from custom_resource_interface import CustomResourceInterface
 
 
 SERVER_SELECTION_TIMEOUT = 30
@@ -47,61 +47,44 @@ def lambda_handler(event: CloudFormationCustomResourceEvent, context: LambdaCont
     to include all CRUD operations.
     """
     logger.info(f"Received event: {json.dumps(event)}")
-    lambda_handler = DocumentDBSetupLambda(event, context)
-    lambda_handler.execute_crud_operation()
+    settings = {} # TODO add settings here
+    custom_resource = DocumentDBCustomResource(event, context, settings)
+    custom_resource.execute_crud_operation()
 
 
-class DocumentDBSetupLambda(CustomResourceInterface):
+class DocumentDBCustomResource(CustomResourceInterface):
     """Define the Lambda function for initializing the database."""
 
-    def execute_crud_operation(self) -> None:
-        event = self._event
-        try:
-            admin_credentials = self.get_secret(SETTINGS["admin_credentials_secret_name"]) # TODO add secret name to settings
-            user_name = admin_credentials[SETTINGS["user_name_key"]] # TODO add user name key to settings
-            password = admin_credentials[SETTINGS["password_key"]] # TODO add password key to settings
-        except Exception as e:
-            logger.exception(e)
-            raise ValueError("Failed to retrieve admin credentials from Secrets Manager") from e
-        client = self._get_mongo_client(user_name, password)
-        mongodb = client[SETTINGS["database_name"]] # TODO add database name to settings
-        if event["RequestType"] == "Create":
-            logger.info("Creating database")
-            self._create_database(mongodb, client)
-        elif event["RequestType"] == "Update":
-            logger.info("Updating database")
-            self._update_database(mongodb)
-        elif event["RequestType"] == "Delete":
-            logger.info("Deleting database")
-            self._delete_database(mongodb)
-        else:
-            logger.error(f"Invalid request type: {event['RequestType']}")
-            raise ValueError(f"Invalid request type: {event['RequestType']}")
-
-
-    def _get_mongo_client(self, user_name: str, password: str) -> pymongo.MongoClient:
+    def __init__(self, event: CloudFormationCustomResourceEvent, context: LambdaContext, settings: dict) -> None:
+        super().__init__(event, context)
+        password = self.get_secret(settings["admin_credentials_secret_name"]) # TODO add secret name to settings
+        self._settings = settings
+        self._mongo_client = self._run_operation_with_retry(self._connect_to_database, password)
+    
+    def _connect_to_database(self, password: str) -> pymongo.MongoClient:
         logger.info("Creating MongoDB client")
         mongo_client = pymongo.MongoClient(
-            f"mongodb://{user_name}:{password}@{SETTINGS['host']}:{SETTINGS['port']}/?tls=true&retryWrites=false",
+            f"mongodb://{self._settings['user_name']}:{password}@{self._settings['host']}:{self._settings['port']}/?tls=true&retryWrites=false",
             serverSelectionTimeoutMS=SERVER_SELECTION_TIMEOUT,
         )
         logger.info(mongo_client.server_info())
-        # logger.info(f"Succesfully connected to database: {SETTINGS['database_name']}") # TODO add database name to settings
+        logger.info("Succesfully connected to cluster.")
         return mongo_client
 
-    def _create_database(self, db: pymongo.database.Database, client: pymongo.MongoClient) -> None:
-        self._run_operation_with_retry(self._create_user, db, SETTINGS["user_read_write_credentials_secret_name"]) # TODO add user credentials secret name to settings
-        self._run_operation_with_retry(self._create_user, db, SETTINGS["user_read_credentials_secret_name"]) # TODO add admin credentials secret name to settings
-        self._run_operation_with_retry(self._create_shards, db, client)
+    def _create_database(self) -> None:
+        db = self._mongo_client[SETTINGS["database_name"]] # TODO add database name to settings
+        self._run_operation_with_retry(self._create_user, db, self._settings["user_read_write_credentials_secret_name"]) # TODO add user credentials secret name to settings
+        self._run_operation_with_retry(self._create_user, db, self._settings["user_read_credentials_secret_name"]) # TODO add admin credentials secret name to settings
+        self._run_operation_with_retry(self._create_shards, db, self._mongo_client)
         self._run_operation_with_retry(self._create_indexes, db)
 
 
-    def _update_database(self, db: Database) -> None:
-        pass
+    def _update_database(self) -> None:
+        raise NotImplementedError("Update operation not implemented.")
 
 
-    def _delete_database(self, db: Database) -> None:
-        pass
+    def _delete_database(self) -> None:
+        raise NotImplementedError("Delete operation not implemented.")
 
     def _create_user(self, db: Database, secret_name: str) -> None:
         use_credentials = self.get_secret(secret_name)

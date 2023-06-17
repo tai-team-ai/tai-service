@@ -3,6 +3,7 @@
 from abc import ABC, abstractmethod
 import json
 from enum import Enum
+import time
 from typing import Optional
 import traceback
 from loguru import logger
@@ -56,7 +57,7 @@ class CustomResourceInterface(ABC):
                 self._delete_database()
             else:
                 raise ValueError(f"Invalid request type: {request_type}")
-        except Exception as e:
+        except Exception as e: # pylint: disable=broad-except
             logger.exception(e)
             logger.exception(traceback.format_exc())
             self._send_cloud_formation_response(
@@ -120,7 +121,7 @@ class CustomResourceInterface(ABC):
         for attempt in range(MAX_NUM_ATTEMPTS):
             try:
                 return operation(*args, **kwargs)
-            except Exception as e:
+            except Exception as e: # pylint: disable=broad-except
                 logger.exception(e)
                 logger.info(f"Attempt {attempt + 1} of {MAX_NUM_ATTEMPTS} failed. Retrying in {DELAY_BETWEEN_ATTEMPTS} seconds...")
                 time.sleep(DELAY_BETWEEN_ATTEMPTS)

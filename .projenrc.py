@@ -14,6 +14,7 @@ project = AwsCdkPythonApp(
         "requests",
         "pymongo",
         "pygit2",
+        "pinecone-client[grpc]",
     ],
     dev_deps=[
         "aws-lambda-powertools",

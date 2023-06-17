@@ -32,6 +32,10 @@
       "type": "runtime"
     },
     {
+      "name": "pinecone-client[grpc]",
+      "type": "runtime"
+    },
+    {
       "name": "pydantic",
       "type": "runtime"
     },
