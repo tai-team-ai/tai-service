@@ -5,7 +5,7 @@ from typing import Any, Dict, List, Optional, TypedDict
 from aws_lambda_powertools.utilities.typing import LambdaContext
 from aws_lambda_typing.events import CloudFormationCustomResourceEvent
 from loguru import logger
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, validator
 import pinecone
 
 # first imports are for local development, second imports are for deployment
@@ -48,60 +48,73 @@ class DistanceMetric(Enum):
     DOT_PRODUCT = "dot_product"
 
 
-class PineconeIndexSettings(BaseModel):
+class PineconeIndexConfig(BaseModel):
     """Define the settings for the Pinecone index."""
 
     name: str = Field(
         ...,
-        max_length=45, # pinecone index name max length
-        description="The name of the index.",
+        max_length=45, # max length defined by Pinecone docs
+        description="Name of the index.",
     )
     dimension: int = Field(
         ...,
-        description="The dimension of vectors stored in the index.",
+        description="Dimension of vectors stored in the index.",
     )
     metric: Optional[DistanceMetric] = Field(
         DistanceMetric.DOT_PRODUCT,
-        description="The distance metric used to compute the distance between vectors.",
+        description="Distance metric used to compute the distance between vectors.",
     )
     pods: Optional[int] = Field(
         default=1,
         le=2,
         ge=1,
-        description="The number of pods to use for the index.",
+        description="Number of pods to use for the index.",
     )
     replicas: Optional[int] = Field(
         default=1,
         le=1,
         ge=1,
-        description="The number of replicas to use for the index.",
+        description="Number of replicas to use for the index.",
     )
     pod_type: Optional[PodType] = Field(
         PodType.S1x1,
-        description="The type of pod to use for the index. (https://docs.pinecone.io/docs/indexes)",
+        description="Type of pod to use for the index. (https://docs.pinecone.io/docs/indexes)",
     )
     metadata_config: Optional[MetaDataConfig] = Field(
         default=None,
-        description="The metadata configuration for the index.",
+        description="Metadata configuration for the index.",
     )
     source_collection: Optional[str] = Field(
         default=None,
-        description="The name of the source collection to use for the index.",
+        description="Name of the source collection to use for the index.",
     )
 
 
 class PineconeDBConfig(BaseModel):
     """Define the settings for the PineconeDBSetupLambda."""
 
-    pinecone_indexes: List[PineconeIndexSettings] = Field(
+    indexes: List[PineconeIndexConfig] = Field(
         ...,
         max_items=2,
-        description="The settings for the Pinecone indexes.",
+        description="Config for the Pinecone indexes.",
     )
     db_settings: BasePineconeDBSettings = Field(
         ...,
-        description="The settings for the Pinecone database.",
+        description="Settings for the Pinecone database.",
     )
+
+    @validator("indexes")
+    def ensure_index_names_is_same_as_settings(cls, indexes: List[PineconeIndexConfig], values: Dict[str, Any]) -> List[PineconeIndexConfig]:
+        """Ensure that the index names are a subset of the collection names."""
+        index_names = set(index.name for index in indexes)
+        db_settings: BasePineconeDBSettings = values["db_settings"]
+        setting_index_names = set(db_settings.index_names)
+        if index_names == setting_index_names:
+            return indexes
+        raise ValueError(
+            "Index names used for creating indexes do not match the index names in the settings. " \
+            f"Index names used for creating indexes: {index_names}. Index names in settings: {setting_index_names}."
+        )
 
 
 def lambda_handler(event: CloudFormationCustomResourceEvent, context: LambdaContext) -> None:
@@ -134,10 +147,10 @@ class PineconeDBSetupCustomResource(CustomResourceInterface):
         )
 
     def _create_database(self) -> None:
-        for index_config in self.config.pinecone_indexes:
+        for index_config in self.config.indexes:
             self._create_index(index_config)
 
-    def _create_index(self, index_settings: PineconeIndexSettings) -> None:
+    def _create_index(self, index_settings: PineconeIndexConfig) -> None:
         self._run_operation_with_retry(
             pinecone.create_index,
             kwargs=index_settings.dict(),

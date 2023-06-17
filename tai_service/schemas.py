@@ -114,3 +114,8 @@ class BasePineconeDBSettings(BasePydanticSettings):
         env="PINECONE_ENVIRONMENT",
         description="The environment to use for the Pinecone project.",
     )
+    index_names: list[str] = Field(
+        ...,
+        env="INDEX_NAMES",
+        description="The names of the indexes in the Pinecone environment.",
+    )

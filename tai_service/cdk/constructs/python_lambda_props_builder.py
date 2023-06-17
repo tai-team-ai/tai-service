@@ -6,7 +6,7 @@ import shutil
 import tempfile
 from typing import Optional, Union
 from constructs import Construct
-from pydantic import BaseModel, Field, root_validator, validator, BaseSettings
+from pydantic import BaseModel, Field, root_validator, validator
 from aws_cdk import (
     aws_ec2 as ec2,
     Duration,
@@ -16,10 +16,10 @@ from aws_cdk import (
     BundlingOptions,
 )
 from loguru import logger
+from .construct_helpers import get_vpc, sanitize_name, validate_vpc
+from tai_service.schemas import BaseDocumentDBSettings, BasePineconeDBSettings
 
-from tai_service.cdk.constructs.construct_helpers import get_vpc, sanitize_name, validate_vpc
-
-LAMBDA_RUNTIME_ENVIRONMENT_TYPES = BaseSettings # add more settings models here with a Union Clause
+LAMBDA_RUNTIME_ENVIRONMENT_TYPES = Union[BaseDocumentDBSettings, BasePineconeDBSettings]
 
 TEMP_BUILD_DIR = Path("/tmp/lambda-build")
 MAX_LENGTH_FOR_FUNCTION_NAME = 64

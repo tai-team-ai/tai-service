@@ -1,12 +1,13 @@
 """Define the Lambda function for initializing the database."""
 from enum import Enum
 import json
+from typing import Any
 from loguru import logger
 from aws_lambda_powertools.utilities.typing import LambdaContext
 from aws_lambda_typing.events import CloudFormationCustomResourceEvent
 import pymongo
 from pymongo.database import Database
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, validator
 # first imports are for local development, second imports are for deployment
 try:
     from ..custom_resource_interface import CustomResourceInterface
@@ -16,8 +17,6 @@ except ImportError:
     from schemas import AdminDocumentDBSettings
 
 
-# TODO add document schema here to build indexes and shards
-DOCUMENT_MAPPING = {}
 
 class BuiltInMongoDBRoles(Enum):
     """Define the built-in MongoDB roles."""
@@ -30,13 +29,26 @@ class DocumentDBConfig(BaseModel):
     """Define the settings for the collections."""
 
     collection_indexes: dict[str, list[str]] = Field(
-        ...,
+        default_factory=dict,
         description="The indexes to create for each collection.",
     )
     db_settings: AdminDocumentDBSettings = Field(
         ...,
         description="The settings for the database.",
     )
+
+    @validator("collection_indexes")
+    def ensure_index_names_is_subset_of_settings(cls, col_indexes: dict[str, list[str]], values: dict[str, Any]) -> dict[str, list[str]]:
+        """Ensure that the index names are a subset of the collection names."""
+        fields_to_index = set(col_indexes.keys())
+        db_settings: AdminDocumentDBSettings = values["db_settings"]
+        collection_names = set(db_settings.collection_names)
+        if fields_to_index.issubset(collection_names):
+            return col_indexes
+        raise ValueError(
+            "Index names used for creating indexes must be a subset of the index names in the settings. " \
+            f"Index names used for creating indexes: {fields_to_index}. Index names in settings: {collection_names}."
+        )
 
 
 def lambda_handler(event: CloudFormationCustomResourceEvent, context: LambdaContext) -> None:
@@ -115,7 +127,7 @@ class DocumentDBCustomResource(CustomResourceInterface):
 
     def _create_shards(self, db: Database, client: pymongo.MongoClient) -> None:
         client.admin.command('enableSharding', db.name)
-        for col_name in self._settings.collection_names:
+        for col_name in self._settings.collection_indexes:
             db.command({
                 "shardCollection": f"{db.name}.{col_name}",
                 "key": {"_id": "hashed"},
@@ -124,7 +136,7 @@ class DocumentDBCustomResource(CustomResourceInterface):
 
 
     def _create_indexes(self, db: Database) -> None:
-        for col_name in self._settings.collection_names:
-            for doc_field_name in self._settings.collection_indexes[col_name]:
+        for col_name in self._settings.collection_indexes:
+            for doc_field_name in self._settings.collection_indexes.get(col_name, []):
                 logger.info(f"Creating index for doc field: {doc_field_name} in collection: {col_name}")
                 db[col_name].create_index(doc_field_name)
