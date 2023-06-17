@@ -2,9 +2,10 @@
 aws-cdk-lib>=2.1.0, <3.0.0
 boto3
 constructs>=10.0.5, <11.0.0
+fastapi
 loguru
 pinecone-client[grpc]
-pydantic
+pydantic==v2.0b2
 pygit2
 pymongo
 requests

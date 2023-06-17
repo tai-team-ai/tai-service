@@ -1,5 +1,6 @@
 """Defines the PineconeDBSetupLambda class and handler."""
 from enum import Enum
+import json
 from typing import Any, Dict, List, Optional, TypedDict
 from aws_lambda_powertools.utilities.typing import LambdaContext
 from aws_lambda_typing.events import CloudFormationCustomResourceEvent
@@ -54,6 +55,9 @@ class PineconeIndexSettings(TypedDict):
     pod_type: Optional[str]
     metadata_config: Optional[MetaDataConfig]
     source_collection: Optional[str]
+
+
+class 
 
 
 def lambda_handler(event: CloudFormationCustomResourceEvent, context: LambdaContext) -> None:
