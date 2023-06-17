@@ -9,11 +9,13 @@ from aws_cdk import (
     aws_docdbelastic as docdb_elastic,
     aws_docdb as docdb,
     aws_iam as iam,
-    Environment,
     CustomResource,
 )
-from tai_service.cdk.constructs.construct_helpers import validate_vpc
-from tai_service.cdk.constructs.python_lambda_props_builder import PythonLambdaPropsBuilder, PythonLambdaPropsBuilderConfigModel
+from tai_service.cdk.constructs.construct_helpers import validate_vpc, VALID_SECRET_ARN_PATTERN
+from tai_service.cdk.constructs.python_lambda_props_builder import (
+    PythonLambdaPropsBuilder,
+    PythonLambdaPropsBuilderConfigModel,
+)
 
 # This schema is defined by aws documentation for AWS Elastic DocumentDB
 # (https://docs.aws.amazon.com/cdk/api/v2/python/aws_cdk.aws_docdbelastic/CfnCluster.html)
@@ -24,7 +26,7 @@ VALID_SHARD_COUNT_RANGE = range(1, 33)
 VALID_DAYS_OF_THE_WEEK = r'(Mon|Tue|Wed|Thu|Fri|Sat|Sun)'
 # Format: ddd:hh24:mi-ddd:hh24:mi
 VALID_MAINTENANCE_WINDOW_PATTERN =  fr'^{VALID_DAYS_OF_THE_WEEK}\:([01]\d|2[0-3])\:[0-5]\d\-([A-Z][a-z]{2})\:([01]\d|2[0-3])\:[0-5]\d$'
-VALID_SECRET_ARN_PATTERN = r'^arn:aws:secretsmanager:[a-z]{2}-[a-z]{4,9}-\d{1}:\d{12}:secret:[a-zA-Z0-9_-]{1,64}\/[a-zA-Z0-9_-]{1,64}\/[a-zA-Z0-9_-]{1,64}$'
+
 
 class AuthType(str, Enum):
     """Define the authentication type for the DocumentDB cluster."""
@@ -182,9 +184,12 @@ class DocumentDatabase(Construct):
         return cluster
 
     def _create_custom_resource(self) -> CustomResource:
+        name = self._namer("custom-resource-db-initializer-lambda")
+        self._lambda_config.function_name = name
+        self._lambda_config.security_groups.append(self.security_group)
         lambda_function = PythonLambdaPropsBuilder.get_lambda_function(
             self,
-            construct_id=self._namer("custom-resource-db-initializer-lambda"),
+            construct_id=name,
             config=self._lambda_config,
         )
         lambda_function.add_to_role_policy(

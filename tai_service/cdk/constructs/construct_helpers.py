@@ -7,6 +7,10 @@ from aws_cdk import (
     aws_ec2 as ec2,
 )
 
+
+VALID_SECRET_ARN_PATTERN = r'^arn:aws:secretsmanager:[a-z]{2}-[a-z]{4,9}-\d{1}:\d{12}:secret:[a-zA-Z0-9_-]{1,64}\/[a-zA-Z0-9_-]{1,64}\/[a-zA-Z0-9_-]{1,64}$'
+
+
 def implements_vpc_protocol(obj: Any) -> bool:
     """Return True if the object implements the VPC protocol."""
     required_attributes = [
@@ -73,5 +77,3 @@ def sanitize_name(name: str, truncation_length: int = 63) -> str:
             f"Name {name} is longer than {truncation_length} characters. It will be truncated to {name[:truncation_length]}"
         )
     return name[:truncation_length]
-
-def _
