@@ -54,6 +54,7 @@ class ElasticDocumentDBConfigModel(BaseModel):
     )
     auth_type: AuthType = Field(
         default=AuthType.PLAINTEXT_PASSWORD,
+        const=True,
         description="The authentication type for the DocumentDB cluster.",
     )
     shard_count: int = Field(
@@ -65,23 +66,17 @@ class ElasticDocumentDBConfigModel(BaseModel):
     shard_capacity: int = Field(
         default=2,
         description="The capacity of each shard in the cluster.",
-        in_=VALID_SHARD_CAPACITIES,
     )
     maintenance_window: str = Field(
         default="Mon:00:00-Mon:01:00",
         description=f"The maintenance window for the cluster. Format: {VALID_MAINTENANCE_WINDOW_PATTERN}",
         regex=VALID_MAINTENANCE_WINDOW_PATTERN,
     )
-    database_password_secret_arn: str = Field(
-        ...,
-        description="The name of the secret to create for the database.",
-        regex=VALID_SECRET_ARN_PATTERN,
-    )
     vpc: Union[ec2.IVpc, str] = Field(
         ...,
         description="The VPC to use for the cluster.",
     )
-    subnets: ec2.SubnetType = Field(
+    subnet_type: ec2.SubnetType = Field(
         default=ec2.SubnetType.PRIVATE_ISOLATED,
         description="The subnet type to use for the cluster.",
     )
@@ -90,7 +85,7 @@ class ElasticDocumentDBConfigModel(BaseModel):
         description="The security groups to use for the cluster.",
     )
     tags: Optional[dict[str, str]] = Field(
-        default=None,
+        ...,
         description="The tags to apply to the cluster.",
     )
 
@@ -105,6 +100,13 @@ class ElasticDocumentDBConfigModel(BaseModel):
         if values["auth_type"] == AuthType.SECRET_ARN_PASSWORD and values["admin_password"] is None:
             raise ValueError(f"Must define admin_password when auth_type is {AuthType.SECRET_ARN_PASSWORD}")
         return values
+
+    @validator("shard_capacity")
+    def validate_shard_capacity(cls, shard_capacity: int) -> int:
+        """Validate the shard capacity."""
+        if shard_capacity in VALID_SHARD_CAPACITIES:
+            return shard_capacity
+        raise ValueError(f"shard_capacity must be one of {VALID_SHARD_CAPACITIES}. You provided {shard_capacity}")
 
     @validator("vpc")
     def validate_vpc(cls, vpc) -> Optional[Union[ec2.IVpc, str]]:
@@ -166,7 +168,7 @@ class DocumentDatabase(Construct):
 
     def _create_elastic_cluster(self) -> docdb_elastic.CfnCluster:
         """Create the DocumentDB cluster."""
-        selected_subnets = self._config.vpc.select_subnets(subnet_type=self._config.subnets)
+        selected_subnets = self._config.vpc.select_subnets(subnet_type=self._config.subnet_type)
         cluster = docdb_elastic.CfnCluster(
             self,
             id=self._namer("cluster"),

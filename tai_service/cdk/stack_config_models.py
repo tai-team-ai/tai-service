@@ -75,7 +75,14 @@ class AWSDeploymentSettings(BaseSettings):
                 account=values["aws_deployment_account_id"],
                 region=values["aws_region"],
             )
-        return env
+        if env.account != values["aws_deployment_account_id"]:
+            raise ValueError(
+                f"Environment account {env.account} does not match deployment account {values['aws_deployment_account_id']}."
+            )
+        if env.region != values["aws_region"]:
+            raise ValueError(
+                f"Environment region {env.region} does not match deployment region {values['aws_region']}."
+            )
 
     @validator("staging_stack_suffix")
     def initialize_staging_stack_suffix(cls, suffix: str) -> str:
@@ -84,6 +91,7 @@ class AWSDeploymentSettings(BaseSettings):
             return suffix
         return ""
 
+
 class StackConfigBaseModel(BaseModel):
     """Define the base model for stack configuration."""
 
@@ -91,9 +99,15 @@ class StackConfigBaseModel(BaseModel):
         ...,
         description="The ID of the stack.",
     )
-    resource_name: str = Field(
+    description: str = Field(
         ...,
-        description="The name of the resource that the stack is creating.",
+        min_length=10,
+        max_length=255,
+        description="The description of the stack.",
+    )
+    stack_name: str = Field(
+        ...,
+        description="The name of the stack/service.",
     )
     deployment_settings: AWSDeploymentSettings = Field(
         ...,
@@ -148,4 +162,3 @@ class StackConfigBaseModel(BaseModel):
             if key == "blame":
                 return tags
         raise ValueError("A blame tag must be included in the tags.")
-

@@ -26,7 +26,7 @@ class BasePydanticSettings(BaseSettings):
 class BaseDocumentDBSettings(BasePydanticSettings):
     """Define the base settings for the document database."""
 
-    cluster_host_name: str = Field(
+    cluster_name: str = Field(
         ...,
         env="CLUSTER_HOST_NAME",
         description="The fully qualified domain name of the cluster.",
@@ -83,6 +83,21 @@ class ReadWriteDocumentDBSettings(BaseDocumentDBSettings):
         ...,
         env="READ_WRITE_USER_PASSWORD_SECRET_NAME",
         description="The name of the secret containing the read/write user password.",
+    )
+
+
+class AdminDocumentDBSettings(ReadOnlyDocumentDBSettings, ReadWriteDocumentDBSettings):
+    """Define the settings for the collections."""
+
+    admin_user_name: str = Field(
+        ...,
+        env="ADMIN_USER_NAME",
+        description="The name of the database user.",
+    )
+    admin_user_password_secret_name: str = Field(
+        ...,
+        env="ADMIN_USER_PASSWORD_SECRET_NAME",
+        description="The name of the secret containing the admin user password.",
     )
 
 

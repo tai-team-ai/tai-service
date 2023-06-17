@@ -6,20 +6,14 @@ from aws_lambda_powertools.utilities.typing import LambdaContext
 from aws_lambda_typing.events import CloudFormationCustomResourceEvent
 import pymongo
 from pymongo.database import Database
-from pydantic import BaseSettings, Field
+from pydantic import BaseModel, Field
 # first imports are for local development, second imports are for deployment
 try:
     from ..custom_resource_interface import CustomResourceInterface
-    from tai_service.schemas import (
-        ReadOnlyDocumentDBSettings,
-        ReadWriteDocumentDBSettings,
-    )
+    from tai_service.schemas import AdminDocumentDBSettings
 except ImportError:
     from custom_resource_interface import CustomResourceInterface
-    from schemas import (
-        ReadOnlyDocumentDBSettings,
-        ReadWriteDocumentDBSettings,
-    )
+    from schemas import AdminDocumentDBSettings
 
 
 # TODO add document schema here to build indexes and shards
@@ -32,22 +26,16 @@ class BuiltInMongoDBRoles(Enum):
     READ_WRITE = "readWrite"
 
 
-class AdminDocumentDBSettings(ReadOnlyDocumentDBSettings, ReadWriteDocumentDBSettings):
+class DocumentDBConfig(BaseModel):
     """Define the settings for the collections."""
 
-    admin_user_name: str = Field(
-        ...,
-        env="ADMIN_USER_NAME",
-        description="The name of the database user.",
-    )
-    admin_user_password_secret_name: str = Field(
-        ...,
-        env="ADMIN_USER_PASSWORD_SECRET_NAME",
-        description="The name of the secret containing the admin user password.",
-    )
     collection_indexes: dict[str, list[str]] = Field(
         ...,
-        env="COLLECTION_INDEXES",
+        description="The indexes to create for each collection.",
+    )
+    db_settings: AdminDocumentDBSettings = Field(
+        ...,
+        description="The settings for the database.",
     )
 
 
@@ -63,18 +51,18 @@ def lambda_handler(event: CloudFormationCustomResourceEvent, context: LambdaCont
     to include all CRUD operations.
     """
     logger.info(f"Received event: {json.dumps(event)}")
-    settings = AdminDocumentDBSettings()
-    custom_resource = DocumentDBCustomResource(event, context, settings)
+    db_config = DocumentDBConfig()
+    custom_resource = DocumentDBCustomResource(event, context, db_config)
     custom_resource.execute_crud_operation()
 
 
 class DocumentDBCustomResource(CustomResourceInterface):
     """Define the Lambda function for initializing the database."""
 
-    def __init__(self, event: CloudFormationCustomResourceEvent, context: LambdaContext, settings: AdminDocumentDBSettings) -> None:
+    def __init__(self, event: CloudFormationCustomResourceEvent, context: LambdaContext, config: DocumentDBConfig) -> None:
         super().__init__(event, context)
-        password = self.get_secret(settings.admin_user_password_secret_name)
-        self._settings = settings
+        password = self.get_secret(config.db_settings.admin_user_password_secret_name)
+        self._settings = config
         self._mongo_client = self._run_operation_with_retry(self._connect_to_database, password)
 
     def _connect_to_database(self, password: str) -> pymongo.MongoClient:

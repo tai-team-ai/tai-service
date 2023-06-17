@@ -90,14 +90,17 @@ class PineconeIndexSettings(BaseModel):
     )
 
 
-class PineconeDBSettings(BasePineconeDBSettings):
+class PineconeDBConfig(BaseModel):
     """Define the settings for the PineconeDBSetupLambda."""
 
     pinecone_indexes: List[PineconeIndexSettings] = Field(
         ...,
         max_items=2,
-        env="PINECONE_INDEXES",
         description="The settings for the Pinecone indexes.",
+    )
+    db_settings: BasePineconeDBSettings = Field(
+        ...,
+        description="The settings for the Pinecone database.",
     )
 
 
@@ -113,7 +116,7 @@ def lambda_handler(event: CloudFormationCustomResourceEvent, context: LambdaCont
     to include all CRUD operations.
     """
     logger.info(f"Received event: {json.dumps(event)}")
-    settings = PineconeDBSettings()
+    settings = PineconeDBConfig()
     custom_resource = PineconeDBSetupCustomResource(event, context, settings)
     custom_resource.execute_crud_operation()
 
@@ -121,18 +124,18 @@ def lambda_handler(event: CloudFormationCustomResourceEvent, context: LambdaCont
 class PineconeDBSetupCustomResource(CustomResourceInterface):
     """Define the Lambda function for initializing the database."""
 
-    def __init__(self, event: CloudFormationCustomResourceEvent, context: LambdaContext, settings: PineconeDBSettings) -> None:
+    def __init__(self, event: CloudFormationCustomResourceEvent, context: LambdaContext, config: PineconeDBConfig) -> None:
         super().__init__(event, context)
-        password = self.get_secret(settings.pinecone_api_key_secret_name)
-        self._settings = settings
+        password = self.get_secret(config.db_settings.pinecone_api_key_secret_name)
+        self.config = config
         pinecone.init(
             api_key=password,
-            environment=settings.pinecone_environment,
+            environment=config.db_settings.pinecone_environment,
         )
 
     def _create_database(self) -> None:
-        for index_settings in self._settings.pinecone_indexes:
-            self._create_index(index_settings)
+        for index_config in self.config.pinecone_indexes:
+            self._create_index(index_config)
 
     def _create_index(self, index_settings: PineconeIndexSettings) -> None:
         self._run_operation_with_retry(

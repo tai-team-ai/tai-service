@@ -1,5 +1,6 @@
 """Define helpers for CDK stacks."""
 from aws_cdk import Tags
+import boto3
 from constructs import Construct
 from tai_service.cdk.stack_config_models import AWSDeploymentSettings
 
@@ -23,6 +24,43 @@ def retrieve_secret(deployment_settings: AWSDeploymentSettings, secret_name: str
     Returns:
         str: The value of the secret.
     """
-    credentials = {
-        "access_key_id": deployment_settings.
-    }
+    credentials = {}
+    if deployment_settings.aws_access_key_id and deployment_settings.aws_secret_access_key:
+        credentials = {
+            "aws_access_key_id": deployment_settings.aws_access_key_id,
+            "aws_secret_access_key": deployment_settings.aws_secret_access_key,
+        }
+
+    client = boto3.client(
+        "secretsmanager",
+        region_name=deployment_settings.aws_region,
+        **credentials,
+    )
+    response = client.get_secret_value(SecretId=secret_name)
+    return response["SecretString"]
+
+
+def get_secret_arn_from_name(deployment_settings: AWSDeploymentSettings, secret_name: str) -> str:
+    """Get the ARN of a secret from its name.
+
+    Args:
+        deployment_settings (AWSDeploymentSettings): The deployment settings for the stack.
+        secret_name (str): The name of the secret to get the ARN for.
+
+    Returns:
+        str: The ARN of the secret.
+    """
+    credentials = {}
+    if deployment_settings.aws_access_key_id and deployment_settings.aws_secret_access_key:
+        credentials = {
+            "aws_access_key_id": deployment_settings.aws_access_key_id,
+            "aws_secret_access_key": deployment_settings.aws_secret_access_key,
+        }
+
+    client = boto3.client(
+        "secretsmanager",
+        region_name=deployment_settings.aws_region,
+        **credentials,
+    )
+    response = client.describe_secret(SecretId=secret_name)
+    return response["ARN"]
