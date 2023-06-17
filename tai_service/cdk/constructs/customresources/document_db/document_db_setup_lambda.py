@@ -53,10 +53,10 @@ class AdminDocumentDBSettings(ReadOnlyDocumentDBSettings, ReadWriteDocumentDBSet
 
 def lambda_handler(event: CloudFormationCustomResourceEvent, context: LambdaContext) -> None:
     """
-    Run the database initialization.
+    Run the database operation.
     
     This function is invoked by the CloudFormation custom resource. It is responsible for
-    initializing the database by retrieving admin credentials from Secrets Manager and
+    running CRUD operations on the database by retrieving admin credentials from Secrets Manager and
     creating shards, collections, and indexes for the database.
 
     Currently, only create operations are supported, but this function could be extended

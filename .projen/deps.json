@@ -28,10 +28,6 @@
       "type": "runtime"
     },
     {
-      "name": "fastapi",
-      "type": "runtime"
-    },
-    {
       "name": "loguru",
       "type": "runtime"
     },
@@ -40,7 +36,7 @@
       "type": "runtime"
     },
     {
-      "name": "pydantic==v2.0b2",
+      "name": "pydantic",
       "type": "runtime"
     },
     {

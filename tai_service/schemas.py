@@ -15,6 +15,13 @@ class BasePydanticSettings(BaseSettings):
                 output[key] = json.dumps(value)
         return output
 
+    class Config:
+        """Define the Pydantic config."""
+
+        use_enum_values = True
+        env_file = ".env"
+        env_file_encoding = "utf-8"
+
 
 class BaseDocumentDBSettings(BasePydanticSettings):
     """Define the base settings for the document database."""
@@ -77,4 +84,3 @@ class ReadWriteDocumentDBSettings(BaseDocumentDBSettings):
         env="READ_WRITE_USER_PASSWORD_SECRET_NAME",
         description="The name of the secret containing the read/write user password.",
     )
-
