@@ -37,7 +37,7 @@ class SearchServiceDatabases(Stack):
     ) -> None:
         """Initialize the search database stack."""
         super().__init__(
-            scope=self,
+            scope=scope,
             id=config.stack_id,
             stack_name=config.stack_name,
             description=config.description,
@@ -49,8 +49,8 @@ class SearchServiceDatabases(Stack):
         self._namer = lambda name: f"{config.stack_id}-{name}"
         self._cdk_directory = Path(__file__).parent.parent
         self._custom_resource_dir = self._cdk_directory / "constructs/customresources"
-        self.vpc = self._create_vpc()
         self._subnet_type_for_doc_db = ec2.SubnetType.PUBLIC
+        self.vpc = self._create_vpc()
         self.document_db = self._get_document_db(doc_db_settings=doc_db_settings)
         self.pinecone_db = self._get_pinecone_db(pinecone_db_settings=pinecone_db_settings)
 
@@ -125,7 +125,7 @@ class SearchServiceDatabases(Stack):
 
     def _get_pinecone_db(self, pinecone_db_settings: BasePineconeDBSettings) -> PineconeDatabase:
         pinecone_secret_arn = get_secret_arn_from_name(
-            secret_name=pinecone_db_settings.secret_name,
+            secret_name=pinecone_db_settings.api_key_secret_name,
             deployment_settings=self._config.deployment_settings,
         )
         db_custom_resource_dir = self._custom_resource_dir / "pinecone_db"

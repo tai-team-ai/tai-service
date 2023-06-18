@@ -5,6 +5,7 @@ constructs>=10.0.5, <11.0.0
 loguru
 pinecone-client[grpc]
 pydantic
+pydantic[dotenv]
 pygit2
 pymongo
 requests

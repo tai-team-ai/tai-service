@@ -139,11 +139,11 @@ class PineconeDBSetupCustomResource(CustomResourceInterface):
 
     def __init__(self, event: CloudFormationCustomResourceEvent, context: LambdaContext, config: PineconeDBConfig) -> None:
         super().__init__(event, context)
-        password = self.get_secret(config.db_settings.pinecone_api_key_secret_name)
+        password = self.get_secret(config.db_settings.api_key_secret_name)
         self.config = config
         pinecone.init(
             api_key=password,
-            environment=config.db_settings.pinecone_environment,
+            environment=config.db_settings.environment,
         )
 
     def _create_database(self) -> None:

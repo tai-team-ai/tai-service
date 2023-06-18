@@ -10,7 +10,7 @@
     },
     {
       "name": "projen",
-      "version": "0.71.94",
+      "version": "0.71.72",
       "type": "devenv"
     },
     {
@@ -37,6 +37,10 @@
     },
     {
       "name": "pydantic",
+      "type": "runtime"
+    },
+    {
+      "name": "pydantic[dotenv]",
       "type": "runtime"
     },
     {

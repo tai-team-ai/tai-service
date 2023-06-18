@@ -72,7 +72,7 @@ class ElasticDocumentDBConfigModel(BaseModel):
         description=f"The maintenance window for the cluster. Format: {VALID_MAINTENANCE_WINDOW_PATTERN}",
         regex=VALID_MAINTENANCE_WINDOW_PATTERN,
     )
-    vpc: Union[ec2.IVpc, str] = Field(
+    vpc: Union[ec2.Vpc, str] = Field(
         ...,
         description="The VPC to use for the cluster.",
     )
@@ -80,8 +80,8 @@ class ElasticDocumentDBConfigModel(BaseModel):
         default=ec2.SubnetType.PRIVATE_ISOLATED,
         description="The subnet type to use for the cluster.",
     )
-    security_groups: Optional[list[ec2.ISecurityGroup]] = Field(
-        default=None,
+    security_groups: Optional[list[ec2.SecurityGroup]] = Field(
+        default=[],
         description="The security groups to use for the cluster.",
     )
     tags: Optional[dict[str, str]] = Field(

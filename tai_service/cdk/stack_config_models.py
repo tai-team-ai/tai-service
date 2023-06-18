@@ -73,8 +73,8 @@ class AWSDeploymentSettings(BaseSettings):
         """Initialize the AWS environment."""
         if env is None:
             return Environment(
-                account=values["aws_deployment_account_id"],
-                region=values["aws_region"],
+                account=values.get("aws_deployment_account_id"),
+                region=values.get("aws_region"),
             )
         if env.account != values["aws_deployment_account_id"]:
             raise ValueError(
@@ -160,7 +160,8 @@ class StackConfigBaseModel(BaseModel):
     @validator("termination_protection")
     def ensure_termination_protection_for_prod(cls, termination_protection: bool, values: dict) -> bool:
         """Ensure termination protection is enabled for production deployments."""
-        if values["deployment_type"] == DeploymentType.PROD:
+        deployment_settings: AWSDeploymentSettings = values.get("deployment_settings")
+        if deployment_settings.deployment_type == DeploymentType.PROD:
             if not termination_protection:
                 logger.warning(
                     "Termination protection is disabled. Enabling termination protection for production deployment."
