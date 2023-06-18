@@ -1,5 +1,6 @@
 """Define the search database stack."""
 from pathlib import Path
+from constructs import Construct
 from aws_cdk import (
     Stack,
     aws_ec2 as ec2,
@@ -29,6 +30,7 @@ class SearchServiceDatabases(Stack):
 
     def __init__(
         self,
+        scope: Construct,
         config: StackConfigBaseModel,
         doc_db_settings: AdminDocumentDBSettings,
         pinecone_db_settings: BasePineconeDBSettings,

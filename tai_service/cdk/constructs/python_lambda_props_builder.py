@@ -55,7 +55,7 @@ class PythonLambdaPropsBuilderConfigModel(BaseModel):
         default=None,
         description="The path to the requirements file for the Lambda function.",
     )
-    vpc: Optional[Union[ec2.IVpc, str]] = Field(
+    vpc: Optional[Union[ec2.Vpc, str]] = Field(
         default=None,
         description="The VPC to run the Lambda function in.",
     )
@@ -63,7 +63,7 @@ class PythonLambdaPropsBuilderConfigModel(BaseModel):
         default=None,
         description="The subnet selection for the Lambda function to run in.",
     )
-    security_groups: Optional[list[ec2.ISecurityGroup]] = Field(
+    security_groups: Optional[list[ec2.SecurityGroup]] = Field(
         default=None,
         description="The security groups to apply to the Lambda function.",
     )

@@ -53,6 +53,11 @@ class BaseDocumentDBSettings(BasePydanticSettings):
         description="The number of seconds to wait for a server to be selected.",
     )
 
+    class Config:
+        """Define the Pydantic config."""
+
+        env_prefix = "DOC_DB_"
+
 
 class ReadOnlyDocumentDBSettings(BaseDocumentDBSettings):
     """Define the settings for the collections."""
@@ -119,3 +124,8 @@ class BasePineconeDBSettings(BasePydanticSettings):
         env="INDEX_NAMES",
         description="The names of the indexes in the Pinecone environment.",
     )
+
+    class Config:
+        """Define the Pydantic config."""
+
+        env_prefix = "PINECONE_DB_"

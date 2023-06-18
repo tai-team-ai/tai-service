@@ -85,13 +85,6 @@ class AWSDeploymentSettings(BaseSettings):
                 f"Environment region {env.region} does not match deployment region {values['aws_region']}."
             )
 
-    @validator("staging_stack_suffix")
-    def initialize_staging_stack_suffix(cls, suffix: str) -> str:
-        """Initialize the staging stack suffix."""
-        if suffix:
-            return suffix
-        return ""
-
 
 class StackConfigBaseModel(BaseModel):
     """Define the base model for stack configuration."""
@@ -137,7 +130,7 @@ class StackConfigBaseModel(BaseModel):
         validate_assignment = True
         extra = Extra.forbid
 
-    @validator("resource_name", "stack_id")
+    @validator("stack_name", "stack_id")
     def add_suffix_to_names(cls, name: str, values: dict) -> str:
         """Add the staging stack suffix to the resource name."""
         branch_name = Repository(os.getcwd()).head.shorthand
