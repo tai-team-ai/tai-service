@@ -11,7 +11,7 @@ from aws_cdk import (
     aws_iam as iam,
     CustomResource,
 )
-from tai_service.cdk.constructs.construct_helpers import validate_vpc, VALID_SECRET_ARN_PATTERN
+from tai_service.cdk.constructs.construct_helpers import validate_vpc
 from tai_service.cdk.constructs.python_lambda_props_builder import (
     PythonLambdaPropsBuilder,
     PythonLambdaPropsBuilderConfigModel,
@@ -83,10 +83,6 @@ class ElasticDocumentDBConfigModel(BaseModel):
     security_groups: Optional[list[ec2.SecurityGroup]] = Field(
         default=[],
         description="The security groups to use for the cluster.",
-    )
-    tags: Optional[dict[str, str]] = Field(
-        ...,
-        description="The tags to apply to the cluster.",
     )
 
     class Config:
@@ -181,7 +177,6 @@ class DocumentDatabase(Construct):
             preferred_maintenance_window=self._config.maintenance_window,
             subnet_ids=[subnet.subnet_id for subnet in selected_subnets.subnets],
             vpc_security_group_ids=[security_group.security_group_id for security_group in self._config.security_groups],
-            tags=self._config.tags,
         )
         return cluster
 

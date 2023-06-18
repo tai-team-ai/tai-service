@@ -11,7 +11,7 @@ from tai_service.schemas import (
     AdminDocumentDBSettings,
     BasePineconeDBSettings,
 )
-from ..stack_helpers import retrieve_secret, get_secret_arn_from_name
+from ..stack_helpers import retrieve_secret, get_secret_arn_from_name, add_tags
 from ..stack_config_models import StackConfigBaseModel
 from ..constructs.document_db_construct import (
     DocumentDatabase,
@@ -53,6 +53,7 @@ class SearchServiceDatabases(Stack):
         self.vpc = self._create_vpc()
         self.document_db = self._get_document_db(doc_db_settings=doc_db_settings)
         self.pinecone_db = self._get_pinecone_db(pinecone_db_settings=pinecone_db_settings)
+        add_tags(self, config.tags)
 
     def _create_vpc(self) -> ec2.Vpc:
         # need to create enough subnets for the document db at a minimum
@@ -96,7 +97,6 @@ class SearchServiceDatabases(Stack):
             admin_password=db_password,
             vpc=self.vpc,
             subnet_type=self._subnet_type_for_doc_db,
-            tags=self._config.tags,
         )
         db_custom_resource_dir = self._custom_resource_dir / "document_db"
         lambda_config = PythonLambdaPropsBuilderConfigModel(
