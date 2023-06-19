@@ -2,8 +2,6 @@
 from enum import Enum
 import json
 from typing import Any, Dict, List, Optional, TypedDict
-from aws_lambda_powertools.utilities.typing import LambdaContext
-from aws_lambda_typing.events import CloudFormationCustomResourceEvent
 from loguru import logger
 from pydantic import BaseModel, Field, validator
 import pinecone
@@ -12,6 +10,8 @@ import pinecone
 try:
     from ..custom_resource_interface import CustomResourceInterface
     from tai_service.schemas import BasePineconeDBSettings
+    from aws_lambda_powertools.utilities.typing import LambdaContext
+    from aws_lambda_typing.events import CloudFormationCustomResourceEvent
 except ImportError:
     from custom_resource_interface import CustomResourceInterface
     from schemas import BasePineconeDBSettings

@@ -1,0 +1,4 @@
+pinecone
+pymongo
+pydantic
+loguru
