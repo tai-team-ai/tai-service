@@ -74,7 +74,8 @@ class DocumentDBCustomResource(CustomResourceInterface):
     def __init__(self, event: CloudFormationCustomResourceEvent, context: LambdaContext, config: DocumentDBConfig) -> None:
         super().__init__(event, context)
         password = self.get_secret(config.db_settings.admin_user_password_secret_name)
-        self._settings = config
+        self._config = config
+        self._settings = config.db_settings
         self._mongo_client = self._run_operation_with_retry(self._connect_to_database, password)
 
     def _connect_to_database(self, password: str) -> pymongo.MongoClient:
@@ -90,18 +91,20 @@ class DocumentDBCustomResource(CustomResourceInterface):
 
     def _create_database(self) -> None:
         db = self._mongo_client[self._settings.db_name]
-        self._run_operation_with_retry(
-            self._create_user,
-            db,
-            self._settings.read_only_user_password_secret_name,
-            self._settings.read_only_user_name
-        )
-        self._run_operation_with_retry(
-            self._create_user,
-            db,
-            self._settings.read_write_user_password_secret_name,
-            self._settings.read_write_user_name
-        )
+        if self._settings.read_only_user_name:
+            self._run_operation_with_retry(
+                self._create_user,
+                db,
+                self._settings.read_only_user_password_secret_name,
+                self._settings.read_only_user_name
+            )
+        if self._settings.read_write_user_name:
+            self._run_operation_with_retry(
+                self._create_user,
+                db,
+                self._settings.read_write_user_password_secret_name,
+                self._settings.read_write_user_name
+            )
         self._run_operation_with_retry(self._create_shards, db, self._mongo_client)
         self._run_operation_with_retry(self._create_indexes, db)
 
@@ -127,7 +130,7 @@ class DocumentDBCustomResource(CustomResourceInterface):
 
     def _create_shards(self, db: Database, client: pymongo.MongoClient) -> None:
         client.admin.command('enableSharding', db.name)
-        for col_name in self._settings.collection_indexes:
+        for col_name in self._config.collection_indexes:
             db.command({
                 "shardCollection": f"{db.name}.{col_name}",
                 "key": {"_id": "hashed"},
@@ -136,7 +139,7 @@ class DocumentDBCustomResource(CustomResourceInterface):
 
 
     def _create_indexes(self, db: Database) -> None:
-        for col_name in self._settings.collection_indexes:
-            for doc_field_name in self._settings.collection_indexes.get(col_name, []):
+        for col_name in self._config.collection_indexes:
+            for doc_field_name in self._config.collection_indexes.get(col_name, []):
                 logger.info(f"Creating index for doc field: {doc_field_name} in collection: {col_name}")
                 db[col_name].create_index(doc_field_name)

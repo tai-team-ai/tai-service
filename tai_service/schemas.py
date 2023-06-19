@@ -1,10 +1,16 @@
 """Define schemas used in the package."""
+from enum import Enum
 import json
-from typing import Sequence
-from pydantic import BaseSettings, Field
+from typing import Optional, Sequence
+from pydantic import BaseSettings, Field, validator
 
 
 DOC_DB_ENVIRONMENT_PREFIX = "DOC_DB_"
+
+class PineConeEnvironment(Enum):
+    """Define the environments for the Pinecone project."""
+
+    EAST_1 = "us-east-1-aws"
 
 class BasePydanticSettings(BaseSettings):
     """Define the base settings for the package."""
@@ -50,33 +56,54 @@ class BaseDocumentDBSettings(BasePydanticSettings):
         description="The number of seconds to wait for a server to be selected.",
     )
 
+    class Config:
+        """Define the Pydantic config."""
+
+        env_prefix = DOC_DB_ENVIRONMENT_PREFIX
+
 
 class ReadOnlyDocumentDBSettings(BaseDocumentDBSettings):
     """Define the settings for the collections."""
 
-    read_only_user_name: str = Field(
-        default="readOnlyUser",
-        const=True,
+    read_only_user_name: Optional[str] = Field(
+        default=None,
         description="The name of the database user with read-only permissions.",
     )
     read_only_user_password_secret_name: str = Field(
-        ...,
+        default=None,
         description="The name of the secret containing the read-only user password.",
     )
+
+    @validator("read_only_user_password_secret_name")
+    def ensure_secret_if_user_name_provided(cls, secret_name: str, values: dict) -> str:
+        """Ensure that a secret name is provided if a user name is provided."""
+        if secret_name and values.get("read_only_user_name"):
+            return secret_name
+        raise ValueError(
+            "A secret name must be provided if a read-only user name is provided."
+        )
 
 
 class ReadWriteDocumentDBSettings(BaseDocumentDBSettings):
     """Define the settings for the collections."""
 
-    read_write_user_name: str = Field(
-        default="readWriteUser",
-        const=True,
+    read_write_user_name: Optional[str] = Field(
+        default=None,
         description="The name of the database user with read/write permissions.",
     )
     read_write_user_password_secret_name: str = Field(
-        ...,
+        default=None,
         description="The name of the secret containing the read/write user password.",
     )
+
+    @validator("read_write_user_password_secret_name")
+    def ensure_secret_if_user_name_provided(cls, secret_name: str, values: dict) -> str:
+        """Ensure that a secret name is provided if a user name is provided."""
+        if secret_name and values.get("read_write_user_name"):
+            return secret_name
+        raise ValueError(
+            "A secret name must be provided if a read/write user name is provided."
+        )
 
 
 class AdminDocumentDBSettings(ReadOnlyDocumentDBSettings, ReadWriteDocumentDBSettings):
@@ -91,11 +118,6 @@ class AdminDocumentDBSettings(ReadOnlyDocumentDBSettings, ReadWriteDocumentDBSet
         description="The name of the secret containing the admin user password.",
     )
 
-    class Config:
-        """Define the Pydantic config."""
-
-        env_prefix = DOC_DB_ENVIRONMENT_PREFIX
-
 
 class BasePineconeDBSettings(BasePydanticSettings):
     """Define the settings for initializing the Pinecone database."""
@@ -104,7 +126,7 @@ class BasePineconeDBSettings(BasePydanticSettings):
         ...,
         description="The name of the secret containing the Pinecone API key.",
     )
-    environment: str = Field(
+    environment: PineConeEnvironment = Field(
         ...,
         description="The environment to use for the Pinecone project.",
     )
