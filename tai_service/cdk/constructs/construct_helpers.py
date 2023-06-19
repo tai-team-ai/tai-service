@@ -8,9 +8,6 @@ from aws_cdk import (
 )
 
 
-VALID_SECRET_ARN_PATTERN = r'^arn:aws:secretsmanager:[a-z]{2}-[a-z]{4,9}-\d{1}:\d{12}:secret:[a-zA-Z0-9_-]{1,64}\/[a-zA-Z0-9_-]{1,64}\/[a-zA-Z0-9_-]{1,64}$'
-
-
 def implements_vpc_protocol(obj: Any) -> bool:
     """Return True if the object implements the VPC protocol."""
     required_attributes = [

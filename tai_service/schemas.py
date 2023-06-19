@@ -1,5 +1,6 @@
 """Define schemas used in the package."""
 from enum import Enum
+from numbers import Number
 import json
 from typing import Optional, Sequence
 from pydantic import BaseSettings, Field, validator
@@ -21,6 +22,8 @@ class BasePydanticSettings(BaseSettings):
         for key, value in output.items():
             if isinstance(value, dict) or isinstance(value, Sequence) or isinstance(value, set):
                 output[key] = json.dumps(value)
+            if isinstance(value, Number):
+                output[key] = str(value)
         return output
 
     class Config:

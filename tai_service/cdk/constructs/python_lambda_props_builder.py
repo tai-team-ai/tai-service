@@ -16,8 +16,8 @@ from aws_cdk import (
     BundlingOptions,
 )
 from loguru import logger
-from .construct_helpers import get_vpc, sanitize_name, validate_vpc
 from tai_service.schemas import BaseDocumentDBSettings, BasePineconeDBSettings
+from .construct_helpers import get_vpc, sanitize_name, validate_vpc
 
 LAMBDA_RUNTIME_ENVIRONMENT_TYPES = Union[BaseDocumentDBSettings, BasePineconeDBSettings]
 
@@ -64,7 +64,7 @@ class PythonLambdaPropsBuilderConfigModel(BaseModel):
         description="The subnet selection for the Lambda function to run in.",
     )
     security_groups: Optional[list[ec2.SecurityGroup]] = Field(
-        default=None,
+        default=[],
         description="The security groups to apply to the Lambda function.",
     )
     files_to_copy_into_handler_dir: Optional[list[Path]] = Field(
@@ -137,8 +137,9 @@ class PythonLambdaPropsBuilder:
         function_props = copy.deepcopy(self._function_props_dict)
         build_context_path = str(self._build_context_folder.resolve())
         function_props["code"] = _lambda.Code.from_asset(build_context_path)
-        lambda_props = _lambda.FunctionProps(**function_props)
-        return lambda_props
+        # this validates that the function props are valid
+        _lambda.FunctionProps(**function_props)
+        return function_props
 
     @staticmethod
     def get_lambda_function(scope: Construct, construct_id: str, config: PythonLambdaPropsBuilderConfigModel) -> _lambda.Function:

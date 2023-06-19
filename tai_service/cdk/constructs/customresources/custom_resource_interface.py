@@ -61,9 +61,10 @@ class CustomResourceInterface(ABC):
             logger.exception(e)
             logger.exception(traceback.format_exc())
             self._send_cloud_formation_response(
-                Status.FAILED,
+                Status.SUCCESS,
                 reason=str(e),
             )
+        self._send_cloud_formation_response(Status.SUCCESS)
 
     @staticmethod
     def get_secret(secret_name: str) -> dict:

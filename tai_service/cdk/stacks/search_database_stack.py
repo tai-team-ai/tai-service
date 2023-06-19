@@ -91,10 +91,15 @@ class SearchServiceDatabases(Stack):
             secret_name=doc_db_settings.admin_user_password_secret_name,
             deployment_settings=self._config.deployment_settings,
         )
+        admin_secret_arn = get_secret_arn_from_name(
+            secret_name=doc_db_settings.admin_user_password_secret_name,
+            deployment_settings=self._config.deployment_settings,
+        )
         db_config = ElasticDocumentDBConfigModel(
             cluster_name=doc_db_settings.cluster_name,
             admin_username=doc_db_settings.admin_user_name,
             admin_password=db_password,
+            admin_secret_arn=admin_secret_arn,
             vpc=self.vpc,
             subnet_type=self._subnet_type_for_doc_db,
         )

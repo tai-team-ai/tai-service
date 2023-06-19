@@ -11,15 +11,15 @@ from aws_cdk import (
     aws_iam as iam,
     CustomResource,
 )
-from tai_service.cdk.constructs.construct_helpers import validate_vpc
-from tai_service.cdk.constructs.python_lambda_props_builder import (
+from .construct_helpers import validate_vpc
+from .python_lambda_props_builder import (
     PythonLambdaPropsBuilder,
     PythonLambdaPropsBuilderConfigModel,
 )
-
 # This schema is defined by aws documentation for AWS Elastic DocumentDB
 # (https://docs.aws.amazon.com/cdk/api/v2/python/aws_cdk.aws_docdbelastic/CfnCluster.html)
 VALID_ADMIN_USERNAME_PATTERN = r"^(?!(admin|root|master|user|username|dbuser|dbadmin|dbroot|dbmaster)$)[a-zA-Z][a-zA-Z0-9]{0,62}$"
+VALID_ADMIN_PASSWORD_PATTERN = r"^[a-zA-Z0-9!#$%&*+=?._-]{8,100}$"
 VALID_CLUSTER_NAME_PATTERN = r"^[a-z][a-z0-9-]{0,62}$"
 VALID_SHARD_CAPACITIES = {2, 4, 8, 16, 32, 64}
 VALID_SHARD_COUNT_RANGE = range(1, 33)
@@ -51,6 +51,10 @@ class ElasticDocumentDBConfigModel(BaseModel):
     admin_password: Optional[str] = Field(
         default=None,
         description="The password for the admin user.",
+    )
+    admin_secret_arn: str = Field(
+        ...,
+        description="The secret ARN for the admin user.",
     )
     auth_type: AuthType = Field(
         default=AuthType.PLAINTEXT_PASSWORD,
@@ -189,11 +193,12 @@ class DocumentDatabase(Construct):
             construct_id=name,
             config=self._lambda_config,
         )
+        
         lambda_function.add_to_role_policy(
             statement=iam.PolicyStatement(
                 actions=["secretsmanager:GetSecretValue"],
                 effect=iam.Effect.ALLOW,
-                resources=[self._config.database_secret_arn],
+                resources=[self._config.admin_secret_arn],
             )
         )
         custom_resource = CustomResource(

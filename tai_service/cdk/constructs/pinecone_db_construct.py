@@ -5,7 +5,6 @@ from aws_cdk import (
     aws_iam as iam,
     CustomResource,
 )
-from tai_service.cdk.constructs.construct_helpers import VALID_SECRET_ARN_PATTERN
 from tai_service.cdk.constructs.python_lambda_props_builder import (
     PythonLambdaPropsBuilderConfigModel,
     PythonLambdaPropsBuilder,
@@ -28,13 +27,6 @@ class PineconeDatabase(Construct):
         self._namer = lambda name: f"{construct_id}-{name}"
         self._secret_arn = pinecone_db_api_secret_arn
         self._lambda_config = lambda_config
-
-    def _validate_secret_arn(self) -> None:
-        """Validate the secret ARN."""
-        if not re.match(VALID_SECRET_ARN_PATTERN, self._secret_arn):
-            raise ValueError(
-                f"Invalid secret ARN: {self._secret_arn}. Please provide a valid secret ARN."
-            )
 
     def _create_custom_resource(self) -> CustomResource:
         name = self._namer("custom-resource-db-initializer-lambda")
