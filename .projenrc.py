@@ -1,4 +1,5 @@
 from projen.awscdk import AwsCdkPythonApp
+from projen.python import VenvOptions
 
 project = AwsCdkPythonApp(
     author_email="jacobpetterle+aiforu@gmail.com",
@@ -7,6 +8,7 @@ project = AwsCdkPythonApp(
     module_name="tai_service",
     name="tai-service",
     version="0.1.0",
+    venv_options=VenvOptions(envdir=".venv"),
     deps=[
         "pydantic",
         "loguru",
