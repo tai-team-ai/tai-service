@@ -21,7 +21,7 @@ from .construct_helpers import get_vpc, sanitize_name, validate_vpc
 
 LAMBDA_RUNTIME_ENVIRONMENT_TYPES = Union[BaseDocumentDBSettings, BasePineconeDBSettings]
 
-TEMP_BUILD_DIR = Path("/tmp/lambda-build")
+TEMP_BUILD_DIR = "/tmp/lambda-build"
 MAX_LENGTH_FOR_FUNCTION_NAME = 64
 
 class PythonLambdaPropsBuilderConfigModel(BaseModel):
@@ -130,6 +130,7 @@ class PythonLambdaPropsBuilder:
             "environment": config.runtime_environment.dict(by_alias=True),
             "layers": [],
         }
+        self._create_optional_props()
 
     @property
     def lambda_props(self) -> dict:
@@ -190,9 +191,9 @@ class PythonLambdaPropsBuilder:
             for path in self._config.files_to_copy_into_handler_dir:
                 destination = Path(build_context) / path.name
                 if path.is_file():
-                    shutil.copy2(object, destination)
+                    shutil.copy2(path, destination)
                 elif path.is_dir():
-                    shutil.copytree(object, destination)
+                    shutil.copytree(path, destination)
                 else:
                     logger.warning(f"Unable to copy {path} into handler directory. Not a file or directory.")
             shutil.copytree(build_context, self._build_context_folder, dirs_exist_ok=True)
@@ -202,11 +203,12 @@ class PythonLambdaPropsBuilder:
         with tempfile.TemporaryDirectory(prefix=TEMP_BUILD_DIR) as build_context:
             chmod(build_context, 0o0755)
             shutil.copy(config.requirements_file_path, build_context)
-            runtime: _lambda.Runtime = self._function_props_dict["runtime"]
+            runtime: _lambda.Runtime = self._function_props_dict['runtime']
             image_obj: DockerImage = runtime.bundling_image
+            install_cmd = f"pip install -r {config.requirements_file_path.name} -t /asset-output/python"
             bundling_options = BundlingOptions(
                 image=image_obj,
-                command=["bash", "-c", "pip install -r requirements.txt -t /asset-output"],
+                command=["bash", "-c", install_cmd],
                 user="root",
             )
             code_asset = _lambda.Code.from_asset(build_context, bundling=bundling_options)

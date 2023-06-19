@@ -4,16 +4,14 @@ from abc import ABC, abstractmethod
 import json
 from enum import Enum
 import time
+from typing import Optional
+import traceback
 from loguru import logger
+import requests
 import boto3
 from botocore.config import Config as BotoConfig
-# These type hints are NOT required for the custom resource to work.
-try:
-    from aws_lambda_powertools.utilities.typing import LambdaContext
-    from aws_lambda_typing.events import CloudFormationCustomResourceEvent
-except ImportError:
-    from typing import Any
-    LambdaContext = CloudFormationCustomResourceEvent = Any
+from aws_lambda_powertools.utilities.typing import LambdaContext
+from aws_lambda_typing.events import CloudFormationCustomResourceEvent
 
 
 DELAY_BEFORE_CONNECTION_ATTEMPT = 5

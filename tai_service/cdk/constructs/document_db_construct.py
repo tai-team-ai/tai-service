@@ -9,6 +9,7 @@ from aws_cdk import (
     aws_docdbelastic as docdb_elastic,
     aws_docdb as docdb,
     aws_iam as iam,
+    custom_resources as cr,
     CustomResource,
 )
 from .construct_helpers import validate_vpc
@@ -138,7 +139,7 @@ class DocumentDatabase(Construct):
         self._config.security_groups.append(self.security_group)
         self.db_cluster = self._create_cluster()
         self.custom_resource = self._create_custom_resource()
-        self.custom_resource.node.add_dependency(self.db_cluster)
+        self.custom_resource_provider.node.add_dependency(self.db_cluster)
 
     def _create_security_group(self) -> ec2.SecurityGroup:
         """Create the security groups for the cluster."""
@@ -184,7 +185,7 @@ class DocumentDatabase(Construct):
         )
         return cluster
 
-    def _create_custom_resource(self) -> CustomResource:
+    def _create_custom_resource(self) -> cr.Provider:
         name = self._namer("custom-resource-db-initializer-lambda")
         self._lambda_config.function_name = name
         self._lambda_config.security_groups.append(self.security_group)
@@ -201,9 +202,15 @@ class DocumentDatabase(Construct):
                 resources=[self._config.admin_secret_arn],
             )
         )
+        provider = cr.Provider(
+            self,
+            id="custom-resource-provider",
+            on_event_handler=lambda_function,
+            provider_function_name=name + "-PROVIDER",
+        )
         custom_resource = CustomResource(
             self,
-            id=self._namer("custom-resource"),
-            service_token=lambda_function.function_arn,
+            id="custom-resource",
+            service_token=provider.service_token,
         )
         return custom_resource

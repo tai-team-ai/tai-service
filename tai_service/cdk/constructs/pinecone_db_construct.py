@@ -3,6 +3,7 @@ import re
 from constructs import Construct
 from aws_cdk import (
     aws_iam as iam,
+    custom_resources as cr,
     CustomResource,
 )
 from tai_service.cdk.constructs.python_lambda_props_builder import (
@@ -24,12 +25,12 @@ class PineconeDatabase(Construct):
     ) -> None:
         """Initialize the Pinecone database construct."""
         super().__init__(scope, construct_id, **kwargs)
-        self._namer = lambda name: f"{construct_id}-{name}"
         self._secret_arn = pinecone_db_api_secret_arn
         self._lambda_config = lambda_config
+        self.custom_resource_provider = self._create_custom_resource()
 
-    def _create_custom_resource(self) -> CustomResource:
-        name = self._namer("custom-resource-db-initializer-lambda")
+    def _create_custom_resource(self) -> cr.Provider:
+        name = "pinecone-custom-resource-db-initializer-lambda"
         self._lambda_config.function_name = name
         lambda_function = PythonLambdaPropsBuilder.get_lambda_function(
             self,
@@ -43,9 +44,15 @@ class PineconeDatabase(Construct):
                 resources=[self._secret_arn],
             )
         )
+        provider = cr.Provider(
+            self,
+            id="custom-resource-provider",
+            on_event_handler=lambda_function,
+            provider_function_name=name + "-PROVIDER",
+        )
         custom_resource = CustomResource(
             self,
-            id=self._namer("custom-resource"),
-            service_token=lambda_function.function_arn,
+            id="custom-resource",
+            service_token=provider.service_token,
         )
         return custom_resource

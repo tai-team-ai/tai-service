@@ -15,7 +15,6 @@ try:
 except ImportError:
     from custom_resource_interface import CustomResourceInterface
     from schemas import BasePineconeDBSettings
-    LambdaContext = CloudFormationCustomResourceEvent = Any
 
 
 class MetaDataConfig(TypedDict):

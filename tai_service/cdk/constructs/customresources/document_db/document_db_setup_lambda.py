@@ -15,6 +15,7 @@ try:
 except ImportError:
     from custom_resource_interface import CustomResourceInterface
     from schemas import AdminDocumentDBSettings
+    LambdaContext = CloudFormationCustomResourceEvent = Any
 
 
 

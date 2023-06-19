@@ -22,6 +22,7 @@ from ..constructs.python_lambda_props_builder import (
     PythonLambdaPropsBuilderConfigModel,
 )
 
+
 MINIMUM_SUBNETS_FOR_DOCUMENT_DB = 3
 
 
@@ -51,7 +52,7 @@ class SearchServiceDatabases(Stack):
         self._custom_resource_dir = self._cdk_directory / "constructs/customresources"
         self._subnet_type_for_doc_db = ec2.SubnetType.PUBLIC
         self.vpc = self._create_vpc()
-        self.document_db = self._get_document_db(doc_db_settings=doc_db_settings)
+        # self.document_db = self._get_document_db(doc_db_settings=doc_db_settings)
         self.pinecone_db = self._get_pinecone_db(pinecone_db_settings=pinecone_db_settings)
         add_tags(self, config.tags)
 

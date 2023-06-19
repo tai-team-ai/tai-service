@@ -3,8 +3,6 @@ from enum import Enum
 import json
 from typing import Any
 from loguru import logger
-from aws_lambda_powertools.utilities.typing import LambdaContext
-from aws_lambda_typing.events import CloudFormationCustomResourceEvent
 import pymongo
 from pymongo.database import Database
 from pydantic import BaseModel, Field, validator
@@ -12,6 +10,8 @@ from pydantic import BaseModel, Field, validator
 try:
     from ..custom_resource_interface import CustomResourceInterface
     from tai_service.schemas import AdminDocumentDBSettings
+    from aws_lambda_powertools.utilities.typing import LambdaContext
+    from aws_lambda_typing.events import CloudFormationCustomResourceEvent
 except ImportError:
     from custom_resource_interface import CustomResourceInterface
     from schemas import AdminDocumentDBSettings
