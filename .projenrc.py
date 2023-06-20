@@ -1,8 +1,8 @@
 from projen.awscdk import AwsCdkPythonApp
 from projen.python import VenvOptions
-from projen import IgnoreFile
+from projen import IgnoreFile, Project
 
-project = AwsCdkPythonApp(
+project:Project = AwsCdkPythonApp(
     author_email="jacobpetterle+aiforu@gmail.com",
     author_name="Jacob Petterle",
     cdk_version="2.1.0",
@@ -26,7 +26,6 @@ project = AwsCdkPythonApp(
     ]
 )
 
-IgnoreFile(project=project, file_path=".build/*")
-IgnoreFile(project=project, file_path=".sINSDFUINIFODS/*")
+project.add_git_ignore("/.build/*")
 
 project.synth()
