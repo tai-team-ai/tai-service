@@ -1,16 +1,21 @@
 """Define the Pinecone database construct."""
-import re
+from pathlib import Path
 from constructs import Construct
 from aws_cdk import (
     aws_iam as iam,
     custom_resources as cr,
     CustomResource,
+    Duration,
+    Size as StorageSize,
 )
-from tai_service.cdk.constructs.python_lambda_props_builder import (
+from .customresources.pinecone_db.pinecone_db_setup_lambda import PineconeDBSettings
+from .python_lambda_props_builder import (
     PythonLambdaPropsBuilderConfigModel,
     PythonLambdaPropsBuilder,
 )
 
+PINECONE_CUSTOM_RESOURCE_DIR = Path(__file__).parent / "customresources" / "pinecone_db"
+CDK_DIR = Path(__file__).parent.parent.parent
 
 class PineconeDatabase(Construct):
     """Define the Pinecone database construct."""
@@ -20,22 +25,22 @@ class PineconeDatabase(Construct):
         scope: Construct,
         construct_id: str,
         pinecone_db_api_secret_arn: str,
-        lambda_config: PythonLambdaPropsBuilderConfigModel,
+        db_settings: PineconeDBSettings,
         **kwargs,
     ) -> None:
         """Initialize the Pinecone database construct."""
         super().__init__(scope, construct_id, **kwargs)
         self._secret_arn = pinecone_db_api_secret_arn
-        self._lambda_config = lambda_config
+        self._db_settings = db_settings
         self.custom_resource_provider = self._create_custom_resource()
 
     def _create_custom_resource(self) -> cr.Provider:
-        name = "pinecone-custom-resource-db-initializer-lambda"
-        self._lambda_config.function_name = name
+        config = self._get_lambda_config()
+        name = config.function_name
         lambda_function = PythonLambdaPropsBuilder.get_lambda_function(
             self,
-            construct_id=name,
-            config=self._lambda_config,
+            construct_id=f"custom-resource-lambda-{name}",
+            config=config,
         )
         lambda_function.add_to_role_policy(
             statement=iam.PolicyStatement(
@@ -56,3 +61,22 @@ class PineconeDatabase(Construct):
             service_token=provider.service_token,
         )
         return custom_resource
+
+    def _get_lambda_config(self) -> PythonLambdaPropsBuilderConfigModel:
+        lambda_config = PythonLambdaPropsBuilderConfigModel(
+            function_name="pinecone-db-custom-resource",
+            description="Custom resource for performing CRUD operations on the pinecone database",
+            code_path=PINECONE_CUSTOM_RESOURCE_DIR,
+            handler_module_name="main",
+            handler_name="lambda_handler",
+            runtime_environment=self._db_settings,
+            requirements_file_path=PINECONE_CUSTOM_RESOURCE_DIR / "requirements.txt",
+            files_to_copy_into_handler_dir=[
+                CDK_DIR / "schemas.py",
+                PINECONE_CUSTOM_RESOURCE_DIR.parent / "custom_resource_interface.py",
+            ],
+            timeout=Duration.minutes(3),
+            memory_size=128,
+            ephemeral_storage_size=StorageSize.mebibytes(512),
+        )
+        return lambda_config

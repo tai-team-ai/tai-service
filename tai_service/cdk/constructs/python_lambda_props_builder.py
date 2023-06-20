@@ -16,13 +16,13 @@ from aws_cdk import (
     BundlingOptions,
 )
 from loguru import logger
-from tai_service.schemas import BaseDocumentDBSettings, BasePineconeDBSettings
+from tai_service.schemas import BasePydanticSettings
 from .construct_helpers import get_vpc, sanitize_name, validate_vpc
 
-LAMBDA_RUNTIME_ENVIRONMENT_TYPES = Union[BaseDocumentDBSettings, BasePineconeDBSettings]
 
 TEMP_BUILD_DIR = "/tmp/lambda-build"
 MAX_LENGTH_FOR_FUNCTION_NAME = 64
+
 
 class PythonLambdaPropsBuilderConfigModel(BaseModel):
     """Define the configuration for the Python Lambda properties builder."""
@@ -47,7 +47,7 @@ class PythonLambdaPropsBuilderConfigModel(BaseModel):
         ...,
         description="The name of the handler function. This is the entry point to the Lambda code.",
     )
-    runtime_environment: LAMBDA_RUNTIME_ENVIRONMENT_TYPES = Field(
+    runtime_environment: BasePydanticSettings = Field(
         ...,
         description="The runtime environment for the Lambda function.",
     )

@@ -53,23 +53,6 @@ class DocumentDBConfig(BaseModel):
         )
 
 
-def lambda_handler(event: CloudFormationCustomResourceEvent, context: LambdaContext) -> None:
-    """
-    Run the database operation.
-    
-    This function is invoked by the CloudFormation custom resource. It is responsible for
-    running CRUD operations on the database by retrieving admin credentials from Secrets Manager and
-    creating shards, collections, and indexes for the database.
-
-    Currently, only create operations are supported, but this function could be extended
-    to include all CRUD operations.
-    """
-    logger.info(f"Received event: {json.dumps(event)}")
-    db_config = DocumentDBConfig()
-    custom_resource = DocumentDBCustomResource(event, context, db_config)
-    custom_resource.execute_crud_operation()
-
-
 class DocumentDBCustomResource(CustomResourceInterface):
     """Define the Lambda function for initializing the database."""
 

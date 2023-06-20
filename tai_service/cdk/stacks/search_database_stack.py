@@ -4,8 +4,6 @@ from constructs import Construct
 from aws_cdk import (
     Stack,
     aws_ec2 as ec2,
-    Duration,
-    Size as StorageSize,
 )
 from tai_service.schemas import (
     AdminDocumentDBSettings,
@@ -18,12 +16,26 @@ from ..constructs.document_db_construct import (
     ElasticDocumentDBConfigModel,
 )
 from ..constructs.pinecone_db_construct import PineconeDatabase
-from ..constructs.python_lambda_props_builder import (
-    PythonLambdaPropsBuilderConfigModel,
+from ..constructs.customresources.pinecone_db.pinecone_db_setup_lambda import (
+    PineconeDBSettings,
+    PineconeIndexConfig,
+    PodType,
+    DistanceMetric,
 )
 
 
 MINIMUM_SUBNETS_FOR_DOCUMENT_DB = 3
+INDEXES = [
+    PineconeIndexConfig(
+        name="tai-index",
+        dimension=768,
+        metric=DistanceMetric.DOT_PRODUCT,
+        pod_type=PodType.S1x1,
+        pods=1,
+        replicas=1,
+    )
+]
+PINECONE_DB_SETTINGS = PineconeDBSettings(indexes=INDEXES)
 
 
 class SearchServiceDatabases(Stack):
@@ -48,8 +60,6 @@ class SearchServiceDatabases(Stack):
         )
         self._config = config
         self._namer = lambda name: f"{config.stack_id}-{name}"
-        self._cdk_directory = Path(__file__).parent.parent
-        self._custom_resource_dir = self._cdk_directory / "constructs/customresources"
         self._subnet_type_for_doc_db = ec2.SubnetType.PUBLIC
         self.vpc = self._create_vpc()
         # self.document_db = self._get_document_db(doc_db_settings=doc_db_settings)
@@ -104,28 +114,10 @@ class SearchServiceDatabases(Stack):
             vpc=self.vpc,
             subnet_type=self._subnet_type_for_doc_db,
         )
-        db_custom_resource_dir = self._custom_resource_dir / "document_db"
-        lambda_config = PythonLambdaPropsBuilderConfigModel(
-            function_name=self._namer("document-db-custom-resource"),
-            description="Custom resource for performing CRUD operations on the document database",
-            code_path=db_custom_resource_dir,
-            handler_module_name="document_db_setup_lambda",
-            handler_name="lambda_handler",
-            runtime_environment=doc_db_settings,
-            requirements_file_path=db_custom_resource_dir / "requirements.txt",
-            files_to_copy_into_handler_dir=[
-                self._cdk_directory.parent / "schemas.py",
-                self._custom_resource_dir / "custom_resource_interface.py",
-            ],
-            vpc=self.vpc,
-            subnet_type=self._subnet_type_for_doc_db,
-            **self._get_global_custom_resource_lambda_config(),
-        )
         db = DocumentDatabase(
             scope=self,
             construct_id=self._namer("document-db"),
             db_config=db_config,
-            lambda_config=lambda_config,
         )
         return db
 
@@ -134,33 +126,11 @@ class SearchServiceDatabases(Stack):
             secret_name=pinecone_db_settings.api_key_secret_name,
             deployment_settings=self._config.deployment_settings,
         )
-        db_custom_resource_dir = self._custom_resource_dir / "pinecone_db"
-        lambda_config = PythonLambdaPropsBuilderConfigModel(
-            function_name=self._namer("pinecone-db-custom-resource"),
-            description="Custom resource for performing CRUD operations on the pinecone database",
-            code_path=self._custom_resource_dir / "pinecone_db",
-            handler_module_name="pinecone_db_setup_lambda",
-            handler_name="lambda_handler",
-            runtime_environment=pinecone_db_settings,
-            requirements_file_path=db_custom_resource_dir / "requirements.txt",
-            files_to_copy_into_handler_dir=[
-                self._cdk_directory.parent / "schemas.py",
-                self._custom_resource_dir / "custom_resource_interface.py",
-            ],
-            **self._get_global_custom_resource_lambda_config(),
-        )
         db = PineconeDatabase(
             scope=self,
             construct_id=self._namer("pinecone-db"),
             pinecone_db_api_secret_arn=pinecone_secret_arn,
-            lambda_config=lambda_config,
+            db_settings=PINECONE_DB_SETTINGS,
         )
         return db
 
-    def _get_global_custom_resource_lambda_config(self) -> dict:
-        config = {
-            'timeout': Duration.minutes(3),
-            'memory_size': 128,
-            'ephemeral_storage_size': StorageSize.mebibytes(512),
-        }
-        return config
