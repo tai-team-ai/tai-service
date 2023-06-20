@@ -27,15 +27,15 @@ from ..constructs.customresources.pinecone_db.pinecone_db_setup_lambda import (
 
 MINIMUM_SUBNETS_FOR_DOCUMENT_DB = 3
 INDEXES = [
-    PineconeIndexConfig(
-        name="tai-index",
-        dimension=768,
-        metric=DistanceMetric.DOT_PRODUCT,
-        pod_type=PodType.S1,
-        pod_size=PodSize.X1,
-        pods=1,
-        replicas=1,
-    )
+    # PineconeIndexConfig(
+    #     name="tai-index",
+    #     dimension=768,
+    #     metric=DistanceMetric.DOT_PRODUCT,
+    #     pod_instance_type=PodType.S1,
+    #     pod_size=PodSize.X1,
+    #     pods=1,
+    #     replicas=1,
+    # )
 ]
 PINECONE_DB_SETTINGS = PineconeDBSettings(indexes=INDEXES)
 

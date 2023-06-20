@@ -137,11 +137,3 @@ class BasePineconeDBSettings(BasePydanticSettings):
         """Define the Pydantic config."""
 
         env_prefix = "PINECONE_DB_"
-
-    @validator("environment", pre=True)
-    def print_environment(cls, environment: str) -> str:
-        """Print the environment."""
-        print(f"Using Pinecone environment: {environment}")
-        # strip quotes from environment
-        environment = environment.replace('"', "")
-        return environment

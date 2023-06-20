@@ -1,6 +1,7 @@
 """Define the Pinecone database construct."""
 from pathlib import Path
 from constructs import Construct
+import hashlib
 from aws_cdk import (
     aws_iam as iam,
     custom_resources as cr,
@@ -16,6 +17,7 @@ from .python_lambda_props_builder import (
 
 PINECONE_CUSTOM_RESOURCE_DIR = Path(__file__).parent / "customresources" / "pinecone_db"
 CDK_DIR = Path(__file__).parent.parent.parent
+SRC_DIR = CDK_DIR.parent
 
 class PineconeDatabase(Construct):
     """Define the Pinecone database construct."""
@@ -59,8 +61,21 @@ class PineconeDatabase(Construct):
             self,
             id="custom-resource",
             service_token=provider.service_token,
+            properties={"hash": self._get_hash_for_all_files_in_dir(SRC_DIR)},
         )
         return custom_resource
+
+
+    def _get_hash_for_all_files_in_dir(self, dir_path: Path) -> str:
+        """Return a hash of all files in a directory."""
+        hash_string = ""
+        for file_path in dir_path.glob("**/*"):
+            if file_path.is_file():
+                with open(file_path, "rb") as file:
+                    bytes_buffer = file.read()
+                    hash_string += hashlib.md5(bytes_buffer).hexdigest()
+        hash_string = hashlib.md5(hash_string.encode("utf-8")).hexdigest()
+        return hash_string
 
     def _get_lambda_config(self) -> PythonLambdaPropsBuilderConfigModel:
         lambda_config = PythonLambdaPropsBuilderConfigModel(

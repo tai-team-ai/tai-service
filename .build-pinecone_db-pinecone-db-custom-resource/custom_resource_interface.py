@@ -92,6 +92,9 @@ class CustomResourceInterface(ABC):
                 return operation(*args, **kwargs)
             except Exception as e: # pylint: disable=broad-except
                 logger.exception(e)
-                logger.info(f"Attempt {attempt + 1} of {MAX_NUM_ATTEMPTS} failed. Retrying in {DELAY_BETWEEN_ATTEMPTS} seconds...")
+                logger.info(f"Attempt {attempt + 1} of {MAX_NUM_ATTEMPTS} failed.")
+                if attempt + 1 == MAX_NUM_ATTEMPTS:
+                    logger.error(f"Failed to run operation: {operation.__name__}")
+                    raise e
+                logger.info(f"Retrying in {DELAY_BETWEEN_ATTEMPTS} seconds...")
                 time.sleep(DELAY_BETWEEN_ATTEMPTS)
-        raise RuntimeError(f"Failed to run operation: {operation.__name__}")
