@@ -23,6 +23,7 @@ jobs:
         npm install -g aws-cdk && \
         python -m pip install --upgrade pip && \
         pip install projen && \
+        pip list && \
         projen
 
     - name: Deploy to AWS
