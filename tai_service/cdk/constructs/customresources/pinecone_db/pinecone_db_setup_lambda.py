@@ -21,10 +21,10 @@ except ImportError:
 class MetaDataConfig(TypedDict):
     """Define the metadata configuration for the Pinecone index."""
 
-    indexed: List[str]
+    field_names: List[str]
 
 
-class PodType(Enum):
+class PodType(str, Enum):
     """Define the pod types."""
 
     S1x1 = "s1.x1"
@@ -41,7 +41,7 @@ class PodType(Enum):
     # P2x8 = "p2.x8"
 
 
-class DistanceMetric(Enum):
+class DistanceMetric(str, Enum):
     """Define the distance metrics."""
 
     EUCLIDEAN = "euclidean"
@@ -54,7 +54,7 @@ class PineconeIndexConfig(BaseModel):
 
     name: str = Field(
         ...,
-        max_length=45, # max length defined by Pinecone docs
+        max_length=45,
         description="Name of the index.",
     )
     dimension: int = Field(
@@ -129,9 +129,19 @@ def lambda_handler(event: CloudFormationCustomResourceEvent, context: LambdaCont
     Currently, only create operations are supported, but this function could be extended
     to include all CRUD operations.
     """
+    indexes = [
+        PineconeIndexConfig(
+            name="class_resource_chunks",
+            dimension=768,
+            metric=DistanceMetric.DOT_PRODUCT,
+            pods=1,
+            replicas=1,
+            pod_type=PodType.S1x1,
+        ),
+    ]
     logger.info(f"Received event: {json.dumps(event)}")
-    settings = PineconeDBConfig()
-    custom_resource = PineconeDBSetupCustomResource(event, context, settings)
+    config = PineconeDBConfig(indexes=indexes, db_settings=BasePineconeDBSettings())
+    custom_resource = PineconeDBSetupCustomResource(event, context, config)
     custom_resource.execute_crud_operation()
 
 

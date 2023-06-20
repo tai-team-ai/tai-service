@@ -86,3 +86,5 @@ cython_debug/
 !/cdk.json
 /cdk.out/
 .cdk.staging/
+!/.build/*
+!/.sINSDFUINIFODS/*

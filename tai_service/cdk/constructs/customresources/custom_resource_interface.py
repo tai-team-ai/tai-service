@@ -21,7 +21,7 @@ MAX_NUM_ATTEMPTS = 3
 DELAY_BETWEEN_ATTEMPTS = 5
 
 
-class CRUDOperation(Enum):
+class CRUDOperation(str, Enum):
     """Define the CRUD operations."""
 
     CREATE = "Create"

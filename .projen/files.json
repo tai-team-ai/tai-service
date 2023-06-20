@@ -1,11 +1,13 @@
 {
   "files": [
+    ".build/*",
     ".gitattributes",
     ".github/workflows/pull-request-lint.yml",
     ".gitignore",
     ".projen/deps.json",
     ".projen/files.json",
     ".projen/tasks.json",
+    ".sINSDFUINIFODS/*",
     "cdk.json",
     "requirements-dev.txt",
     "requirements.txt"

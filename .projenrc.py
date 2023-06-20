@@ -1,5 +1,6 @@
 from projen.awscdk import AwsCdkPythonApp
 from projen.python import VenvOptions
+from projen import IgnoreFile
 
 project = AwsCdkPythonApp(
     author_email="jacobpetterle+aiforu@gmail.com",
@@ -24,5 +25,8 @@ project = AwsCdkPythonApp(
         "aws-lambda-typing",
     ]
 )
+
+IgnoreFile(project=project, file_path=".build/*")
+IgnoreFile(project=project, file_path=".sINSDFUINIFODS/*")
 
 project.synth()

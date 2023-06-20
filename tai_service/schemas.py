@@ -8,7 +8,7 @@ from pydantic import BaseSettings, Field, validator
 
 DOC_DB_ENVIRONMENT_PREFIX = "DOC_DB_"
 
-class PineConeEnvironment(Enum):
+class PineConeEnvironment(str, Enum):
     """Define the environments for the Pinecone project."""
 
     EAST_1 = "us-east-1-aws"
@@ -19,12 +19,17 @@ class BasePydanticSettings(BaseSettings):
     def dict(self, *args, **kwargs):
         """Override the dict method to convert nested, dicts, sets and sequences to JSON."""
         output = super().dict(*args, **kwargs)
+        new_output = {}
         for key, value in output.items():
+            if hasattr(self.Config, "env_prefix"):
+                key = self.Config.env_prefix + key
             if isinstance(value, dict) or isinstance(value, Sequence) or isinstance(value, set):
-                output[key] = json.dumps(value)
+                value = json.dumps(value)
             if isinstance(value, Number):
-                output[key] = str(value)
-        return output
+                value = str(value)
+            key = key.upper()
+            new_output[key] = value
+        return new_output
 
     class Config:
         """Define the Pydantic config."""
@@ -142,3 +147,9 @@ class BasePineconeDBSettings(BasePydanticSettings):
         """Define the Pydantic config."""
 
         env_prefix = "PINECONE_DB_"
+
+    @validator("environment", pre=True)
+    def print_environment(cls, environment: str) -> str:
+        """Print the environment."""
+        print(f"Using Pinecone environment: {environment}")
+        return environment

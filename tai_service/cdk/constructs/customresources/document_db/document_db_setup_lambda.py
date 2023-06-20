@@ -19,7 +19,8 @@ except ImportError:
 
 
 
-class BuiltInMongoDBRoles(Enum):
+
+class BuiltInMongoDBRoles(str, Enum):
     """Define the built-in MongoDB roles."""
 
     READ = "read"
