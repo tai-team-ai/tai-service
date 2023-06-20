@@ -20,8 +20,9 @@ jobs:
 
     - name: Install dependencies
       run: |
-        python -m pip install --upgrade pip
-        pip install projen
+        npm install -g aws-cdk && \
+        python -m pip install --upgrade pip && \
+        pip install projen && \
         projen
 
     - name: Deploy to AWS
