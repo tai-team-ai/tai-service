@@ -94,5 +94,4 @@ class CustomResourceInterface(ABC):
                 logger.exception(e)
                 logger.info(f"Attempt {attempt + 1} of {MAX_NUM_ATTEMPTS} failed. Retrying in {DELAY_BETWEEN_ATTEMPTS} seconds...")
                 time.sleep(DELAY_BETWEEN_ATTEMPTS)
-        logger.error(f"Failed to run operation: {operation.__name__}")
-        raise e
+        raise RuntimeError(f"Failed to run operation: {operation.__name__}")

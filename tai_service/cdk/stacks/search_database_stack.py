@@ -20,6 +20,7 @@ from ..constructs.customresources.pinecone_db.pinecone_db_setup_lambda import (
     PineconeDBSettings,
     PineconeIndexConfig,
     PodType,
+    PodSize,
     DistanceMetric,
 )
 
@@ -30,7 +31,8 @@ INDEXES = [
         name="tai-index",
         dimension=768,
         metric=DistanceMetric.DOT_PRODUCT,
-        pod_type=PodType.S1x1,
+        pod_type=PodType.S1,
+        pod_size=PodSize.X1,
         pods=1,
         replicas=1,
     )

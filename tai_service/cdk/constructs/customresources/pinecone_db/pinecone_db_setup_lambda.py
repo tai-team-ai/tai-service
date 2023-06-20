@@ -27,18 +27,17 @@ class MetaDataConfig(TypedDict):
 class PodType(str, Enum):
     """Define the pod types."""
 
-    S1x1 = "s1.x1"
-    # S1x2 = "s1.x2"
-    # S1x4 = "s1.x4"
-    # S1x8 = "s1.x8"
-    P1x1 = "p1.x1"
-    # P1x2 = "p1.x2"
-    # P1x4 = "p1.x4"
-    # P1x8 = "p1.x8"
-    P2x1 = "p2.x1"
-    # P2x2 = "p2.x2"
-    # P2x4 = "p2.x4"
-    # P2x8 = "p2.x8"
+    S1 = "s1"
+    P1 = "p1"
+    P2 = "p2"
+
+class PodSize(str, Enum):
+    """Define the pod sizes."""
+
+    X1 = "x1"
+    X2 = "x2"
+    X4 = "x4"
+    X8 = "x8"
 
 
 class DistanceMetric(str, Enum):
@@ -46,7 +45,7 @@ class DistanceMetric(str, Enum):
 
     EUCLIDEAN = "euclidean"
     COSINE = "cosine"
-    DOT_PRODUCT = "dot_product"
+    DOT_PRODUCT = "dotproduct"
 
 
 class PineconeIndexConfig(BaseModel):
@@ -78,8 +77,12 @@ class PineconeIndexConfig(BaseModel):
         description="Number of replicas to use for the index.",
     )
     pod_type: Optional[PodType] = Field(
-        PodType.S1x1,
+        PodType.S1,
         description="Type of pod to use for the index. (https://docs.pinecone.io/docs/indexes)",
+    )
+    pod_size: Optional[PodSize] = Field(
+        PodSize.X1,
+        description="Size of pod to use for the index. (https://docs.pinecone.io/docs/indexes)",
     )
     metadata_config: Optional[MetaDataConfig] = Field(
         default=None,
@@ -89,6 +92,11 @@ class PineconeIndexConfig(BaseModel):
         default=None,
         description="Name of the source collection to use for the index.",
     )
+
+    @property
+    def pod_type(self) -> str:
+        """Return the pod type as a string."""
+        return self.pod_type.value + "." + self.pod_size.value
 
 
 class PineconeDBSettings(BasePineconeDBSettings):
@@ -137,12 +145,43 @@ class PineconeDBSetupCustomResource(CustomResourceInterface):
     def _create_index(self, index_settings: PineconeIndexConfig) -> None:
         self._run_operation_with_retry(
             pinecone.create_index,
-            **index_settings.dict(),
+            **index_settings.dict(exclude_none=True),
         )
 
     def _update_database(self) -> None:
-        raise NotImplementedError("Update operation not implemented.")
+        # check if the indexes exist
+        # if it doesn't exist, create it
+        # if it does, we can only update the pod type and replicas
+        indexes = set(pinecone.list_indexes())
+        for index_config in self._settings.indexes:
+            if index_config.name in indexes:
+                self._update_index(index_config)
+            else:
+                self._create_index(index_config)
 
+    def _update_index(self, index_settings: PineconeIndexConfig) -> None:
+        pod_type = pinecone.describe_index(index_settings.name).pod_type
+        current_pod_size = self._get_pod_size(pod_type)
+        new_pod_size = self._get_pod_size(index_settings.pod_type)
+        assert new_pod_size >= current_pod_size, f"Cannot downgrade pod size. Current pod size: {current_pod_size}, new pod size: {new_pod_size}"
+        self._run_operation_with_retry(
+            pinecone.configure_index,
+            index_settings.name,
+            index_settings.replicas,
+            index_settings.pod_type,
+        )
+
+    def _get_pod_size(self, pod_type: str) -> int:
+        """Pod type is in the format s1.x1, so we need to split and get the number."""
+        return int(pod_type.split(".")[1][1:])
 
     def _delete_database(self) -> None:
-        raise NotImplementedError("Delete operation not implemented.")
+        indexes = pinecone.list_indexes()
+        self._delete_indexes(indexes)
+
+    def _delete_indexes(self, indexes: List[str]) -> None:
+        for index in indexes:
+            self._run_operation_with_retry(
+                pinecone.delete_index,
+                index,
+            )
