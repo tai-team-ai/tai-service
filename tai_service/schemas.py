@@ -138,7 +138,7 @@ class BasePineconeDBSettings(BasePydanticSettings):
 
         env_prefix = "PINECONE_DB_"
 
-    @validator("environment", pre=True)
+    @validator("environment",pre=True)
     def log_environment_value(cls, value: Any) -> Any:
         print(f"Environment value: {value!r}")
         return value
