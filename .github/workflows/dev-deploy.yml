@@ -29,17 +29,17 @@ jobs:
 
     - name: Debug env variables
       run: |
-        echo "API Key Secret Name: ${{ secrets.PINECONE_DB_API_KEY_SECRET_NAME }}"
-        echo "Environment: ${{ secrets.PINECONE_DB_ENVIRONMENT }}"
+        echo "API Key Secret Name: ${{ vars.PINECONE_DB_API_KEY_SECRET_NAME }}"
+        echo "Environment: ${{ vars.PINECONE_DB_ENVIRONMENT }}"
 
     - name: Deploy to AWS
       env:
-        AWS_REGION: ${{ env.AWS_REGION }}
-        AWS_DEPLOYMENT_ACCOUNT_ID: ${{ env.AWS_DEPLOYMENT_ACCOUNT_ID }}
-        AWS_ACCESS_KEY_ID: ${{ env.AWS_ACCESS_KEY_ID }}
+        AWS_REGION: ${{ vars.AWS_REGION }}
+        AWS_DEPLOYMENT_ACCOUNT_ID: ${{ vars.AWS_DEPLOYMENT_ACCOUNT_ID }}
+        AWS_ACCESS_KEY_ID: ${{ vars.AWS_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        PINECONE_DB_API_KEY_SECRET_NAME: ${{ env.PINECONE_DB_API_KEY_SECRET_NAME }}
-        PINECONE_DB_ENVIRONMENT: ${{ env.PINECONE_DB_ENVIRONMENT }}
+        PINECONE_DB_API_KEY_SECRET_NAME: ${{ vars.PINECONE_DB_API_KEY_SECRET_NAME }}
+        PINECONE_DB_ENVIRONMENT: ${{ vars.PINECONE_DB_ENVIRONMENT }}
       run: |
         source .venv/bin/activate && \
         export PATH=.venv/bin:$PATH && \
