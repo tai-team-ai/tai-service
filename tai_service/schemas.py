@@ -2,7 +2,7 @@
 from enum import Enum
 from numbers import Number
 import json
-from typing import Optional, Sequence
+from typing import Any, Optional, Sequence
 from pydantic import BaseSettings, Field, root_validator, validator
 
 
@@ -137,3 +137,8 @@ class BasePineconeDBSettings(BasePydanticSettings):
         """Define the Pydantic config."""
 
         env_prefix = "PINECONE_DB_"
+
+    @validator("environment", pre=True)
+    def log_environment_value(cls, value: Any) -> Any:
+        print(f"Environment value: {value!r}")
+        return value
