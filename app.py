@@ -27,13 +27,13 @@ base_stack_config = StackConfigBaseModel(
     }
 )
 
-doc_db_settings = AdminDocumentDBSettings()
+# doc_db_settings = AdminDocumentDBSettings()
 pinecone_db_settings = BasePineconeDBSettings()
 
 search_service_databases = SearchServiceDatabases(
     app,
 	config=base_stack_config,
-	doc_db_settings=doc_db_settings,
+	doc_db_settings="doc_db_settings",
 	pinecone_db_settings=pinecone_db_settings,
 )
 
