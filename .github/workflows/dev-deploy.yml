@@ -23,7 +23,6 @@ jobs:
         npm install -g aws-cdk && \
         python -m pip install --upgrade pip && \
         pip install projen && \
-        pip list && \
         projen && \
         source .venv/bin/activate && \
         pip list
@@ -35,7 +34,7 @@ jobs:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         PINECONE_DB_API_KEY_SECRET_NAME: ${{ secrets.PINECONE_DB_API_KEY_SECRET_NAME }}
-        PINECONE_DB_ENVIRONMENT: ${{ secrets.PINECONE_DB_ENVIRONMENT }}
+        PINECONE_DB_ENVIRONMENT: us-east-1-aws
       run: |
         source .venv/bin/activate && \
         export PATH=.venv/bin:$PATH && \
