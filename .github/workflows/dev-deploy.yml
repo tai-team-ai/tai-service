@@ -34,12 +34,12 @@ jobs:
 
     - name: Deploy to AWS
       env:
-        AWS_REGION: ${{ secrets.AWS_REGION }}
-        AWS_DEPLOYMENT_ACCOUNT_ID: ${{ secrets.AWS_DEPLOYMENT_ACCOUNT_ID }}
-        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        AWS_REGION: ${{ variables.AWS_REGION }}
+        AWS_DEPLOYMENT_ACCOUNT_ID: ${{ variables.AWS_DEPLOYMENT_ACCOUNT_ID }}
+        AWS_ACCESS_KEY_ID: ${{ variables.AWS_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        PINECONE_DB_API_KEY_SECRET_NAME: ${{ secrets.PINECONE_DB_API_KEY_SECRET_NAME }}
-        PINECONE_DB_ENVIRONMENT: ${{ secrets.PINECONE_DB_ENVIRONMENT }}
+        PINECONE_DB_API_KEY_SECRET_NAME: ${{ variables.PINECONE_DB_API_KEY_SECRET_NAME }}
+        PINECONE_DB_ENVIRONMENT: ${{ variables.PINECONE_DB_ENVIRONMENT }}
       run: |
         source .venv/bin/activate && \
         export PATH=.venv/bin:$PATH && \
