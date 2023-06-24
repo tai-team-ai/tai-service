@@ -1,7 +1,6 @@
 """Define the Pinecone database construct."""
 from pathlib import Path
 from constructs import Construct
-import hashlib
 from aws_cdk import (
     aws_iam as iam,
     custom_resources as cr,
@@ -9,15 +8,15 @@ from aws_cdk import (
     Duration,
     Size as StorageSize,
 )
-from .customresources.pinecone_db.pinecone_db_setup_lambda import PineconeDBSettings
+from .customresources.pinecone_db.pinecone_db_custom_resource import PineconeDBSettings
+from .construct_helpers import get_hash_for_all_files_in_dir
 from .python_lambda_props_builder import (
     PythonLambdaPropsBuilderConfigModel,
     PythonLambdaPropsBuilder,
 )
 
-PINECONE_CUSTOM_RESOURCE_DIR = Path(__file__).parent / "customresources" / "pinecone_db"
-CDK_DIR = Path(__file__).parent.parent.parent
-SRC_DIR = CDK_DIR.parent
+CONSTRUCTS_DIR = Path(__file__).parent
+PINECONE_CUSTOM_RESOURCE_DIR = CONSTRUCTS_DIR / "customresources" / "pinecone_db_custom_resource"
 
 class PineconeDatabase(Construct):
     """Define the Pinecone database construct."""
@@ -51,7 +50,7 @@ class PineconeDatabase(Construct):
                 resources=[self._secret_arn],
             )
         )
-        provider = cr.Provider(
+        provider: cr.Provider = cr.Provider(
             self,
             id="custom-resource-provider",
             on_event_handler=lambda_function,
@@ -61,21 +60,10 @@ class PineconeDatabase(Construct):
             self,
             id="custom-resource",
             service_token=provider.service_token,
-            properties={"hash": self._get_hash_for_all_files_in_dir(SRC_DIR)},
+            properties={"hash": get_hash_for_all_files_in_dir(CONSTRUCTS_DIR)},
         )
         return custom_resource
 
-
-    def _get_hash_for_all_files_in_dir(self, dir_path: Path) -> str:
-        """Return a hash of all files in a directory."""
-        hash_string = ""
-        for file_path in dir_path.glob("**/*"):
-            if file_path.is_file():
-                with open(file_path, "rb") as file:
-                    bytes_buffer = file.read()
-                    hash_string += hashlib.md5(bytes_buffer).hexdigest()
-        hash_string = hashlib.md5(hash_string.encode("utf-8")).hexdigest()
-        return hash_string
 
     def _get_lambda_config(self) -> PythonLambdaPropsBuilderConfigModel:
         lambda_config = PythonLambdaPropsBuilderConfigModel(
@@ -87,7 +75,7 @@ class PineconeDatabase(Construct):
             runtime_environment=self._db_settings,
             requirements_file_path=PINECONE_CUSTOM_RESOURCE_DIR / "requirements.txt",
             files_to_copy_into_handler_dir=[
-                CDK_DIR / "schemas.py",
+                CONSTRUCTS_DIR / "construct_config.py",
                 PINECONE_CUSTOM_RESOURCE_DIR.parent / "custom_resource_interface.py",
             ],
             timeout=Duration.minutes(3),

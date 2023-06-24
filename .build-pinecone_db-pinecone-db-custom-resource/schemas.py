@@ -2,7 +2,7 @@
 from enum import Enum
 from numbers import Number
 import json
-from typing import Optional, Sequence
+from typing import Any, Optional, Sequence
 from pydantic import BaseSettings, Field, root_validator, validator
 
 

@@ -16,7 +16,7 @@ from aws_cdk import (
     BundlingOptions,
 )
 from loguru import logger
-from tai_service.schemas import BasePydanticSettings
+from.construct_config import BasePydanticSettings
 from .construct_helpers import get_vpc, sanitize_name, validate_vpc
 
 

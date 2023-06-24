@@ -1,4 +1,6 @@
 """Define helper functions for CDK constructs."""
+import hashlib
+from pathlib import Path
 from typing import Any, Optional, Union
 import re
 from constructs import Construct
@@ -74,3 +76,14 @@ def sanitize_name(name: str, truncation_length: int = 63) -> str:
             f"Name {name} is longer than {truncation_length} characters. It will be truncated to {name[:truncation_length]}"
         )
     return name[:truncation_length]
+
+def get_hash_for_all_files_in_dir(dir_path: Path) -> str:
+    """Return a hash of all files in a directory."""
+    hash_string = ""
+    for file_path in dir_path.glob("**/*"):
+        if file_path.is_file():
+            with open(file_path, "rb") as file:
+                bytes_buffer = file.read()
+                hash_string += hashlib.md5(bytes_buffer).hexdigest()
+    hash_string = hashlib.md5(hash_string.encode("utf-8")).hexdigest()
+    return hash_string

@@ -16,7 +16,7 @@ from ..constructs.document_db_construct import (
     ElasticDocumentDBConfigModel,
 )
 from ..constructs.pinecone_db_construct import PineconeDatabase
-from ..constructs.customresources.pinecone_db.pinecone_db_setup_lambda import (
+from ..constructs.customresources.pinecone_db.pinecone_db_custom_resource import (
     PineconeDBSettings,
     PineconeIndexConfig,
     PodType,
@@ -37,7 +37,6 @@ INDEXES = [
     #     replicas=1,
     # )
 ]
-PINECONE_DB_SETTINGS = PineconeDBSettings(indexes=INDEXES)
 
 
 class SearchServiceDatabases(Stack):
@@ -48,7 +47,6 @@ class SearchServiceDatabases(Stack):
         scope: Construct,
         config: StackConfigBaseModel,
         doc_db_settings: AdminDocumentDBSettings,
-        pinecone_db_settings: BasePineconeDBSettings,
     ) -> None:
         """Initialize the search database stack."""
         super().__init__(
@@ -60,12 +58,13 @@ class SearchServiceDatabases(Stack):
             tags=config.tags,
             termination_protection=config.termination_protection,
         )
+        self._pinecone_db_settings = PineconeDBSettings(indexes=INDEXES)
         self._config = config
         self._namer = lambda name: f"{config.stack_id}-{name}"
         self._subnet_type_for_doc_db = ec2.SubnetType.PUBLIC
         self.vpc = self._create_vpc()
         # self.document_db = self._get_document_db(doc_db_settings=doc_db_settings)
-        self.pinecone_db = self._get_pinecone_db(pinecone_db_settings=pinecone_db_settings)
+        self.pinecone_db = self._get_pinecone_db()
         add_tags(self, config.tags)
 
     def _create_vpc(self) -> ec2.Vpc:
@@ -123,16 +122,15 @@ class SearchServiceDatabases(Stack):
         )
         return db
 
-    def _get_pinecone_db(self, pinecone_db_settings: BasePineconeDBSettings) -> PineconeDatabase:
+    def _get_pinecone_db(self) -> PineconeDatabase:
         pinecone_secret_arn = get_secret_arn_from_name(
-            secret_name=pinecone_db_settings.api_key_secret_name,
+            secret_name=self._pinecone_db_settings.api_key_secret_name,
             deployment_settings=self._config.deployment_settings,
         )
         db = PineconeDatabase(
             scope=self,
             construct_id=self._namer("pinecone-db"),
             pinecone_db_api_secret_arn=pinecone_secret_arn,
-            db_settings=PINECONE_DB_SETTINGS,
+            db_settings=self._pinecone_db_settings,
         )
         return db
-

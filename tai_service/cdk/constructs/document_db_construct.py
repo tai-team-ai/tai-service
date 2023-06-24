@@ -1,5 +1,5 @@
 """Define the DocumentDB construct."""
-
+from pathlib import Path
 from enum import Enum
 from typing import Optional, Union
 from constructs import Construct
@@ -12,7 +12,7 @@ from aws_cdk import (
     custom_resources as cr,
     CustomResource,
 )
-from .construct_helpers import validate_vpc
+from .construct_helpers import validate_vpc, get_hash_for_all_files_in_dir
 from .python_lambda_props_builder import (
     PythonLambdaPropsBuilder,
     PythonLambdaPropsBuilderConfigModel,
@@ -27,7 +27,9 @@ VALID_SHARD_COUNT_RANGE = range(1, 33)
 VALID_DAYS_OF_THE_WEEK = r'(Mon|Tue|Wed|Thu|Fri|Sat|Sun)'
 # Format: ddd:hh24:mi-ddd:hh24:mi
 VALID_MAINTENANCE_WINDOW_PATTERN =  fr'^{VALID_DAYS_OF_THE_WEEK}\:([01]\d|2[0-3])\:[0-5]\d\-([A-Z][a-z]{2})\:([01]\d|2[0-3])\:[0-5]\d$'
-
+DOCUMENT_DB_CUSTOM_RESOURCE_DIR = Path(__file__).parent / "customresources" / "document_db_custom_resource"
+CDK_DIR = Path(__file__).parent.parent.parent
+SRC_DIR = CDK_DIR.parent
 
 class AuthType(str, Enum):
     """Define the authentication type for the DocumentDB cluster."""
@@ -127,24 +129,22 @@ class DocumentDatabase(Construct):
         scope: Construct,
         construct_id: str,
         db_config: Union[DocumentDBConfigModel, ElasticDocumentDBConfigModel],
-        lambda_config: PythonLambdaPropsBuilderConfigModel,
         **kwargs,
     ) -> None:
         """Initialize the DocumentDB construct."""
         super().__init__(scope, construct_id, **kwargs)
         self._namer = lambda x: f"{db_config.cluster_name}-{x}"
         self._config = db_config
-        self._lambda_config = lambda_config
         self.security_group = self._create_security_group()
         self._config.security_groups.append(self.security_group)
         self.db_cluster = self._create_cluster()
         self.custom_resource = self._create_custom_resource()
-        self.custom_resource_provider.node.add_dependency(self.db_cluster)
+        self.custom_resource.node.add_dependency(self.db_cluster)
 
     def _create_security_group(self) -> ec2.SecurityGroup:
         """Create the security groups for the cluster."""
         name = self._namer("security-group")
-        security_group = ec2.SecurityGroup(
+        security_group: ec2.SecurityGroup = ec2.SecurityGroup(
             self,
             id=name,
             security_group_name=name,
@@ -186,20 +186,18 @@ class DocumentDatabase(Construct):
         return cluster
 
     def _create_custom_resource(self) -> cr.Provider:
-        name = self._namer("custom-resource-db-initializer-lambda")
-        self._lambda_config.function_name = name
-        self._lambda_config.security_groups.append(self.security_group)
+        config = self._get_lambda_config()
+        name = config.function_name
         lambda_function = PythonLambdaPropsBuilder.get_lambda_function(
             self,
-            construct_id=name,
-            config=self._lambda_config,
+            construct_id=f"custom-resource-lambda-{name}",
+            config=config,
         )
-        
         lambda_function.add_to_role_policy(
             statement=iam.PolicyStatement(
                 actions=["secretsmanager:GetSecretValue"],
                 effect=iam.Effect.ALLOW,
-                resources=[self._config.admin_secret_arn],
+                resources=[self._secret_arn],
             )
         )
         provider = cr.Provider(
@@ -212,5 +210,26 @@ class DocumentDatabase(Construct):
             self,
             id="custom-resource",
             service_token=provider.service_token,
+            properties={"hash": get_hash_for_all_files_in_dir(SRC_DIR)},
         )
         return custom_resource
+
+
+    def _get_lambda_config(self) -> PythonLambdaPropsBuilderConfigModel:
+        lambda_config = PythonLambdaPropsBuilderConfigModel(
+            function_name="pinecone-db-custom-resource",
+            description="Custom resource for performing CRUD operations on the pinecone database",
+            code_path=DOCUMENT_DB_CUSTOM_RESOURCE_DIR,
+            handler_module_name="main",
+            handler_name="lambda_handler",
+            runtime_environment=self._db_settings,
+            requirements_file_path=DOCUMENT_DB_CUSTOM_RESOURCE_DIR / "requirements.txt",
+            files_to_copy_into_handler_dir=[
+                CDK_DIR / "schemas.py",
+                DOCUMENT_DB_CUSTOM_RESOURCE_DIR.parent / "custom_resource_interface.py",
+            ],
+            timeout=Duration.minutes(3),
+            memory_size=128,
+            ephemeral_storage_size=StorageSize.mebibytes(512),
+        )
+        return lambda_config
