@@ -1,7 +1,7 @@
 """Define the DocumentDB construct."""
 from pathlib import Path
 from enum import Enum
-from typing import Optional, Union
+from typing import Optional, Union, List
 from constructs import Construct
 from pydantic import BaseModel, Field, root_validator, validator
 from aws_cdk import (
@@ -11,12 +11,21 @@ from aws_cdk import (
     aws_iam as iam,
     custom_resources as cr,
     CustomResource,
+    Duration,
+    Size as StorageSize,
 )
-from .construct_helpers import validate_vpc, get_hash_for_all_files_in_dir
+from .construct_helpers import (
+    validate_vpc,
+    get_hash_for_all_files_in_dir,
+    retrieve_secret,
+    get_secret_arn_from_name,
+    get_vpc,
+)
 from .python_lambda_props_builder import (
     PythonLambdaPropsBuilder,
     PythonLambdaPropsBuilderConfigModel,
 )
+from .customresources.document_db.document_db_custom_resource import DocumentDBSettings, RuntimeDocumentDBSettings
 # This schema is defined by aws documentation for AWS Elastic DocumentDB
 # (https://docs.aws.amazon.com/cdk/api/v2/python/aws_cdk.aws_docdbelastic/CfnCluster.html)
 VALID_ADMIN_USERNAME_PATTERN = r"^(?!(admin|root|master|user|username|dbuser|dbadmin|dbroot|dbmaster)$)[a-zA-Z][a-zA-Z0-9]{0,62}$"
@@ -25,11 +34,11 @@ VALID_CLUSTER_NAME_PATTERN = r"^[a-z][a-z0-9-]{0,62}$"
 VALID_SHARD_CAPACITIES = {2, 4, 8, 16, 32, 64}
 VALID_SHARD_COUNT_RANGE = range(1, 33)
 VALID_DAYS_OF_THE_WEEK = r'(Mon|Tue|Wed|Thu|Fri|Sat|Sun)'
+MINIMUM_SUBNETS_FOR_DOCUMENT_DB = 3
 # Format: ddd:hh24:mi-ddd:hh24:mi
 VALID_MAINTENANCE_WINDOW_PATTERN =  fr'^{VALID_DAYS_OF_THE_WEEK}\:([01]\d|2[0-3])\:[0-5]\d\-([A-Z][a-z]{2})\:([01]\d|2[0-3])\:[0-5]\d$'
-DOCUMENT_DB_CUSTOM_RESOURCE_DIR = Path(__file__).parent / "customresources" / "document_db_custom_resource"
-CDK_DIR = Path(__file__).parent.parent.parent
-SRC_DIR = CDK_DIR.parent
+CONSTRUCTS_DIR = Path(__file__).parent
+DOCUMENT_DB_CUSTOM_RESOURCE_DIR = CONSTRUCTS_DIR / "customresources" / "document_db"
 
 class AuthType(str, Enum):
     """Define the authentication type for the DocumentDB cluster."""
@@ -43,21 +52,8 @@ class ElasticDocumentDBConfigModel(BaseModel):
 
     cluster_name: str = Field(
         ...,
-        description="The name of the DocumentDB cluster.",
+        description="The name of the DocumentDB cluster. Note, this is not the fully qualified domain name.",
         regex=VALID_CLUSTER_NAME_PATTERN,
-    )
-    admin_username: str = Field(
-        ...,
-        description="The username for the admin user.",
-        regex=VALID_ADMIN_USERNAME_PATTERN,
-    )
-    admin_password: Optional[str] = Field(
-        default=None,
-        description="The password for the admin user.",
-    )
-    admin_secret_arn: str = Field(
-        ...,
-        description="The secret ARN for the admin user.",
     )
     auth_type: AuthType = Field(
         default=AuthType.PLAINTEXT_PASSWORD,
@@ -128,13 +124,16 @@ class DocumentDatabase(Construct):
         self,
         scope: Construct,
         construct_id: str,
+        db_setup_settings: DocumentDBSettings,
         db_config: Union[DocumentDBConfigModel, ElasticDocumentDBConfigModel],
         **kwargs,
     ) -> None:
         """Initialize the DocumentDB construct."""
         super().__init__(scope, construct_id, **kwargs)
         self._namer = lambda x: f"{db_config.cluster_name}-{x}"
+        db_config.vpc = get_vpc(self, db_config.vpc)
         self._config = db_config
+        self._settings = db_setup_settings
         self.security_group = self._create_security_group()
         self._config.security_groups.append(self.security_group)
         self.db_cluster = self._create_cluster()
@@ -156,6 +155,11 @@ class DocumentDatabase(Construct):
             connection=ec2.Port.tcp(443),
             description="Allow outbound HTTPS traffic for the lambda function to access secrets manager.",
         )
+        security_group.add_ingress_rule(
+            peer=ec2.Peer.any_ipv4(),
+            connection=ec2.Port.tcp(self._settings.cluster_port),
+            description="Allow inbound traffic from the VPC CIDR block.",
+        )
         return security_group
 
     def _create_cluster(self) -> Union[docdb_elastic.CfnCluster, docdb.DatabaseCluster]:
@@ -169,21 +173,28 @@ class DocumentDatabase(Construct):
 
     def _create_elastic_cluster(self) -> docdb_elastic.CfnCluster:
         """Create the DocumentDB cluster."""
-        selected_subnets = self._config.vpc.select_subnets(subnet_type=self._config.subnet_type)
+        admin_password = retrieve_secret(self._settings.admin_user_password_secret_name)
         cluster = docdb_elastic.CfnCluster(
             self,
             id=self._namer("cluster"),
             cluster_name=self._config.cluster_name,
-            admin_user_name=self._config.admin_username,
-            admin_user_password=self._config.admin_password,
+            admin_user_name=self._settings.admin_username,
+            admin_user_password=admin_password,
             auth_type=self._config.auth_type.value,
             shard_count=self._config.shard_count,
             shard_capacity=self._config.shard_capacity,
             preferred_maintenance_window=self._config.maintenance_window,
-            subnet_ids=[subnet.subnet_id for subnet in selected_subnets.subnets],
+            subnet_ids=[subnet.subnet_id for subnet in self._get_selected_subnets().subnets],
             vpc_security_group_ids=[security_group.security_group_id for security_group in self._config.security_groups],
         )
         return cluster
+
+    def _get_selected_subnets(self) -> ec2.SelectedSubnets:
+        selected_subnets = self._config.vpc.select_subnets(subnet_type=self._config.subnet_type)
+        assert len(selected_subnets.subnets) >= MINIMUM_SUBNETS_FOR_DOCUMENT_DB,\
+            f"VPC must have at least {MINIMUM_SUBNETS_FOR_DOCUMENT_DB} subnets. The VPC provided only "\
+                f"has {len(selected_subnets.subnets)} subnets."
+        return selected_subnets
 
     def _create_custom_resource(self) -> cr.Provider:
         config = self._get_lambda_config()
@@ -197,10 +208,10 @@ class DocumentDatabase(Construct):
             statement=iam.PolicyStatement(
                 actions=["secretsmanager:GetSecretValue"],
                 effect=iam.Effect.ALLOW,
-                resources=[self._secret_arn],
+                resources=self._get_secret_arns(),
             )
         )
-        provider = cr.Provider(
+        provider: cr.Provider = cr.Provider(
             self,
             id="custom-resource-provider",
             on_event_handler=lambda_function,
@@ -210,22 +221,25 @@ class DocumentDatabase(Construct):
             self,
             id="custom-resource",
             service_token=provider.service_token,
-            properties={"hash": get_hash_for_all_files_in_dir(SRC_DIR)},
+            properties={"hash": get_hash_for_all_files_in_dir(CONSTRUCTS_DIR)},
         )
         return custom_resource
 
-
     def _get_lambda_config(self) -> PythonLambdaPropsBuilderConfigModel:
+        runtime_settings = RuntimeDocumentDBSettings(
+            cluster_host_name=self.db_cluster.attr_cluster_endpoint,
+            **self._settings.dict(),
+        )
         lambda_config = PythonLambdaPropsBuilderConfigModel(
             function_name="pinecone-db-custom-resource",
             description="Custom resource for performing CRUD operations on the pinecone database",
             code_path=DOCUMENT_DB_CUSTOM_RESOURCE_DIR,
             handler_module_name="main",
             handler_name="lambda_handler",
-            runtime_environment=self._db_settings,
+            runtime_environment=runtime_settings,
             requirements_file_path=DOCUMENT_DB_CUSTOM_RESOURCE_DIR / "requirements.txt",
             files_to_copy_into_handler_dir=[
-                CDK_DIR / "schemas.py",
+                CONSTRUCTS_DIR / "construct_config.py",
                 DOCUMENT_DB_CUSTOM_RESOURCE_DIR.parent / "custom_resource_interface.py",
             ],
             timeout=Duration.minutes(3),
@@ -233,3 +247,11 @@ class DocumentDatabase(Construct):
             ephemeral_storage_size=StorageSize.mebibytes(512),
         )
         return lambda_config
+
+    def _get_secret_arns(self) -> List[str]:
+        secret_names = [
+            self._settings.admin_user_password_secret_name,
+            self._settings.read_only_user_password_secret_name,
+            self._settings.read_write_user_password_secret_name,
+        ]
+        return [get_secret_arn_from_name(secret_name) for secret_name in secret_names if secret_name is not None]

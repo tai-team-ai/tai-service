@@ -27,22 +27,17 @@ class BuiltInMongoDBRoles(str, Enum):
 class BaseDocumentDBSettings(BasePydanticSettings):
     """Define the base settings for the document database."""
 
-    cluster_host_name: str = Field(
+    cluster_name: str = Field(
         ...,
-        description="The fully qualified domain name of the cluster.",
+        description="The name of the cluster.",
     )
     cluster_port: int = Field(
-        ...,
+        default=27017,
         description="The port number of the cluster.",
     )
     db_name: str = Field(
         ...,
         description="The name of the database.",
-    )
-    server_selection_timeout: int = Field(
-        default=10,
-        const=True,
-        description="The number of seconds to wait for a server to be selected.",
     )
 
     class Config:
@@ -51,47 +46,24 @@ class BaseDocumentDBSettings(BasePydanticSettings):
         env_prefix = "DOC_DB_"
 
 
-class ReadOnlyDocumentDBSettings(BaseDocumentDBSettings):
+class MongoDBUser(BaseModel):
     """Define the settings for the collections."""
 
-    read_only_username: Optional[str] = Field(
-        default=None,
-        description="The name of the database user with read-only permissions.",
+    username: Optional[str] = Field(
+        ...,
+        description="The name of the database user.",
     )
-    read_only_user_password_secret_name: Optional[str] = Field(
-        default=None,
-        description="The name of the secret containing the read-only user password.",
+    role: BuiltInMongoDBRoles = Field(
+        default=BuiltInMongoDBRoles.READ,
+        description="The built-in MongoDB role to assign to the user.",
     )
-
-    @validator("read_only_user_password_secret_name")
-    def ensure_user_name(cls, password_secret_name: str, values: dict) -> str:
-        """Ensure that a secret name is provided."""
-        if password_secret_name:
-            assert values.get("read_only_user_name"), "Please provide a user name."
-        return password_secret_name
-
-
-class ReadWriteDocumentDBSettings(BaseDocumentDBSettings):
-    """Define the settings for the collections."""
-
-    read_write_username: Optional[str] = Field(
-        default=None,
-        description="The name of the database user with read/write permissions.",
-    )
-    read_write_user_password_secret_name: Optional[str] = Field(
-        default=None,
-        description="The name of the secret containing the read/write user password.",
+    password_secret_name: Optional[str] = Field(
+        ...,
+        description="The name of the secret containing the user password.",
     )
 
-    @validator("read_write_user_password_secret_name")
-    def ensure_user_name(cls, password_secret_name: str, values: dict) -> str:
-        """Ensure that a secret name is provided."""
-        if password_secret_name:
-            assert values.get("read_write_user_name"), "Please provide a user name."
-        return password_secret_name
 
-
-class AdminDocumentDBSettings(ReadOnlyDocumentDBSettings, ReadWriteDocumentDBSettings):
+class AdminDocumentDBSettings(BaseDocumentDBSettings):
     """Define the settings for the collections."""
 
     admin_username: str = Field(
@@ -116,6 +88,10 @@ class CollectionConfig(BaseModel):
         default=None,
         description="The fields to index for the collection.",
     )
+    shard_key: Optional[str] = Field(
+        default=None,
+        description="The field to use as the shard key.",
+    )
 
 
 class DocumentDBSettings(AdminDocumentDBSettings):
@@ -125,8 +101,14 @@ class DocumentDBSettings(AdminDocumentDBSettings):
         default=None,
         description="The indexes to create for each collection.",
     )
+    user_config: Optional[List[MongoDBUser]] = Field(
+        ...,
+        max_items=3,
+        min_items=1,
+        description="The users to create for the database.",
+    )
 
-    @validator("collection_indexes")
+    @validator("collection_config")
     def ensure_no_duplicate_indexes(cls, collections: Optional[List[CollectionConfig]]) -> Optional[CollectionConfig]:
         """Ensure that there are no duplicate indexes."""
         if collections is None:
@@ -137,10 +119,29 @@ class DocumentDBSettings(AdminDocumentDBSettings):
         return collections
 
 
+class RuntimeDocumentDBSettings(DocumentDBSettings):
+    """Define runtime settings for the document database."""
+
+    cluster_host_name: str = Field(
+        ...,
+        description="""The fully qualified domain name of the cluster.
+            Note, this is not the same as the cluster name.
+            Examples:
+                cluster_host_name: cluster-1234567890.us-east-1.docdb.amazonaws.com
+                cluster_name: cluster-1234567890
+        """,
+    )
+    server_selection_timeout: int = Field(
+        default=10,
+        const=True,
+        description="The number of seconds to wait for a server to be selected.",
+    )
+
+
 class DocumentDBCustomResource(CustomResourceInterface):
     """Define the Lambda function for initializing the database."""
 
-    def __init__(self, event: CloudFormationCustomResourceEvent, context: LambdaContext, settings: DocumentDBSettings) -> None:
+    def __init__(self, event: CloudFormationCustomResourceEvent, context: LambdaContext, settings: RuntimeDocumentDBSettings) -> None:
         super().__init__(event, context)
         password = self.get_secret(settings.admin_user_password_secret_name)
         self._settings = settings
@@ -159,20 +160,8 @@ class DocumentDBCustomResource(CustomResourceInterface):
 
     def _create_database(self) -> None:
         db = self._mongo_client[self._settings.db_name]
-        if self._settings.read_only_user_password_secret_name:
-            self._run_operation_with_retry(
-                self._create_user,
-                db,
-                self._settings.read_only_user_password_secret_name,
-                self._settings.read_only_username
-            )
-        if self._settings.read_write_user_password_secret_name:
-            self._run_operation_with_retry(
-                self._create_user,
-                db,
-                self._settings.read_write_user_password_secret_name,
-                self._settings.read_write_username
-            )
+        for user in self._settings.user_config:
+            self._run_operation_with_retry(self._create_user, db, user)
         self._run_operation_with_retry(self._create_collections, db)
         self._run_operation_with_retry(self._create_shards, db, self._mongo_client)
         self._run_operation_with_retry(self._create_indexes, db)
@@ -185,14 +174,14 @@ class DocumentDBCustomResource(CustomResourceInterface):
     def _delete_database(self) -> None:
         raise NotImplementedError("Delete operation not implemented.")
 
-    def _create_user(self, db: Database, secret_name: str, user_name: str) -> None:
-        password = self.get_secret(secret_name)
-        logger.info(f"Creating user: {user_name}")
+    def _create_user(self, db: Database, user: MongoDBUser) -> None:
+        password = self.get_secret(user.password_secret_name)
+        logger.info(f"Creating user: {user.username}")
         db.command({
-            "createUser": user_name,
+            "createUser": user.username,
             "pwd": password,
             "roles": [
-                {"role": BuiltInMongoDBRoles.READ.value, "db": db.name},
+                {"role": user.role, "db": db.name},
             ],
         })
 

@@ -37,7 +37,7 @@ class AWSDeploymentSettings(BaseSettings):
     )
     aws_region: AWSRegion = Field(
         default=AWSRegion.US_EAST_1,
-        env="AWS_REGION",
+        env="AWS_DEFAULT_REGION",
         description="The AWS region to deploy to.",
     )
     aws_environment: Optional[Environment] = Field(

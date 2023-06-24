@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Any, Optional, Union
 import re
 from constructs import Construct
+import boto3
 from loguru import logger
 from aws_cdk import (
     aws_ec2 as ec2,
@@ -87,3 +88,31 @@ def get_hash_for_all_files_in_dir(dir_path: Path) -> str:
                 hash_string += hashlib.md5(bytes_buffer).hexdigest()
     hash_string = hashlib.md5(hash_string.encode("utf-8")).hexdigest()
     return hash_string
+
+def get_secret_arn_from_name(secret_name: str) -> str:
+    """Get the ARN of a secret from its name.
+
+    Args:
+        deployment_settings (AWSDeploymentSettings): The deployment settings for the stack.
+        secret_name (str): The name of the secret to get the ARN for.
+
+    Returns:
+        str: The ARN of the secret.
+    """
+    client = boto3.client("secretsmanager")
+    response = client.describe_secret(SecretId=secret_name)
+    return response["ARN"]
+
+def retrieve_secret(secret_name: str) -> str:
+    """Retrieve a secret from AWS Secrets Manager.
+
+    Args:
+        deployment_settings (AWSDeploymentSettings): The deployment settings for the stack.
+        secret_name (str): The name of the secret to retrieve.
+
+    Returns:
+        str: The value of the secret.
+    """
+    client = boto3.client("secretsmanager")
+    response = client.get_secret_value(SecretId=secret_name)
+    return response["SecretString"]

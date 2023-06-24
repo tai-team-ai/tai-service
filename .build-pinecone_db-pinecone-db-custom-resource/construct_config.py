@@ -25,5 +25,3 @@ class BasePydanticSettings(BaseSettings):
         use_enum_values = True
         env_file = ".env"
         env_file_encoding = "utf-8"
-
-    def

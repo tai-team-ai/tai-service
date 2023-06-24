@@ -9,14 +9,14 @@ from aws_cdk import (
     Size as StorageSize,
 )
 from .customresources.pinecone_db.pinecone_db_custom_resource import PineconeDBSettings
-from .construct_helpers import get_hash_for_all_files_in_dir
+from .construct_helpers import get_hash_for_all_files_in_dir, get_secret_arn_from_name
 from .python_lambda_props_builder import (
     PythonLambdaPropsBuilderConfigModel,
     PythonLambdaPropsBuilder,
 )
 
 CONSTRUCTS_DIR = Path(__file__).parent
-PINECONE_CUSTOM_RESOURCE_DIR = CONSTRUCTS_DIR / "customresources" / "pinecone_db_custom_resource"
+PINECONE_CUSTOM_RESOURCE_DIR = CONSTRUCTS_DIR / "customresources" / "pinecone_db"
 
 class PineconeDatabase(Construct):
     """Define the Pinecone database construct."""
@@ -25,13 +25,12 @@ class PineconeDatabase(Construct):
         self,
         scope: Construct,
         construct_id: str,
-        pinecone_db_api_secret_arn: str,
         db_settings: PineconeDBSettings,
         **kwargs,
     ) -> None:
         """Initialize the Pinecone database construct."""
         super().__init__(scope, construct_id, **kwargs)
-        self._secret_arn = pinecone_db_api_secret_arn
+        self._secret_arn = get_secret_arn_from_name(db_settings.api_key_secret_name)
         self._db_settings = db_settings
         self.custom_resource_provider = self._create_custom_resource()
 

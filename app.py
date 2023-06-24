@@ -1,16 +1,16 @@
 """Define the search service app."""
 from aws_cdk import App
 from tai_service.cdk.stacks.search_database_stack import SearchServiceDatabases
-from tai_service.schemas import (
-    AdminDocumentDBSettings,
-    BasePineconeDBSettings,
+from tai_service.cdk.stacks.search_databases_settings import (
+    DOCUMENT_DB_SETTINGS,
+    PINECONE_DB_SETTINGS,
 )
 from tai_service.cdk.stack_config_models import (
     StackConfigBaseModel,
     AWSDeploymentSettings,
 )
 
-app = App()
+app: App = App()
 
 AWS_DEPLOYMENT_SETTINGS = AWSDeploymentSettings()
 
@@ -27,15 +27,11 @@ base_stack_config = StackConfigBaseModel(
     }
 )
 
-# doc_db_settings = AdminDocumentDBSettings()
-pinecone_db_settings = BasePineconeDBSettings()
-
 search_service_databases = SearchServiceDatabases(
     app,
 	config=base_stack_config,
-	doc_db_settings="doc_db_settings",
-	pinecone_db_settings=pinecone_db_settings,
+    doc_db_settings=DOCUMENT_DB_SETTINGS,
+    pinecone_db_settings=PINECONE_DB_SETTINGS,
 )
-
 
 app.synth()

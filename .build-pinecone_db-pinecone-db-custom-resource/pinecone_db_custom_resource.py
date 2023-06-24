@@ -1,6 +1,5 @@
 """Defines the PineconeDBSetupLambda class and handler."""
 from enum import Enum
-import json
 from typing import Any, Dict, List, Optional, TypedDict
 from loguru import logger
 from pydantic import BaseModel, Field, validator
@@ -9,12 +8,12 @@ import pinecone
 # first imports are for local development, second imports are for deployment
 try:
     from ..custom_resource_interface import CustomResourceInterface
-    from tai_service.schemas import BasePineconeDBSettings
+    from ...construct_config import BasePydanticSettings
     from aws_lambda_powertools.utilities.typing import LambdaContext
     from aws_lambda_typing.events import CloudFormationCustomResourceEvent
 except ImportError:
     from custom_resource_interface import CustomResourceInterface
-    from schemas import BasePineconeDBSettings
+    from construct_config import BasePydanticSettings
     LambdaContext = CloudFormationCustomResourceEvent = Any
 
 
@@ -46,6 +45,30 @@ class DistanceMetric(str, Enum):
     EUCLIDEAN = "euclidean"
     COSINE = "cosine"
     DOT_PRODUCT = "dotproduct"
+
+
+class PineConeEnvironment(str, Enum):
+    """Define the environments for the Pinecone project."""
+
+    EAST_1 = "us-east-1-aws"
+
+
+class BasePineconeDBSettings(BasePydanticSettings):
+    """Define the settings for initializing the Pinecone database."""
+
+    api_key_secret_name: str = Field(
+        ...,
+        description="The name of the secret containing the Pinecone API key.",
+    )
+    environment: PineConeEnvironment = Field(
+        ...,
+        description="The environment to use for the Pinecone project.",
+    )
+
+    class Config:
+        """Define the Pydantic config."""
+
+        env_prefix = "PINECONE_DB_"
 
 
 class PineconeIndexConfig(BaseModel):
@@ -125,23 +148,6 @@ class PineconeDBSettings(BasePineconeDBSettings):
         if len(index_names) != len(set(index_names)):
             raise ValueError("Index names must be unique.")
         return indexes
-
-
-def lambda_handler(event: CloudFormationCustomResourceEvent, context: LambdaContext) -> None:
-    """
-    Run the database operation.
-
-    This function is invoked by the CloudFormation custom resource. It is responsible for
-    running CRUD operations on the database by retrieving admin credentials from Secrets Manager and
-    creating indexes for the database.
-
-    Currently, only create operations are supported, but this function could be extended
-    to include all CRUD operations.
-    """
-    logger.info(f"Received event: {json.dumps(event)}")
-    settings = PineconeDBSettings()
-    custom_resource = PineconeDBSetupCustomResource(event, context, settings)
-    custom_resource.execute_crud_operation()
 
 
 class PineconeDBSetupCustomResource(CustomResourceInterface):
