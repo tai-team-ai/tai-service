@@ -18,7 +18,7 @@ except ImportError:
 
 DELAY_BEFORE_CONNECTION_ATTEMPT = 5
 MAX_NUM_ATTEMPTS = 3
-DELAY_BETWEEN_ATTEMPTS = 5
+DELAY_BETWEEN_ATTEMPTS = 3
 
 
 class CRUDOperation(str, Enum):
@@ -61,7 +61,8 @@ class CustomResourceInterface(ABC):
             retries={
                 "max_attempts": MAX_NUM_ATTEMPTS,
                 "mode": "standard",
-            }
+            },
+            read_timeout=10,
         )
         client = session.client(
             service_name="secretsmanager",

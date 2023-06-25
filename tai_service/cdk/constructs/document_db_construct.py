@@ -150,21 +150,24 @@ class DocumentDatabase(Construct):
 
     def _create_restricted_security_group(self, name: str, description: str) -> ec2.SecurityGroup:
         """Create the security groups for the cluster."""
-        name = self._namer(name)
+        name = self._namer(name) + "-sg"
         security_group: ec2.SecurityGroup = ec2.SecurityGroup(
             self,
             id=name,
-            security_group_name=name + "-sg",
+            security_group_name=name,
             description=description,
             vpc=self._config.vpc,
             allow_all_outbound=False,
         )
-        security_group.add_ingress_rule(
-            peer=security_group,
-            connection=ec2.Port.tcp(self._settings.cluster_port),
-            description="Allow traffic from the security group to the cluster.",
-        )
         return security_group
+
+    def _add_security_group_rules_for_cluster(self) -> None:
+        """Add the security group rules for the cluster."""
+        self.security_group.add_ingress_rule(
+            peer=self.security_group,
+            connection=ec2.Port.tcp(self._settings.cluster_port),
+            description="Allow traffic from the VPC.",
+        )
 
     def _create_cluster(self) -> Union[docdb_elastic.CfnCluster, docdb.DatabaseCluster]:
         """Create the DocumentDB cluster."""
@@ -212,6 +215,7 @@ class DocumentDatabase(Construct):
         for user in self._settings.user_config:
             arn = get_secret_arn_from_name(user.password_secret_name)
             secret_arns.append(arn)
+        secret_arns.append(get_secret_arn_from_name(self._settings.admin_user_password_secret_name))
         lambda_function.add_to_role_policy(
             statement=iam.PolicyStatement(
                 actions=["secretsmanager:GetSecretValue"],

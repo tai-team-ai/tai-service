@@ -61,7 +61,8 @@ class CustomResourceInterface(ABC):
             retries={
                 "max_attempts": MAX_NUM_ATTEMPTS,
                 "mode": "standard",
-            }
+            },
+            read_timeout=10,
         )
         client = session.client(
             service_name="secretsmanager",
