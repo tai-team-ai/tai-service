@@ -204,11 +204,15 @@ class DocumentDatabase(Construct):
             construct_id=f"custom-resource-lambda-{name}",
             config=config,
         )
+        secret_arns = []
+        for user in self._settings.user_config:
+            arn = get_secret_arn_from_name(user.password_secret_name)
+            secret_arns.append(arn)
         lambda_function.add_to_role_policy(
             statement=iam.PolicyStatement(
                 actions=["secretsmanager:GetSecretValue"],
                 effect=iam.Effect.ALLOW,
-                resources=self._get_secret_arns(),
+                resources=secret_arns,
             )
         )
         provider: cr.Provider = cr.Provider(
@@ -231,8 +235,8 @@ class DocumentDatabase(Construct):
             **self._settings.dict(),
         )
         lambda_config = PythonLambdaPropsBuilderConfigModel(
-            function_name="pinecone-db-custom-resource",
-            description="Custom resource for performing CRUD operations on the pinecone database",
+            function_name="document-db-custom-resource",
+            description="Custom resource for performing CRUD operations on the document database",
             code_path=DOCUMENT_DB_CUSTOM_RESOURCE_DIR,
             handler_module_name="main",
             handler_name="lambda_handler",
@@ -247,11 +251,3 @@ class DocumentDatabase(Construct):
             ephemeral_storage_size=StorageSize.mebibytes(512),
         )
         return lambda_config
-
-    def _get_secret_arns(self) -> List[str]:
-        secret_names = [
-            self._settings.admin_user_password_secret_name,
-            self._settings.read_only_user_password_secret_name,
-            self._settings.read_write_user_password_secret_name,
-        ]
-        return [get_secret_arn_from_name(secret_name) for secret_name in secret_names if secret_name is not None]

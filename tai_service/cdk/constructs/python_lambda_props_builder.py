@@ -127,7 +127,7 @@ class PythonLambdaPropsBuilder:
             "description": config.description,
             "handler": f"{config.handler_module_name}.{config.handler_name}",
             "runtime": _lambda.Runtime.PYTHON_3_10,
-            "environment": config.runtime_environment.dict(by_alias=True, exclude_none=True),
+            "environment": config.runtime_environment.dict(by_alias=True, exclude_none=True, for_environment=True),
             "layers": [],
         }
         self._create_optional_props()
