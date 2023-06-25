@@ -1,7 +1,7 @@
 """Define settings for instantiating search databases."""
 import os
 from dotenv import load_dotenv
-from tai_service.cdk.constructs.customresources.document_db.document_db_custom_resource import (
+from tai_service.cdk.constructs.customresources.document_db.settings import (
     DocumentDBSettings,
     CollectionConfig,
     MongoDBUser,
@@ -42,14 +42,12 @@ COLLECTION_CONFIG = [
 load_dotenv()
 USER_CONFIG = [
     MongoDBUser(
-        username="readOnlyUser",
+        secret_name=os.environ.get("DOC_DB_READ_ONLY_USER_PASSWORD_SECRET_NAME"),
         role=BuiltInMongoDBRoles.READ,
-        password_secret_name=os.environ.get("DOC_DB_READ_ONLY_USER_PASSWORD_SECRET_NAME"),
     ),
     MongoDBUser(
-        username="readWriteUser",
+        secret_name=os.environ.get("DOC_DB_READ_WRITE_USER_PASSWORD_SECRET_NAME"),
         role=BuiltInMongoDBRoles.READ_WRITE,
-        password_secret_name=os.environ.get("DOC_DB_READ_WRITE_USER_PASSWORD_SECRET_NAME"),
     ),
 ]
 DOCUMENT_DB_SETTINGS = DocumentDBSettings(

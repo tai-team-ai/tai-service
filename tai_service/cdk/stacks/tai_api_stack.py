@@ -1,13 +1,16 @@
 """Define the stack for the TAI API service."""
 from typing import Union
+from pathlib import Path
 from constructs import Construct
-from pydantic import Field
 from aws_cdk import (
     Stack,
     aws_lambda as _lambda,
     aws_iam as iam,
     aws_ec2 as ec2,
+    Duration,
+    Size as StorageSize,
 )
+from ...api.runtime_settings import TaiApiSettings
 from ..stack_config_models import StackConfigBaseModel
 from ..constructs.python_lambda_construct import PythonLambda, PythonLambdaConfigModel
 from ..constructs.construct_helpers import (
@@ -17,8 +20,10 @@ from ..constructs.construct_helpers import (
 )
 
 
-
-
+CDK_DIR = Path(__file__).parent.parent
+API_DIR = CDK_DIR.parent / "api"
+CONSTRUCT_DIR = CDK_DIR / "constructs"
+DOC_DB_CUSTOM_RESOURCE_DIR = CONSTRUCT_DIR / "customresources" / "document_db"
 
 
 class TaiApiStack(Stack):
@@ -42,6 +47,7 @@ class TaiApiStack(Stack):
             termination_protection=config.termination_protection,
         )
         self._settings = api_settings
+        self._vpc = get_vpc(self, vpc)
 
     def _create_custom_resource(self) -> _lambda.Function:
         config = self._get_lambda_config()
@@ -49,6 +55,7 @@ class TaiApiStack(Stack):
         lambda_function = PythonLambda.get_lambda_function(
             self,
             construct_id=f"{name}-lambda",
+            config=config,
         )
         self._add_secrets_to_lambda_role(lambda_function)
         return lambda_function
@@ -59,40 +66,43 @@ class TaiApiStack(Stack):
             statement=iam.PolicyStatement(
                 actions=["secretsmanager:GetSecretValue"],
                 effect=iam.Effect.ALLOW,
-                resources=[get_secret_arn_from_name(self, self._settings.password_secret_name)],
+                resources=[get_secret_arn_from_name(self, self._settings.secret_name)],
             )
         )
 
     def _get_lambda_config(self) -> PythonLambdaConfigModel:
+        function_name = "tai-service-api"
         security_group = create_restricted_security_group(
-            name="lambda",
+            name=function_name + "-sg",
             description="The security group for the DocumentDB lambda.",
+            vpc=self._vpc,
         )
+        subnet_type = ec2.SubnetType.PUBLIC
         ec2.InterfaceVpcEndpoint(
             self,
             id="lambda-secrets-manager-endpoint",
-            vpc=self._config.vpc,
+            vpc=self._vpc,
             service=ec2.InterfaceVpcEndpointAwsService.SECRETS_MANAGER,
             security_groups=[security_group],
-            subnets=ec2.SubnetSelection(subnet_type=self._config.subnet_type),
+            subnets=ec2.SubnetSelection(subnet_type=subnet_type),
         )
         lambda_config = PythonLambdaConfigModel(
-            function_name="document-db-custom-resource",
-            description="Custom resource for performing CRUD operations on the document database",
-            code_path=DOCUMENT_DB_CUSTOM_RESOURCE_DIR,
+            function_name=function_name,
+            description="The lambda for the TAI API service.",
+            code_path=API_DIR,
             handler_module_name="main",
             handler_name="lambda_handler",
-            runtime_environment=runtime_settings,
-            requirements_file_path=DOCUMENT_DB_CUSTOM_RESOURCE_DIR / "requirements.txt",
+            runtime_environment=self._settings,
+            requirements_file_path=API_DIR / "requirements.txt",
             files_to_copy_into_handler_dir=[
-                CONSTRUCTS_DIR / "construct_config.py",
-                DOCUMENT_DB_CUSTOM_RESOURCE_DIR.parent / "custom_resource_interface.py",
+                CONSTRUCT_DIR / "construct_config.py",
+                DOC_DB_CUSTOM_RESOURCE_DIR / "settings.py",
             ],
             timeout=Duration.minutes(3),
             memory_size=128,
             ephemeral_storage_size=StorageSize.mebibytes(512),
-            vpc=self._config.vpc,
-            subnet_selection=ec2.SubnetSelection(subnet_type=self._config.subnet_type),
-            security_groups=[security_group, self.security_group],
+            vpc=self._vpc,
+            subnet_selection=ec2.SubnetSelection(subnet_type=subnet_type),
+            security_groups=[security_group],
         )
         return lambda_config

@@ -137,7 +137,7 @@ class DocumentDatabase(Construct):
         self._config = db_config
         self._settings = db_setup_settings
         self.security_group = create_restricted_security_group(
-            name="cluster",
+            name=self._namer("cluster-sg"),
             description="The security group for the DocumentDB cluster.",
             vpc=self._config.vpc,
         )
@@ -237,7 +237,7 @@ class DocumentDatabase(Construct):
             **self._settings.dict(),
         )
         security_group = create_restricted_security_group(
-            name="lambda",
+            name=self._namer("lambda-sg"),
             description="The security group for the DocumentDB lambda.",
             vpc=self._config.vpc,
         )
