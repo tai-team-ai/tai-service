@@ -49,10 +49,6 @@ class BaseDocumentDBSettings(BasePydanticSettings):
 class MongoDBUser(BaseModel):
     """Define the settings for the collections."""
 
-    username: Optional[str] = Field(
-        ...,
-        description="The name of the database user.",
-    )
     role: BuiltInMongoDBRoles = Field(
         default=BuiltInMongoDBRoles.READ,
         description="The built-in MongoDB role to assign to the user.",
@@ -60,6 +56,14 @@ class MongoDBUser(BaseModel):
     password_secret_name: Optional[str] = Field(
         ...,
         description="The name of the secret containing the user password.",
+    )
+    username_secret_field_name: str = Field(
+        default="username",
+        description="The name of the field containing the username.",
+    )
+    password_secret_field_name: str = Field(
+        default="password",
+        description="The name of the field in containing the password.",
     )
 
 

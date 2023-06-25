@@ -116,3 +116,16 @@ def retrieve_secret(secret_name: str) -> str:
     client = boto3.client("secretsmanager")
     response = client.get_secret_value(SecretId=secret_name)
     return response["SecretString"]
+
+
+def create_restricted_security_group(name: str, description: str, vpc: ec2.IVpc) -> ec2.SecurityGroup:
+    """Create the security groups for the cluster."""
+    security_group: ec2.SecurityGroup = ec2.SecurityGroup(
+        self,
+        id=name + "-sg",
+        security_group_name=name,
+        description=description,
+        vpc=vpc,
+        allow_all_outbound=False,
+    )
+    return security_group

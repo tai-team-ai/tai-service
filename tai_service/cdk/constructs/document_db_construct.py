@@ -21,6 +21,7 @@ from .construct_helpers import (
     retrieve_secret,
     get_secret_arn_from_name,
     get_vpc,
+    create_restricted_security_group,
 )
 from .python_lambda_construct import (
     PythonLambda,
@@ -135,9 +136,10 @@ class DocumentDatabase(Construct):
         db_config.vpc = get_vpc(self, db_config.vpc)
         self._config = db_config
         self._settings = db_setup_settings
-        self.security_group = self._create_restricted_security_group(
+        self.security_group = create_restricted_security_group(
             name="cluster",
             description="The security group for the DocumentDB cluster.",
+            vpc=self._config.vpc,
         )
         self.security_group.add_ingress_rule(
             peer=ec2.Peer.any_ipv4(),
@@ -148,19 +150,6 @@ class DocumentDatabase(Construct):
         self.db_cluster = self._create_cluster()
         self.custom_resource = self._create_custom_resource()
         self.custom_resource.node.add_dependency(self.db_cluster)
-
-    def _create_restricted_security_group(self, name: str, description: str) -> ec2.SecurityGroup:
-        """Create the security groups for the cluster."""
-        name = self._namer(name) + "-sg"
-        security_group: ec2.SecurityGroup = ec2.SecurityGroup(
-            self,
-            id=name,
-            security_group_name=name,
-            description=description,
-            vpc=self._config.vpc,
-            allow_all_outbound=False,
-        )
-        return security_group
 
     def _add_security_group_rules_for_cluster(self) -> None:
         """Add the security group rules for the cluster."""
@@ -247,9 +236,10 @@ class DocumentDatabase(Construct):
             cluster_host_name=self.db_cluster.attr_cluster_endpoint,
             **self._settings.dict(),
         )
-        security_group = self._create_restricted_security_group(
+        security_group = create_restricted_security_group(
             name="lambda",
             description="The security group for the DocumentDB lambda.",
+            vpc=self._config.vpc,
         )
         ec2.InterfaceVpcEndpoint(
             self,
