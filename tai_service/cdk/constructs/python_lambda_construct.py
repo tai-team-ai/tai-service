@@ -23,8 +23,24 @@ from .construct_helpers import get_vpc, sanitize_name, validate_vpc
 TEMP_BUILD_DIR = "/tmp/lambda-build"
 MAX_LENGTH_FOR_FUNCTION_NAME = 64
 
+class LambdaURLConfigModel(BaseModel):
+    """Define the configuration for the Lambda URL."""
 
-class PythonLambdaPropsBuilderConfigModel(BaseModel):
+    auth_type: _lambda.FunctionUrlAuthType = Field(
+        default=_lambda.FunctionUrlAuthType.AWS_IAM,
+        description="The authentication type for the Lambda when using url access.",
+    )
+    invoke_mode: _lambda.InvokeMode = Field(
+        default=_lambda.InvokeMode.BUFFERED,
+        description="The invoke mode for the Lambda when using url access.",
+    )
+    allowed_headers: Optional[list[str]] = Field(
+        default=[],
+        description="The allowed headers for the Lambda when using url access.",
+    )
+
+
+class PythonLambdaConfigModel(BaseModel):
     """Define the configuration for the Python Lambda properties builder."""
 
     function_name: str = Field(
@@ -87,6 +103,10 @@ class PythonLambdaPropsBuilderConfigModel(BaseModel):
         default=StorageSize.mebibytes(512),
         description="The ephemeral storage size for the Lambda function.",
     )
+    function_url: Optional[LambdaURLConfigModel] = Field(
+        default=None,
+        description="The configuration for the Lambda URL. If provided, the Lambda will be accessible via a URL.",
+    )
 
     class Config:
         """Define the Pydantic model configuration."""
@@ -112,11 +132,18 @@ class PythonLambdaPropsBuilderConfigModel(BaseModel):
         return validate_vpc(vpc)
 
 
-class PythonLambdaPropsBuilder:
+class PythonLambda(Construct):
     """Define a builder for Python Lambda properties."""
 
-    def __init__(self, scope: Construct, config: PythonLambdaPropsBuilderConfigModel) -> None:
+    def __init__(
+        self,
+        scope: Construct,
+        construct_id: str,
+        config: PythonLambdaConfigModel,
+        **kwargs,
+    ) -> None:
         """Initialize the builder."""
+        super().__init__(scope, construct_id, **kwargs)
         self._scope = scope
         config.vpc = get_vpc(scope, config.vpc)
         self._config = config
@@ -131,6 +158,13 @@ class PythonLambdaPropsBuilder:
             "layers": [],
         }
         self._create_optional_props()
+        self._lambda_function: _lambda.Function = _lambda.Function(scope, config.function_name, **self.lambda_props)
+        self._create_instantiated_props()
+
+    @property
+    def lambda_function(self) -> _lambda.Function:
+        """Return the Lambda function."""
+        return self._lambda_function
 
     @property
     def lambda_props(self) -> dict:
@@ -143,10 +177,10 @@ class PythonLambdaPropsBuilder:
         return function_props
 
     @staticmethod
-    def get_lambda_function(scope: Construct, construct_id: str, config: PythonLambdaPropsBuilderConfigModel) -> _lambda.Function:
+    def get_lambda_function(scope: Construct, construct_id: str, config: PythonLambdaConfigModel) -> _lambda.Function:
         """Return the Lambda function."""
-        builder = PythonLambdaPropsBuilder(scope, config)
-        return _lambda.Function(scope, construct_id, **builder.lambda_props)
+        builder = PythonLambda(scope, construct_id + "python-lambda", config)
+        return builder.lambda_function
 
     def _initialize_build_folder(self) -> None:
         if self._build_context_folder.exists():
@@ -171,6 +205,11 @@ class PythonLambdaPropsBuilder:
             self._function_props_dict["memory_size"] = config.memory_size
         if config.ephemeral_storage_size:
             self._function_props_dict["ephemeral_storage_size"] = config.ephemeral_storage_size
+
+    def _create_instantiated_props(self) -> None:
+        config = self._config
+        if config.function_url:
+            self._add_function_url(config.function_url)
 
     def _add_vpc_and_subnets(self) -> None:
         config = self._config
@@ -230,3 +269,13 @@ class PythonLambdaPropsBuilder:
     def _add_layer(self, layer: _lambda.ILayerVersion) -> None:
         layers = self._function_props_dict["layers"]
         layers.append(layer)
+
+    def _add_function_url(self, url_config: LambdaURLConfigModel) -> _lambda.FunctionUrl:
+        url = self._lambda_function.add_function_url(
+            auth_type=url_config.auth_type,
+            cors=_lambda.FunctionUrlCorsOptions(
+                allowed_headers=url_config.allowed_headers,
+            ),
+            invoke_mode=url_config.invoke_mode,
+        )
+        return url

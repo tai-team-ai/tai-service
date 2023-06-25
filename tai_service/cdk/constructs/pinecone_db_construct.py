@@ -10,9 +10,9 @@ from aws_cdk import (
 )
 from .customresources.pinecone_db.pinecone_db_custom_resource import PineconeDBSettings
 from .construct_helpers import get_hash_for_all_files_in_dir, get_secret_arn_from_name
-from .python_lambda_props_builder import (
-    PythonLambdaPropsBuilderConfigModel,
-    PythonLambdaPropsBuilder,
+from .python_lambda_construct import (
+    PythonLambdaConfigModel,
+    PythonLambda,
 )
 
 CONSTRUCTS_DIR = Path(__file__).parent
@@ -37,7 +37,7 @@ class PineconeDatabase(Construct):
     def _create_custom_resource(self) -> cr.Provider:
         config = self._get_lambda_config()
         name = config.function_name
-        lambda_function = PythonLambdaPropsBuilder.get_lambda_function(
+        lambda_function = PythonLambda.get_lambda_function(
             self,
             construct_id=f"custom-resource-lambda-{name}",
             config=config,
@@ -63,9 +63,8 @@ class PineconeDatabase(Construct):
         )
         return custom_resource
 
-
-    def _get_lambda_config(self) -> PythonLambdaPropsBuilderConfigModel:
-        lambda_config = PythonLambdaPropsBuilderConfigModel(
+    def _get_lambda_config(self) -> PythonLambdaConfigModel:
+        lambda_config = PythonLambdaConfigModel(
             function_name="pinecone-db-custom-resource",
             description="Custom resource for performing CRUD operations on the pinecone database",
             code_path=PINECONE_CUSTOM_RESOURCE_DIR,

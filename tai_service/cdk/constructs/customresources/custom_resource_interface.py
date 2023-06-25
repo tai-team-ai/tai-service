@@ -61,7 +61,7 @@ class CustomResourceInterface(ABC):
             retries={
                 "max_attempts": MAX_NUM_ATTEMPTS,
                 "mode": "standard",
-            },
+            },wwwww
             read_timeout=10,
         )
         client = session.client(

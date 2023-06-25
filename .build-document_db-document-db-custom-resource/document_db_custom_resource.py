@@ -142,9 +142,9 @@ class DocumentDBCustomResource(CustomResourceInterface):
 
     def __init__(self, event: CloudFormationCustomResourceEvent, context: LambdaContext, settings: RuntimeDocumentDBSettings) -> None:
         super().__init__(event, context)
-        password = self.get_secret(settings.admin_user_password_secret_name)
-        self._settings = settings
-        self._mongo_client = self._run_operation_with_retry(self._connect_to_database, password)
+        # password = self.get_secret(settings.admin_user_password_secret_name)
+        # self._settings = settings
+        # self._mongo_client = self._run_operation_with_retry(self._connect_to_database, password)
 
     def _connect_to_database(self, password: str) -> pymongo.MongoClient:
         logger.info("Creating MongoDB client")
