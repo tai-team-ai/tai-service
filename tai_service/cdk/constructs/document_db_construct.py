@@ -27,7 +27,7 @@ from .python_lambda_construct import (
     PythonLambda,
     PythonLambdaConfigModel,
 )
-from .customresources.document_db.document_db_custom_resource import DocumentDBSettings, RuntimeDocumentDBSettings
+from .customresources.document_db.settings import DocumentDBSettings, RuntimeDocumentDBSettings
 # This schema is defined by aws documentation for AWS Elastic DocumentDB
 # (https://docs.aws.amazon.com/cdk/api/v2/python/aws_cdk.aws_docdbelastic/CfnCluster.html)
 VALID_ADMIN_USERNAME_PATTERN = r"^(?!(admin|root|master|user|username|dbuser|dbadmin|dbroot|dbmaster)$)[a-zA-Z][a-zA-Z0-9]{0,62}$"

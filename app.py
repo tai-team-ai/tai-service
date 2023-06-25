@@ -16,10 +16,10 @@ app: App = App()
 
 AWS_DEPLOYMENT_SETTINGS = AWSDeploymentSettings()
 
-base_stack_config = StackConfigBaseModel(
+BASE_CONFIG = StackConfigBaseModel(
 	stack_id="default-stack",
 	stack_name="default-stack",
-	description="Default stack for the tai service. This stack contains the search service " \
+	description="Default stack for the tai service. This stack contains the search service ",
     deployment_settings=AWS_DEPLOYMENT_SETTINGS,
     duplicate_stack_for_development=True,
     termination_protection=False,
@@ -27,13 +27,15 @@ base_stack_config = StackConfigBaseModel(
         'blame': 'jacob',
     }
 )
-
+print(BASE_CONFIG.dict(exclude={"stack-id", "stack-name", "description"}))
+BASE_CONFIG = BASE_CONFIG.dict(exclude={"stack-id", "stack-name", "description"})
+print(BASE_CONFIG)
 search_databases_config = StackConfigBaseModel(
 	stack_id="search-service-databases",
 	stack_name="search-service-databases",
 	description="Stack for the search service databases. This stack contains the document " \
     	"database and the pinecone database used by the tai search service.",
-    **base_stack_config.dict(),
+    **BASE_CONFIG,
 )
 search_service_databases: SearchServiceDatabases = SearchServiceDatabases(
     scope=app,
@@ -47,7 +49,7 @@ tai_api_config = StackConfigBaseModel(
     stack_id="tai-api",
     stack_name="tai-api",
     description="Stack for the tai api service. This stack contains the tai api service.",
-    **base_stack_config.dict(),
+    **BASE_CONFIG,
 )
 tai_api = TaiApiStack(
     scope=app,
