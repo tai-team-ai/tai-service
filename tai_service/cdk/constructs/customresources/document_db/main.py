@@ -1,5 +1,6 @@
 """Define the lambda function for initializing the Pinecone database."""
 import json
+import traceback
 from loguru import logger
 from document_db_custom_resource import RuntimeDocumentDBSettings, DocumentDBCustomResource
 # first imports are for local development, second imports are for deployment
@@ -28,4 +29,5 @@ def lambda_handler(event: CloudFormationCustomResourceEvent, context: LambdaCont
         custom_resource = DocumentDBCustomResource(event, context, settings)
         custom_resource.execute_crud_operation()
     except Exception:
-        return
+        logger.exception("An exception occurred while running the custom resource.")
+        logger.info(traceback.format_exc())

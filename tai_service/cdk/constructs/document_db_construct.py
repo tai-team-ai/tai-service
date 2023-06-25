@@ -134,31 +134,35 @@ class DocumentDatabase(Construct):
         db_config.vpc = get_vpc(self, db_config.vpc)
         self._config = db_config
         self._settings = db_setup_settings
-        self.security_group = self._create_security_group()
+        self.security_group = self._create_restricted_security_group(
+            name="cluster",
+            description="The security group for the DocumentDB cluster.",
+        )
+        self.security_group.add_ingress_rule(
+            peer=ec2.Peer.any_ipv4(),
+            connection=ec2.Port.tcp(self._settings.cluster_port),
+            description="Allow traffic from any IP address.",
+        )
         self._config.security_groups.append(self.security_group)
         self.db_cluster = self._create_cluster()
         self.custom_resource = self._create_custom_resource()
         self.custom_resource.node.add_dependency(self.db_cluster)
 
-    def _create_security_group(self) -> ec2.SecurityGroup:
+    def _create_restricted_security_group(self, name: str, description: str) -> ec2.SecurityGroup:
         """Create the security groups for the cluster."""
-        name = self._namer("security-group")
+        name = self._namer(name)
         security_group: ec2.SecurityGroup = ec2.SecurityGroup(
             self,
             id=name,
-            security_group_name=name,
-            description=f"Security group for the DocumentDB cluster {self._config.cluster_name}",
+            security_group_name=name + "-sg",
+            description=description,
             vpc=self._config.vpc,
-        )
-        security_group.add_egress_rule(
-            peer=ec2.Peer.any_ipv4(),
-            connection=ec2.Port.tcp(443),
-            description="Allow outbound HTTPS traffic for the lambda function to access secrets manager.",
+            allow_all_outbound=False,
         )
         security_group.add_ingress_rule(
-            peer=ec2.Peer.any_ipv4(),
+            peer=security_group,
             connection=ec2.Port.tcp(self._settings.cluster_port),
-            description="Allow traffic from any IP address.",
+            description="Allow traffic from the security group to the cluster.",
         )
         return security_group
 
@@ -234,6 +238,15 @@ class DocumentDatabase(Construct):
             cluster_host_name=self.db_cluster.attr_cluster_endpoint,
             **self._settings.dict(),
         )
+        security_group = self._create_restricted_security_group(
+            name="lambda",
+            description="The security group for the DocumentDB lambda.",
+        )
+        security_group.add_egress_rule(
+            peer=ec2.Peer.any_ipv4(),
+            connection=ec2.Port.tcp(443),
+            description="Allow outbound traffic to the internet to access secrets manager.",
+        )
         lambda_config = PythonLambdaPropsBuilderConfigModel(
             function_name="document-db-custom-resource",
             description="Custom resource for performing CRUD operations on the document database",
@@ -249,5 +262,8 @@ class DocumentDatabase(Construct):
             timeout=Duration.minutes(3),
             memory_size=128,
             ephemeral_storage_size=StorageSize.mebibytes(512),
+            vpc=self._config.vpc,
+            subnet_selection=ec2.SubnetSelection(subnet_type=self._config.subnet_type),
+            security_groups=[security_group, self.security_group],
         )
         return lambda_config

@@ -131,10 +131,9 @@ class RuntimeDocumentDBSettings(DocumentDBSettings):
                 cluster_name: cluster-1234567890
         """,
     )
-    server_selection_timeout: int = Field(
-        default=10,
-        const=True,
-        description="The number of seconds to wait for a server to be selected.",
+    server_selection_timeout_MS: int = Field(
+        default=10000,
+        description="The number of milliseconds to wait for a server to be selected.",
     )
 
 

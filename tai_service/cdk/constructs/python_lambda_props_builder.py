@@ -162,9 +162,7 @@ class PythonLambdaPropsBuilder:
         if config.requirements_file_path:
             self._create_layer_with_requirements_file()
         if config.vpc:
-            self._function_props_dict["vpc"] = config.vpc
-            if config.subnet_selection:
-                self._function_props_dict["vpc_subnets"] = config.subnet_selection
+            self._add_vpc_and_subnets()
         if config.security_groups:
             self._function_props_dict["security_groups"] = config.security_groups
         if config.timeout:
@@ -173,6 +171,15 @@ class PythonLambdaPropsBuilder:
             self._function_props_dict["memory_size"] = config.memory_size
         if config.ephemeral_storage_size:
             self._function_props_dict["ephemeral_storage_size"] = config.ephemeral_storage_size
+
+    def _add_vpc_and_subnets(self) -> None:
+        config = self._config
+        self._function_props_dict["vpc"] = config.vpc
+        if config.subnet_selection:
+            self._function_props_dict["vpc_subnets"] = config.subnet_selection
+        if config.subnet_selection.subnet_type == ec2.SubnetType.PUBLIC:
+            logger.warning("Lambda is being deployed to a public subnet.")
+            self._function_props_dict["allow_public_subnet"] = True
 
     def _create_layer_with_zip_asset(self) -> None:
         config = self._config
