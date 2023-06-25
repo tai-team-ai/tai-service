@@ -158,7 +158,7 @@ class DocumentDatabase(Construct):
         security_group.add_ingress_rule(
             peer=ec2.Peer.any_ipv4(),
             connection=ec2.Port.tcp(self._settings.cluster_port),
-            description="Allow inbound traffic from the VPC CIDR block.",
+            description="Allow traffic from any IP address.",
         )
         return security_group
 

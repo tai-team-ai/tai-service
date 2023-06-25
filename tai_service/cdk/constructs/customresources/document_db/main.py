@@ -1,7 +1,7 @@
 """Define the lambda function for initializing the Pinecone database."""
 import json
 from loguru import logger
-from document_db_custom_resource import DocumentDBSettings, DocumentDBCustomResource
+from document_db_custom_resource import RuntimeDocumentDBSettings, DocumentDBCustomResource
 # first imports are for local development, second imports are for deployment
 try:
     from aws_lambda_powertools.utilities.typing import LambdaContext
@@ -24,7 +24,7 @@ def lambda_handler(event: CloudFormationCustomResourceEvent, context: LambdaCont
     """
     try:
         logger.info(f"Received event: {json.dumps(event)}")
-        settings = DocumentDBSettings()
+        settings = RuntimeDocumentDBSettings()
         custom_resource = DocumentDBCustomResource(event, context, settings)
         custom_resource.execute_crud_operation()
     except Exception:
