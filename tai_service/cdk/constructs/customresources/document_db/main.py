@@ -2,7 +2,8 @@
 import json
 import traceback
 from loguru import logger
-from document_db_custom_resource import RuntimeDocumentDBSettings, DocumentDBCustomResource
+from settings import RuntimeDocumentDBSettings
+from document_db_custom_resource import DocumentDBCustomResource
 # first imports are for local development, second imports are for deployment
 try:
     from aws_lambda_powertools.utilities.typing import LambdaContext

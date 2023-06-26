@@ -48,13 +48,12 @@ class SearchServiceDatabases(Stack):
 
     def _create_vpc(self) -> ec2.Vpc:
         subnet_configurations = []
-        for i in range(3):
-            subnet_configurations.append(
-                ec2.SubnetConfiguration(
-                    name=self._namer(f"subnet-{i}"),
-                    subnet_type=self._subnet_type_for_doc_db,
-                )
+        subnet_configurations.append(
+            ec2.SubnetConfiguration(
+                name=self._namer("subnet-isolated"),
+                subnet_type=ec2.SubnetType.PRIVATE_ISOLATED,
             )
+        )
         subnet_configurations.append(
             ec2.SubnetConfiguration(
                 name=self._namer("subnet-public"),

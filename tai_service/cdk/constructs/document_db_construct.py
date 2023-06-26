@@ -199,6 +199,10 @@ class DocumentDatabase(Construct):
             f"VPC must have at least {MINIMUM_SUBNETS_FOR_DOCUMENT_DB} subnets. " + default_msg
         assert num_subnets <= MAXIMUM_SUBNETS_FOR_DOCUMENT_DB,\
             f"VPC must have at most {MAXIMUM_SUBNETS_FOR_DOCUMENT_DB} subnets. " + default_msg
+        azs = set()
+        for subnet in selected_subnets.subnets:
+            azs.add(subnet.availability_zone)
+        assert len(azs) == num_subnets, "The subnets must be in different AZs."
         return selected_subnets
 
     def _create_custom_resource(self) -> cr.Provider:
