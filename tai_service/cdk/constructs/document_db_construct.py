@@ -36,7 +36,8 @@ VALID_CLUSTER_NAME_PATTERN = r"^[a-z][a-z0-9-]{0,62}$"
 VALID_SHARD_CAPACITIES = {2, 4, 8, 16, 32, 64}
 VALID_SHARD_COUNT_RANGE = range(1, 33)
 VALID_DAYS_OF_THE_WEEK = r'(Mon|Tue|Wed|Thu|Fri|Sat|Sun)'
-MINIMUM_SUBNETS_FOR_DOCUMENT_DB = 3
+MINIMUM_SUBNETS_FOR_DOCUMENT_DB = 2
+MAXIMUM_SUBNETS_FOR_DOCUMENT_DB = 6
 # Format: ddd:hh24:mi-ddd:hh24:mi
 VALID_MAINTENANCE_WINDOW_PATTERN =  fr'^{VALID_DAYS_OF_THE_WEEK}\:([01]\d|2[0-3])\:[0-5]\d\-([A-Z][a-z]{2})\:([01]\d|2[0-3])\:[0-5]\d$'
 CONSTRUCTS_DIR = Path(__file__).parent
@@ -137,6 +138,7 @@ class DocumentDatabase(Construct):
         self._config = db_config
         self._settings = db_setup_settings
         self.security_group = create_restricted_security_group(
+            scope=self,
             name=self._namer("cluster-sg"),
             description="The security group for the DocumentDB cluster.",
             vpc=self._config.vpc,
@@ -170,27 +172,33 @@ class DocumentDatabase(Construct):
 
     def _create_elastic_cluster(self) -> docdb_elastic.CfnCluster:
         """Create the DocumentDB cluster."""
-        admin_password = retrieve_secret(self._settings.admin_user_password_secret_name)
+        admin_secret_json = retrieve_secret(self._settings.secret_name)
+        username = admin_secret_json[self._settings.username_secret_field_name]
+        admin_password = admin_secret_json[self._settings.password_secret_field_name]
+        subnet_ids = [subnet.subnet_id for subnet in self._get_selected_subnets().subnets]
         cluster = docdb_elastic.CfnCluster(
             self,
             id=self._namer("cluster"),
             cluster_name=self._config.cluster_name,
-            admin_user_name=self._settings.admin_username,
+            admin_user_name=username,
             admin_user_password=admin_password,
             auth_type=self._config.auth_type.value,
             shard_count=self._config.shard_count,
             shard_capacity=self._config.shard_capacity,
             preferred_maintenance_window=self._config.maintenance_window,
-            subnet_ids=[subnet.subnet_id for subnet in self._get_selected_subnets().subnets],
+            subnet_ids=subnet_ids,
             vpc_security_group_ids=[security_group.security_group_id for security_group in self._config.security_groups],
         )
         return cluster
 
     def _get_selected_subnets(self) -> ec2.SelectedSubnets:
         selected_subnets = self._config.vpc.select_subnets(subnet_type=self._config.subnet_type)
-        assert len(selected_subnets.subnets) >= MINIMUM_SUBNETS_FOR_DOCUMENT_DB,\
-            f"VPC must have at least {MINIMUM_SUBNETS_FOR_DOCUMENT_DB} subnets. The VPC provided only "\
-                f"has {len(selected_subnets.subnets)} subnets."
+        num_subnets = len(selected_subnets.subnets)
+        default_msg = f"The VPC has {num_subnets} subnets of type {self._config.subnet_type}."
+        assert num_subnets >= MINIMUM_SUBNETS_FOR_DOCUMENT_DB,\
+            f"VPC must have at least {MINIMUM_SUBNETS_FOR_DOCUMENT_DB} subnets. " + default_msg
+        assert num_subnets <= MAXIMUM_SUBNETS_FOR_DOCUMENT_DB,\
+            f"VPC must have at most {MAXIMUM_SUBNETS_FOR_DOCUMENT_DB} subnets. " + default_msg
         return selected_subnets
 
     def _create_custom_resource(self) -> cr.Provider:
@@ -220,9 +228,9 @@ class DocumentDatabase(Construct):
         """Add the secrets to the lambda role."""
         secret_arns = []
         for user in self._settings.user_config:
-            arn = get_secret_arn_from_name(user.password_secret_name)
+            arn = get_secret_arn_from_name(user.secret_name)
             secret_arns.append(arn)
-        secret_arns.append(get_secret_arn_from_name(self._settings.admin_user_password_secret_name))
+        secret_arns.append(get_secret_arn_from_name(self._settings.secret_name))
         lambda_function.add_to_role_policy(
             statement=iam.PolicyStatement(
                 actions=["secretsmanager:GetSecretValue"],
@@ -237,6 +245,7 @@ class DocumentDatabase(Construct):
             **self._settings.dict(),
         )
         security_group = create_restricted_security_group(
+            scope=self,
             name=self._namer("lambda-sg"),
             description="The security group for the DocumentDB lambda.",
             vpc=self._config.vpc,

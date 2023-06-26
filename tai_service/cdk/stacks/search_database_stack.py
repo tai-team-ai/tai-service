@@ -47,32 +47,27 @@ class SearchServiceDatabases(Stack):
         add_tags(self, config.tags)
 
     def _create_vpc(self) -> ec2.Vpc:
-        subnet_configuration = []
-        for i in range(MINIMUM_SUBNETS_FOR_DOCUMENT_DB):
-            subnet_configuration.append(
+        subnet_configurations = []
+        for i in range(3):
+            subnet_configurations.append(
                 ec2.SubnetConfiguration(
                     name=self._namer(f"subnet-{i}"),
                     subnet_type=self._subnet_type_for_doc_db,
                 )
             )
-        subnet_configuration.append(
+        subnet_configurations.append(
             ec2.SubnetConfiguration(
-                name=self._namer("subnet-private"),
-                subnet_type=ec2.SubnetType.PRIVATE_WITH_EGRESS,
-            )
-        )
-        subnet_configuration.append(
-            ec2.SubnetConfiguration(
-                name=self._namer("subnet-isolated"),
-                subnet_type=ec2.SubnetType.PRIVATE_ISOLATED,
+                name=self._namer("subnet-public"),
+                subnet_type=ec2.SubnetType.PUBLIC,
             )
         )
         vpc = ec2.Vpc(
             scope=self,
             id=self._namer("vpc"),
             vpc_name=self._namer("vpc"),
-            max_azs=MINIMUM_SUBNETS_FOR_DOCUMENT_DB,
+            max_azs=3,
             nat_gateways=0,
+            subnet_configuration=subnet_configurations,
         )
         return vpc
 

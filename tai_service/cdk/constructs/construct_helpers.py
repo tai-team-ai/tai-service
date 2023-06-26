@@ -1,5 +1,6 @@
 """Define helper functions for CDK constructs."""
 import hashlib
+import json
 from pathlib import Path
 from typing import Any, Optional, Union
 import re
@@ -115,13 +116,19 @@ def retrieve_secret(secret_name: str) -> str:
     """
     client = boto3.client("secretsmanager")
     response = client.get_secret_value(SecretId=secret_name)
-    return response["SecretString"]
+    # try converting to dict with json loads
+    secret =  response["SecretString"]
+    try:
+        secret = json.loads(secret)
+    except:
+        pass
+    return secret
 
 
-def create_restricted_security_group(name: str, description: str, vpc: ec2.IVpc) -> ec2.SecurityGroup:
+def create_restricted_security_group(scope: Construct, name: str, description: str, vpc: ec2.IVpc) -> ec2.SecurityGroup:
     """Create the security groups for the cluster."""
     security_group: ec2.SecurityGroup = ec2.SecurityGroup(
-        self,
+        scope,
         id=name + "-sg",
         security_group_name=name,
         description=description,

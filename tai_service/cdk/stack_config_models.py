@@ -72,9 +72,10 @@ class AWSDeploymentSettings(BaseSettings):
     def initialize_environment(cls, env: Optional[Environment], values: dict) -> Environment:
         """Initialize the AWS environment."""
         if env is None:
+            region: AWSRegion = values.get("aws_region")
             return Environment(
                 account=values.get("aws_deployment_account_id"),
-                region=values.get("aws_region"),
+                region=region.value,
             )
         if env.account != values["aws_deployment_account_id"]:
             raise ValueError(
@@ -84,11 +85,16 @@ class AWSDeploymentSettings(BaseSettings):
             raise ValueError(
                 f"Environment region {env.region} does not match deployment region {values['aws_region']}."
             )
+        raise ValueError("AWS Environment must be initialized with account and region.")
 
 
 class StackConfigBaseModel(BaseModel):
     """Define the base model for stack configuration."""
 
+    deployment_settings: AWSDeploymentSettings = Field(
+        ...,
+        description="The AWS deployment settings.",
+    )
     stack_id: str = Field(
         ...,
         description="The ID of the stack.",
@@ -102,10 +108,6 @@ class StackConfigBaseModel(BaseModel):
     stack_name: str = Field(
         ...,
         description="The name of the stack/service.",
-    )
-    deployment_settings: AWSDeploymentSettings = Field(
-        ...,
-        description="The AWS deployment settings.",
     )
     termination_protection: bool = Field(
         default=True,
@@ -156,15 +158,3 @@ class StackConfigBaseModel(BaseModel):
             if key == "blame":
                 return tags
         raise ValueError("A blame tag must be included in the tags.")
-
-    @validator("termination_protection")
-    def ensure_termination_protection_for_prod(cls, termination_protection: bool, values: dict) -> bool:
-        """Ensure termination protection is enabled for production deployments."""
-        deployment_settings: AWSDeploymentSettings = values.get("deployment_settings")
-        if deployment_settings.deployment_type == DeploymentType.PROD:
-            if not termination_protection:
-                logger.warning(
-                    "Termination protection is disabled. Enabling termination protection for production deployment."
-                )
-            return True
-        return termination_protection

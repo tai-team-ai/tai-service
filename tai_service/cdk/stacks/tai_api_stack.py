@@ -37,19 +37,29 @@ class TaiApiStack(Stack):
         vpc: Union[ec2.IVpc, ec2.Vpc, str],
     ) -> None:
         """Initialize the stack for the TAI API service."""
+        aws_env = config.deployment_settings.aws_environment
         super().__init__(
             scope=scope,
             id=config.stack_id,
             stack_name=config.stack_name,
             description=config.description,
-            env=config.deployment_settings.aws_environment,
+            env={
+                "region": aws_env.region,
+                "account": aws_env.account,
+            },
             tags=config.tags,
             termination_protection=config.termination_protection,
         )
         self._settings = api_settings
         self._vpc = get_vpc(self, vpc)
+        self._lambda_function = self._create_lambda_function()
 
-    def _create_custom_resource(self) -> _lambda.Function:
+    @property
+    def lambda_function(self) -> _lambda.Function:
+        """Return the lambda function."""
+        return self._lambda_function
+
+    def _create_lambda_function(self) -> _lambda.Function:
         config = self._get_lambda_config()
         name = config.function_name
         lambda_function = PythonLambda.get_lambda_function(
@@ -66,13 +76,14 @@ class TaiApiStack(Stack):
             statement=iam.PolicyStatement(
                 actions=["secretsmanager:GetSecretValue"],
                 effect=iam.Effect.ALLOW,
-                resources=[get_secret_arn_from_name(self, self._settings.secret_name)],
+                resources=[get_secret_arn_from_name(self._settings.secret_name)],
             )
         )
 
     def _get_lambda_config(self) -> PythonLambdaConfigModel:
         function_name = "tai-service-api"
         security_group = create_restricted_security_group(
+            scope=self,
             name=function_name + "-sg",
             description="The security group for the DocumentDB lambda.",
             vpc=self._vpc,

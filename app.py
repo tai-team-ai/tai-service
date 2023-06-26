@@ -1,5 +1,7 @@
 """Define the search service app."""
+import os
 from aws_cdk import App
+from dotenv import load_dotenv
 from tai_service.cdk.stacks.search_database_stack import SearchServiceDatabases
 from tai_service.cdk.stacks.tai_api_stack import TaiApiStack
 from tai_service.cdk.stacks.search_databases_settings import (
@@ -13,29 +15,20 @@ from tai_service.cdk.stack_config_models import (
 )
 
 app: App = App()
+load_dotenv()
 
 AWS_DEPLOYMENT_SETTINGS = AWSDeploymentSettings()
+TAGS = {'blame': 'jacob'}
 
-BASE_CONFIG = StackConfigBaseModel(
-	stack_id="default-stack",
-	stack_name="default-stack",
-	description="Default stack for the tai service. This stack contains the search service ",
-    deployment_settings=AWS_DEPLOYMENT_SETTINGS,
-    duplicate_stack_for_development=True,
-    termination_protection=False,
-    tags={
-        'blame': 'jacob',
-    }
-)
-print(BASE_CONFIG.dict(exclude={"stack-id", "stack-name", "description"}))
-BASE_CONFIG = BASE_CONFIG.dict(exclude={"stack-id", "stack-name", "description"})
-print(BASE_CONFIG)
 search_databases_config = StackConfigBaseModel(
 	stack_id="search-service-databases",
 	stack_name="search-service-databases",
 	description="Stack for the search service databases. This stack contains the document " \
     	"database and the pinecone database used by the tai search service.",
-    **BASE_CONFIG,
+    deployment_settings=AWS_DEPLOYMENT_SETTINGS,
+    duplicate_stack_for_development=False,
+    termination_protection=False,
+    tags=TAGS,
 )
 search_service_databases: SearchServiceDatabases = SearchServiceDatabases(
     scope=app,
@@ -44,12 +37,14 @@ search_service_databases: SearchServiceDatabases = SearchServiceDatabases(
     pinecone_db_settings=PINECONE_DB_SETTINGS,
 )
 
-
 tai_api_config = StackConfigBaseModel(
     stack_id="tai-api",
     stack_name="tai-api",
     description="Stack for the tai api service. This stack contains the tai api service.",
-    **BASE_CONFIG,
+    deployment_settings=AWS_DEPLOYMENT_SETTINGS,
+    duplicate_stack_for_development=True,
+    termination_protection=False,
+    tags=TAGS,
 )
 tai_api = TaiApiStack(
     scope=app,
