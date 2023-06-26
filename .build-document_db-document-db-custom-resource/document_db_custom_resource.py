@@ -3,7 +3,7 @@ from typing import Any
 from loguru import logger
 import pymongo
 from pymongo.database import Database
-from .settings import RuntimeDocumentDBSettings, MongoDBUser
+from settings import RuntimeDocumentDBSettings, MongoDBUser
 # first imports are for local development, second imports are for deployment
 try:
     from ..custom_resource_interface import CustomResourceInterface

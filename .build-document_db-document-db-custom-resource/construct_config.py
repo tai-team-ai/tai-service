@@ -1,6 +1,6 @@
 """Define base configurations for the constructs."""
 import json
-from pydantic import BaseSettings, root_validator
+from pydantic import BaseSettings
 
 
 class BasePydanticSettings(BaseSettings):
