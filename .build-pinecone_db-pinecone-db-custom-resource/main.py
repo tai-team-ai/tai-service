@@ -28,5 +28,5 @@ def lambda_handler(event: CloudFormationCustomResourceEvent, context: LambdaCont
 
     logger.info(f"Received event: {json.dumps(event)}")
     config = PineconeDBSettings()
-    custom_resource = PineconeDBSetupCustomResource(event, context, config)
-    custom_resource.execute_crud_operation()
+    # custom_resource = PineconeDBSetupCustomResource(event, context, config)
+    # custom_resource.execute_crud_operation()

@@ -50,7 +50,7 @@ tai_api = TaiApiStack(
     scope=app,
     config=tai_api_config,
     api_settings=TAI_API_SETTINGS,
-    vpc=search_service_databases.vpc,
+    vpc="vpc-064f2ef4501aeafc8",
 )
 
 app.synth()

@@ -4,7 +4,7 @@ from os import chmod
 from pathlib import Path
 import shutil
 import tempfile
-from typing import Optional, Union
+from typing import Optional, Union, Any
 from constructs import Construct
 from pydantic import BaseModel, Field, root_validator, validator
 from aws_cdk import (
@@ -71,7 +71,7 @@ class PythonLambdaConfigModel(BaseModel):
         default=None,
         description="The path to the requirements file for the Lambda function.",
     )
-    vpc: Optional[Union[ec2.Vpc, str]] = Field(
+    vpc: Optional[Any] = Field(
         default=None,
         description="The VPC to run the Lambda function in.",
     )
@@ -131,6 +131,15 @@ class PythonLambdaConfigModel(BaseModel):
         """Validate the VPC."""
         return validate_vpc(vpc)
 
+    @validator("requirements_file_path")
+    def ensure_that_contents_not_blank_space_or_empty(cls, requirements_file_path: Path) -> Optional[Path]:
+        """Ensure that the contents of the requirements file are not blank space or empty."""
+        if requirements_file_path is not None:
+            if requirements_file_path.read_text().strip() == "":
+                raise ValueError(f"Requirements file '{requirements_file_path}' is empty. Please provide a valid requirements file " \
+                    "with at least package to install.")
+        return requirements_file_path
+
 
 class PythonLambda(Construct):
     """Define a builder for Python Lambda properties."""
@@ -158,6 +167,8 @@ class PythonLambda(Construct):
             "layers": [],
         }
         self._create_optional_props()
+        build_context_path = str(self._build_context_folder.resolve())
+        self._function_props_dict["code"] = _lambda.Code.from_asset(build_context_path)
         self._lambda_function: _lambda.Function = _lambda.Function(scope, config.function_name, **self.lambda_props)
         self._create_instantiated_props()
 
@@ -169,17 +180,14 @@ class PythonLambda(Construct):
     @property
     def lambda_props(self) -> dict:
         """Return the Lambda properties."""
-        function_props = copy.deepcopy(self._function_props_dict)
-        build_context_path = str(self._build_context_folder.resolve())
-        function_props["code"] = _lambda.Code.from_asset(build_context_path)
         # this validates that the function props are valid
-        _lambda.FunctionProps(**function_props)
-        return function_props
+        _lambda.FunctionProps(**self._function_props_dict)
+        return self._function_props_dict
 
     @staticmethod
     def get_lambda_function(scope: Construct, construct_id: str, config: PythonLambdaConfigModel) -> _lambda.Function:
         """Return the Lambda function."""
-        builder = PythonLambda(scope, construct_id + "python-lambda", config)
+        builder: PythonLambda = PythonLambda(scope, construct_id + "python-lambda", config)
         return builder.lambda_function
 
     def _initialize_build_folder(self) -> None:

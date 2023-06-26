@@ -37,16 +37,12 @@ class TaiApiStack(Stack):
         vpc: Union[ec2.IVpc, ec2.Vpc, str],
     ) -> None:
         """Initialize the stack for the TAI API service."""
-        aws_env = config.deployment_settings.aws_environment
         super().__init__(
             scope=scope,
             id=config.stack_id,
             stack_name=config.stack_name,
             description=config.description,
-            env={
-                "region": aws_env.region,
-                "account": aws_env.account,
-            },
+            env=config.deployment_settings.aws_environment,
             tags=config.tags,
             termination_protection=config.termination_protection,
         )
@@ -62,7 +58,7 @@ class TaiApiStack(Stack):
     def _create_lambda_function(self) -> _lambda.Function:
         config = self._get_lambda_config()
         name = config.function_name
-        lambda_function = PythonLambda.get_lambda_function(
+        lambda_function: _lambda.Function = PythonLambda.get_lambda_function(
             self,
             construct_id=f"{name}-lambda",
             config=config,
@@ -87,6 +83,11 @@ class TaiApiStack(Stack):
             name=function_name + "-sg",
             description="The security group for the DocumentDB lambda.",
             vpc=self._vpc,
+        )
+        security_group.add_egress_rule(
+            peer=ec2.Peer.any_ipv4(),
+            connection=ec2.Port.tcp(443),
+            description="Allow outbound HTTPS traffic to Secrets Manager.",
         )
         subnet_type = ec2.SubnetType.PUBLIC
         ec2.InterfaceVpcEndpoint(

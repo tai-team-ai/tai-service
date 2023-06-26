@@ -1,7 +1,7 @@
 """Define the DocumentDB construct."""
 from pathlib import Path
 from enum import Enum
-from typing import Optional, Union, List
+from typing import Any, Optional, Union, List
 from constructs import Construct
 from pydantic import BaseModel, Field, root_validator, validator
 from aws_cdk import (
@@ -78,7 +78,7 @@ class ElasticDocumentDBConfigModel(BaseModel):
         description=f"The maintenance window for the cluster. Format: {VALID_MAINTENANCE_WINDOW_PATTERN}",
         regex=VALID_MAINTENANCE_WINDOW_PATTERN,
     )
-    vpc: Union[ec2.Vpc, str] = Field(
+    vpc: Any = Field(
         ...,
         description="The VPC to use for the cluster.",
     )
@@ -149,9 +149,9 @@ class DocumentDatabase(Construct):
             description="Allow traffic from any IP address.",
         )
         self._config.security_groups.append(self.security_group)
-        self.db_cluster = self._create_cluster()
+        # self.db_cluster = self._create_cluster()
         self.custom_resource = self._create_custom_resource()
-        self.custom_resource.node.add_dependency(self.db_cluster)
+        # self.custom_resource.node.add_dependency(self.db_cluster)
 
     def _add_security_group_rules_for_cluster(self) -> None:
         """Add the security group rules for the cluster."""
@@ -245,7 +245,8 @@ class DocumentDatabase(Construct):
 
     def _get_lambda_config(self) -> PythonLambdaConfigModel:
         runtime_settings = RuntimeDocumentDBSettings(
-            cluster_host_name=self.db_cluster.attr_cluster_endpoint,
+            # cluster_host_name=self.db_cluster.attr_cluster_endpoint, TODO: uncomment when standard clusters are supported
+            cluster_host_name="test",
             **self._settings.dict(),
         )
         security_group = create_restricted_security_group(

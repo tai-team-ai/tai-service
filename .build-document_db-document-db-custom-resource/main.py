@@ -27,8 +27,8 @@ def lambda_handler(event: CloudFormationCustomResourceEvent, context: LambdaCont
     try:
         logger.info(f"Received event: {json.dumps(event)}")
         settings = RuntimeDocumentDBSettings()
-        custom_resource = DocumentDBCustomResource(event, context, settings)
-        custom_resource.execute_crud_operation()
+        # custom_resource = DocumentDBCustomResource(event, context, settings)
+        # custom_resource.execute_crud_operation()
     except Exception:
         logger.exception("An exception occurred while running the custom resource.")
         logger.info(traceback.format_exc())

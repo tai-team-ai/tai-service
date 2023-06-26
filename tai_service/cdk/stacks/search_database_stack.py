@@ -4,13 +4,12 @@ from aws_cdk import (
     Stack,
     aws_ec2 as ec2,
 )
-from ..stack_helpers import get_secret_arn_from_name, add_tags
+from ..stack_helpers import add_tags
 from ..stack_config_models import StackConfigBaseModel
 from ..constructs.document_db_construct import (
     DocumentDatabase,
     ElasticDocumentDBConfigModel,
     DocumentDBSettings,
-    MINIMUM_SUBNETS_FOR_DOCUMENT_DB,
 )
 from ..constructs.pinecone_db_construct import PineconeDatabase
 from ..constructs.customresources.pinecone_db.pinecone_db_custom_resource import PineconeDBSettings
