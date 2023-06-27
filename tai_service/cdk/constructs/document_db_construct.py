@@ -22,6 +22,7 @@ from .construct_helpers import (
     get_secret_arn_from_name,
     get_vpc,
     create_restricted_security_group,
+    create_interface_vpc_endpoint,
 )
 from .python_lambda_construct import (
     PythonLambda,
@@ -255,13 +256,13 @@ class DocumentDatabase(Construct):
             description="The security group for the DocumentDB lambda.",
             vpc=self._config.vpc,
         )
-        ec2.InterfaceVpcEndpoint(
-            self,
-            id="lambda-secrets-manager-endpoint",
+        create_interface_vpc_endpoint(
+            scope=self,
+            id="SecretsManagerEndpoint",
             vpc=self._config.vpc,
             service=ec2.InterfaceVpcEndpointAwsService.SECRETS_MANAGER,
             security_groups=[security_group],
-            subnets=ec2.SubnetSelection(subnet_type=self._config.subnet_type),
+            subnet_type=self._config.subnet_type,
         )
         lambda_config = PythonLambdaConfigModel(
             function_name="document-db-custom-resource",

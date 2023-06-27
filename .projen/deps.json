@@ -9,6 +9,10 @@
       "type": "devenv"
     },
     {
+      "name": "boto3-stubs[essential]",
+      "type": "devenv"
+    },
+    {
       "name": "projen",
       "version": "0.71.72",
       "type": "devenv"
@@ -28,7 +32,15 @@
       "type": "runtime"
     },
     {
+      "name": "fastapi",
+      "type": "runtime"
+    },
+    {
       "name": "loguru",
+      "type": "runtime"
+    },
+    {
+      "name": "mangum",
       "type": "runtime"
     },
     {

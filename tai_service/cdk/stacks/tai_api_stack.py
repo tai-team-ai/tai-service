@@ -11,12 +11,17 @@ from aws_cdk import (
     Size as StorageSize,
 )
 from ...api.runtime_settings import TaiApiSettings
-from ..stack_config_models import StackConfigBaseModel
-from ..constructs.python_lambda_construct import PythonLambda, PythonLambdaConfigModel
+from .stack_config_models import StackConfigBaseModel
+from ..constructs.python_lambda_construct import (
+    PythonLambda,
+    PythonLambdaConfigModel,
+    LambdaURLConfigModel,
+)
 from ..constructs.construct_helpers import (
     get_secret_arn_from_name,
     create_restricted_security_group,
     get_vpc,
+    create_interface_vpc_endpoint,
 )
 
 
@@ -64,6 +69,7 @@ class TaiApiStack(Stack):
             config=config,
         )
         self._add_secrets_to_lambda_role(lambda_function)
+        self._add_public_access_to_lambda_role(lambda_function)
         return lambda_function
 
     def _add_secrets_to_lambda_role(self, lambda_function: _lambda.Function) -> None:
@@ -76,27 +82,37 @@ class TaiApiStack(Stack):
             )
         )
 
+    def _add_public_access_to_lambda_role(self, lambda_function: _lambda.Function) -> None:
+        """Add public access to the lambda role."""
+        lambda_function.add_to_role_policy(
+            statement=iam.PolicyStatement(
+                actions=["lambda:InvokeFunctionUrl"],
+                effect=iam.Effect.ALLOW,
+                resources=["*"],
+            )
+        )
+
     def _get_lambda_config(self) -> PythonLambdaConfigModel:
         function_name = "tai-service-api"
-        security_group = create_restricted_security_group(
+        security_group_secrets = create_restricted_security_group(
             scope=self,
             name=function_name + "-sg",
             description="The security group for the DocumentDB lambda.",
             vpc=self._vpc,
         )
-        security_group.add_egress_rule(
+        security_group_secrets.add_egress_rule(
             peer=ec2.Peer.any_ipv4(),
             connection=ec2.Port.tcp(443),
             description="Allow outbound HTTPS traffic to Secrets Manager.",
         )
         subnet_type = ec2.SubnetType.PUBLIC
-        ec2.InterfaceVpcEndpoint(
-            self,
-            id="lambda-secrets-manager-endpoint",
+        create_interface_vpc_endpoint(
+            scope=self,
+            id="SecretsManagerEndpoint",
             vpc=self._vpc,
             service=ec2.InterfaceVpcEndpointAwsService.SECRETS_MANAGER,
-            security_groups=[security_group],
-            subnets=ec2.SubnetSelection(subnet_type=subnet_type),
+            security_groups=[security_group_secrets],
+            subnet_type=subnet_type,
         )
         lambda_config = PythonLambdaConfigModel(
             function_name=function_name,
@@ -115,6 +131,7 @@ class TaiApiStack(Stack):
             ephemeral_storage_size=StorageSize.mebibytes(512),
             vpc=self._vpc,
             subnet_selection=ec2.SubnetSelection(subnet_type=subnet_type),
-            security_groups=[security_group],
+            security_groups=[security_group_secrets],
+            function_url_config=LambdaURLConfigModel(allowed_headers=["*"], allow_origins=["*"]),
         )
         return lambda_config

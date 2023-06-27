@@ -4,8 +4,8 @@ from aws_cdk import (
     Stack,
     aws_ec2 as ec2,
 )
-from ..stack_helpers import add_tags
-from ..stack_config_models import StackConfigBaseModel
+from .stack_helpers import add_tags
+from .stack_config_models import StackConfigBaseModel
 from ..constructs.document_db_construct import (
     DocumentDatabase,
     ElasticDocumentDBConfigModel,

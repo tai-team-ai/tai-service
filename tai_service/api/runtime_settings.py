@@ -10,6 +10,9 @@ try:
 except ImportError:
     from settings import BaseDocumentDBSettings, BuiltInMongoDBRoles, MongoDBUser
 
+
+SETTINGS_STATE_ATTRIBUTE_NAME = "runtime_settings"
+
 class TaiApiSettings(MongoDBUser, BaseDocumentDBSettings):
     """Define the configuration model for the TAI API service."""
 

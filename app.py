@@ -9,7 +9,7 @@ from tai_service.cdk.stacks.search_databases_settings import (
     PINECONE_DB_SETTINGS,
 )
 from tai_service.cdk.stacks.tai_api_settings import TAI_API_SETTINGS
-from tai_service.cdk.stack_config_models import (
+from tai_service.cdk.stacks.stack_config_models import (
     StackConfigBaseModel,
     AWSDeploymentSettings,
 )
@@ -50,7 +50,7 @@ tai_api = TaiApiStack(
     scope=app,
     config=tai_api_config,
     api_settings=TAI_API_SETTINGS,
-    vpc="vpc-064f2ef4501aeafc8",
+    vpc=search_service_databases.vpc,
 )
 
 app.synth()

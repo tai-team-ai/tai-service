@@ -136,3 +136,38 @@ def create_restricted_security_group(scope: Construct, name: str, description: s
         allow_all_outbound=False,
     )
     return security_group
+
+
+def create_interface_vpc_endpoint(
+    scope: Construct,
+    id: str,
+    vpc: ec2.Vpc,
+    service: ec2.InterfaceVpcEndpointAwsService,
+    security_groups: list[ec2.SecurityGroup],
+    subnet_type: ec2.SubnetType,
+) -> None:
+    """Create an interface VPC endpoint.
+
+    Args:
+        service: The service to create the endpoint for.
+        security_group: The security group to attach to the endpoint.
+        vpc: The VPC to create the endpoint in.
+
+    Returns:
+        ec2.InterfaceVpcEndpoint: The interface VPC endpoint.
+    """
+    # check if the endpoint already exists with boto3
+    client = boto3.client("ec2")
+    response = client.describe_vpc_endpoints()
+    for endpoint in response["VpcEndpoints"]:
+        service_name = endpoint["ServiceName"].split(".")[-1]
+        if service_name == service.short_name:
+            return
+    ec2.InterfaceVpcEndpoint(
+        scope=scope,
+        id=id,
+        vpc=vpc,
+        service=ec2.InterfaceVpcEndpointAwsService.SECRETS_MANAGER,
+        security_groups=security_groups,
+        subnets=ec2.SubnetSelection(subnet_type=subnet_type),
+    )

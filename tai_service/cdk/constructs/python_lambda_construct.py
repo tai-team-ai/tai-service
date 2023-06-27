@@ -38,6 +38,10 @@ class LambdaURLConfigModel(BaseModel):
         default=[],
         description="The allowed headers for the Lambda when using url access.",
     )
+    allowed_origins: Optional[list[str]] = Field(
+        default=[],
+        description="The allowed origins for the Lambda when using url access.",
+    )
 
 
 class PythonLambdaConfigModel(BaseModel):
@@ -103,7 +107,7 @@ class PythonLambdaConfigModel(BaseModel):
         default=StorageSize.mebibytes(512),
         description="The ephemeral storage size for the Lambda function.",
     )
-    function_url: Optional[LambdaURLConfigModel] = Field(
+    function_url_config: Optional[LambdaURLConfigModel] = Field(
         default=None,
         description="The configuration for the Lambda URL. If provided, the Lambda will be accessible via a URL.",
     )
@@ -216,8 +220,8 @@ class PythonLambda(Construct):
 
     def _create_instantiated_props(self) -> None:
         config = self._config
-        if config.function_url:
-            self._add_function_url(config.function_url)
+        if config.function_url_config:
+            self._add_function_url(config.function_url_config)
 
     def _add_vpc_and_subnets(self) -> None:
         config = self._config
@@ -283,6 +287,7 @@ class PythonLambda(Construct):
             auth_type=url_config.auth_type,
             cors=_lambda.FunctionUrlCorsOptions(
                 allowed_headers=url_config.allowed_headers,
+                allowed_origins=url_config.allowed_origins,
             ),
             invoke_mode=url_config.invoke_mode,
         )

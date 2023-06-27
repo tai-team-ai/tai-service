@@ -19,10 +19,13 @@ project:Project = AwsCdkPythonApp(
         "pygit2",
         "pinecone-client[grpc]",
         "pydantic[dotenv]",
+        "fastapi",
+        "mangum",
     ],
     dev_deps=[
         "aws-lambda-powertools",
         "aws-lambda-typing",
+        "boto3-stubs[essential]",
     ]
 )
 
