@@ -19,16 +19,18 @@ class DocumentDBCustomResource(CustomResourceInterface):
 
     def __init__(self, event: CloudFormationCustomResourceEvent, context: LambdaContext, settings: RuntimeDocumentDBSettings) -> None:
         super().__init__(event, context)
-        password = self.get_secret(settings.admin_user_password_secret_name)
+        secret = self.get_secret(settings.secret_name)
+        self._admin_username = secret[settings.username_secret_field_name]
+        self._admin_password = secret[settings.password_secret_field_name]
         self._settings = settings
-        self._mongo_client = self._run_operation_with_retry(self._connect_to_database, password)
+        self._mongo_client = self._run_operation_with_retry(self._connect_to_database)
 
-    def _connect_to_database(self, password: str) -> pymongo.MongoClient:
+    def _connect_to_database(self) -> pymongo.MongoClient:
         logger.info("Creating MongoDB client")
         settings = self._settings
         mongo_client = pymongo.MongoClient(
-            f"mongodb://{settings.admin_username}:{password}@{settings.cluster_host_name}:{settings.cluster_port}/?tls=true&retryWrites=false",
-            serverSelectionTimeoutMS=settings.server_selection_timeout,
+            f"mongodb://{self._admin_username}:{self._admin_password}@{settings.cluster_host_name}:{settings.cluster_port}/?tls=true&retryWrites=false",
+            serverSelectionTimeoutMS=settings.server_selection_timeout_MS,
         )
         logger.info(mongo_client.server_info())
         logger.info(f"Successfully connected to cluster at {settings.cluster_host_name}:{settings.cluster_port}")
@@ -37,24 +39,36 @@ class DocumentDBCustomResource(CustomResourceInterface):
     def _create_database(self) -> None:
         db = self._mongo_client[self._settings.db_name]
         for user in self._settings.user_config:
-            self._run_operation_with_retry(self._create_user, db, user)
+            secret = self.get_secret(user.secret_name)
+            username = secret[user.username_secret_field_name]
+            password = secret[user.password_secret_field_name]
+            self._run_operation_with_retry(self._create_user, db, user, username, password)
         self._run_operation_with_retry(self._create_collections, db)
         self._run_operation_with_retry(self._create_shards, db, self._mongo_client)
         self._run_operation_with_retry(self._create_indexes, db)
 
 
     def _update_database(self) -> None:
-        raise NotImplementedError("Update operation not implemented.")
-
+        db = self._mongo_client[self._settings.db_name]
+        for user in self._settings.user_config:
+            try:
+                secret = self.get_secret(user.secret_name)
+                username = secret[user.username_secret_field_name]
+                password = secret[user.password_secret_field_name]
+                self._run_operation_with_retry(self._create_user, db, user, username, password)
+            except Exception: # pylint: disable=broad-except
+                logger.info(f"User {username} with role {user.role} already exists. Skipping creation.")
+        self._run_operation_with_retry(self._create_collections, db)
+        self._run_operation_with_retry(self._create_indexes, db)
 
     def _delete_database(self) -> None:
-        raise NotImplementedError("Delete operation not implemented.")
+        # AWS will delete the database for us, so we don't need to do anything here.
+        pass
 
-    def _create_user(self, db: Database, user: MongoDBUser) -> None:
-        password = self.get_secret(user.password_secret_name)
-        logger.info(f"Creating user: {user.username}")
+    def _create_user(self, db: Database, user: MongoDBUser, username: str, password: str) -> None:
+        logger.info(f"Creating user: {username}")
         db.command({
-            "createUser": user.username,
+            "createUser": username,
             "pwd": password,
             "roles": [
                 {"role": user.role, "db": db.name},

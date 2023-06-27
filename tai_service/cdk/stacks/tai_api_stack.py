@@ -10,7 +10,7 @@ from aws_cdk import (
     Duration,
     Size as StorageSize,
 )
-from ...api.runtime_settings import TaiApiSettings
+from ...api.runtime_settings import TaiApiSettings, MongoDBUser, BaseDocumentDBSettings
 from .stack_config_models import StackConfigBaseModel
 from ..constructs.python_lambda_construct import (
     PythonLambda,
@@ -51,46 +51,26 @@ class TaiApiStack(Stack):
             tags=config.tags,
             termination_protection=config.termination_protection,
         )
-        self._settings = api_settings
+        self._settings: Union[MongoDBUser, BaseDocumentDBSettings] = api_settings
         self._vpc = get_vpc(self, vpc)
-        self._lambda_function = self._create_lambda_function()
+        self._python_lambda = self._create_lambda_function()
 
     @property
     def lambda_function(self) -> _lambda.Function:
         """Return the lambda function."""
-        return self._lambda_function
+        return self._python_lambda.lambda_function
 
-    def _create_lambda_function(self) -> _lambda.Function:
+    def _create_lambda_function(self) -> PythonLambda:
         config = self._get_lambda_config()
         name = config.function_name
-        lambda_function: _lambda.Function = PythonLambda.get_lambda_function(
+        python_lambda: PythonLambda = PythonLambda(
             self,
             construct_id=f"{name}-lambda",
             config=config,
         )
-        self._add_secrets_to_lambda_role(lambda_function)
-        self._add_public_access_to_lambda_role(lambda_function)
-        return lambda_function
-
-    def _add_secrets_to_lambda_role(self, lambda_function: _lambda.Function) -> None:
-        """Add the secrets to the lambda role."""
-        lambda_function.add_to_role_policy(
-            statement=iam.PolicyStatement(
-                actions=["secretsmanager:GetSecretValue"],
-                effect=iam.Effect.ALLOW,
-                resources=[get_secret_arn_from_name(self._settings.secret_name)],
-            )
-        )
-
-    def _add_public_access_to_lambda_role(self, lambda_function: _lambda.Function) -> None:
-        """Add public access to the lambda role."""
-        lambda_function.add_to_role_policy(
-            statement=iam.PolicyStatement(
-                actions=["lambda:InvokeFunctionUrl"],
-                effect=iam.Effect.ALLOW,
-                resources=["*"],
-            )
-        )
+        python_lambda.add_read_only_secrets_manager_access(get_secret_arn_from_name(self._settings.secret_name))
+        python_lambda.allow_public_invoke_of_function()
+        return python_lambda
 
     def _get_lambda_config(self) -> PythonLambdaConfigModel:
         function_name = "tai-service-api"
@@ -132,6 +112,6 @@ class TaiApiStack(Stack):
             vpc=self._vpc,
             subnet_selection=ec2.SubnetSelection(subnet_type=subnet_type),
             security_groups=[security_group_secrets],
-            function_url_config=LambdaURLConfigModel(allowed_headers=["*"], allow_origins=["*"]),
+            function_url_config=LambdaURLConfigModel(allowed_headers=["*"], allowed_origins=["*"]),
         )
         return lambda_config

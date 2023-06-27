@@ -9,6 +9,9 @@ import boto3
 from loguru import logger
 from aws_cdk import (
     aws_ec2 as ec2,
+    CfnCondition,
+    CfnResource,
+    Fn,
 )
 
 
@@ -143,8 +146,8 @@ def create_interface_vpc_endpoint(
     id: str,
     vpc: ec2.Vpc,
     service: ec2.InterfaceVpcEndpointAwsService,
-    security_groups: list[ec2.SecurityGroup],
     subnet_type: ec2.SubnetType,
+    security_groups: Optional[list[ec2.SecurityGroup]] = None,
 ) -> None:
     """Create an interface VPC endpoint.
 
@@ -159,15 +162,24 @@ def create_interface_vpc_endpoint(
     # check if the endpoint already exists with boto3
     client = boto3.client("ec2")
     response = client.describe_vpc_endpoints()
+    endpoint_exists = False
     for endpoint in response["VpcEndpoints"]:
         service_name = endpoint["ServiceName"].split(".")[-1]
         if service_name == service.short_name:
-            return
-    ec2.InterfaceVpcEndpoint(
+            endpoint_exists = True
+            break
+    endpoint: ec2.InterfaceVpcEndpoint = ec2.InterfaceVpcEndpoint(
         scope=scope,
         id=id,
         vpc=vpc,
         service=ec2.InterfaceVpcEndpointAwsService.SECRETS_MANAGER,
-        security_groups=security_groups,
+        security_groups=security_groups if security_groups else None,
         subnets=ec2.SubnetSelection(subnet_type=subnet_type),
     )
+
+    condition = CfnCondition(
+        scope,
+        id + "-condition",
+        expression=Fn.condition_equals(endpoint_exists, False),
+    )
+    endpoint.node.default_child.cfn_options.condition = condition

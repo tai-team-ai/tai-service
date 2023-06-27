@@ -14,6 +14,7 @@ from aws_cdk import (
     aws_lambda as _lambda,
     DockerImage,
     BundlingOptions,
+    aws_iam as iam,
 )
 from loguru import logger
 from.construct_config import BasePydanticSettings
@@ -42,6 +43,17 @@ class LambdaURLConfigModel(BaseModel):
         default=[],
         description="The allowed origins for the Lambda when using url access.",
     )
+
+    @validator("allowed_origins")
+    def if_headers_need_cors_then_origins_must_be_set(
+        cls, v: list[str], values: dict[str, Any]
+    ) -> list[str]:
+        """Validate that if headers are set then origins must be set."""
+        if values["allowed_headers"] and not v:
+            raise ValueError(
+                "If allowed_headers is set then allowed_origins must be set."
+            )
+        return v
 
 
 class PythonLambdaConfigModel(BaseModel):
@@ -193,6 +205,24 @@ class PythonLambda(Construct):
         """Return the Lambda function."""
         builder: PythonLambda = PythonLambda(scope, construct_id + "python-lambda", config)
         return builder.lambda_function
+
+    def add_read_only_secrets_manager_access(self, arns: list[str]) -> None:
+        """Add a read only Secrets Manager policy to the Lambda function."""
+        self._lambda_function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=["secretsmanager:GetSecretValue"],
+                resources=arns,
+            )
+        )
+
+    def allow_public_invoke_of_function(self) -> None:
+        self._lambda_function.add_to_role_policy(
+            statement=iam.PolicyStatement(
+                actions=["lambda:InvokeFunctionUrl"],
+                effect=iam.Effect.ALLOW,
+                resources=["*"],
+            )
+        )
 
     def _initialize_build_folder(self) -> None:
         if self._build_context_folder.exists():

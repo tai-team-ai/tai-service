@@ -62,13 +62,15 @@ class CustomResourceInterface(ABC):
                 "max_attempts": MAX_NUM_ATTEMPTS,
                 "mode": "standard",
             },
-            read_timeout=10,
+            connect_timeout=1,
+            read_timeout=1,
         )
         client = session.client(
             service_name="secretsmanager",
             config=boto_config,
         )
         secret_value_response = client.get_secret_value(SecretId=secret_name)
+        print(secret_value_response)
         secret = secret_value_response["SecretString"]
         try:
             secret = json.loads(secret)

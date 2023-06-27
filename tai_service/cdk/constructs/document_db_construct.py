@@ -209,16 +209,21 @@ class DocumentDatabase(Construct):
     def _create_custom_resource(self) -> cr.Provider:
         config = self._get_lambda_config()
         name = config.function_name
-        lambda_function = PythonLambda.get_lambda_function(
-            self,
+        lambda_construct: PythonLambda = PythonLambda(
+            scope=self,
             construct_id=f"custom-resource-lambda-{name}",
             config=config,
         )
-        self._add_secrets_to_lambda_role(lambda_function)
+        secret_arns = []
+        for user in self._settings.user_config:
+            arn = get_secret_arn_from_name(user.secret_name)
+            secret_arns.append(arn)
+        secret_arns.append(get_secret_arn_from_name(self._settings.secret_name))
+        lambda_construct.add_read_only_secrets_manager_access(secret_arns)
         provider: cr.Provider = cr.Provider(
             self,
             id="custom-resource-provider",
-            on_event_handler=lambda_function,
+            on_event_handler=lambda_construct.lambda_function,
             provider_function_name=name + "-PROVIDER",
         )
         custom_resource = CustomResource(
@@ -229,21 +234,6 @@ class DocumentDatabase(Construct):
         )
         return custom_resource
 
-    def _add_secrets_to_lambda_role(self, lambda_function: _lambda.Function) -> None:
-        """Add the secrets to the lambda role."""
-        secret_arns = []
-        for user in self._settings.user_config:
-            arn = get_secret_arn_from_name(user.secret_name)
-            secret_arns.append(arn)
-        secret_arns.append(get_secret_arn_from_name(self._settings.secret_name))
-        lambda_function.add_to_role_policy(
-            statement=iam.PolicyStatement(
-                actions=["secretsmanager:GetSecretValue"],
-                effect=iam.Effect.ALLOW,
-                resources=secret_arns,
-            )
-        )
-
     def _get_lambda_config(self) -> PythonLambdaConfigModel:
         runtime_settings = RuntimeDocumentDBSettings(
             # cluster_host_name=self.db_cluster.attr_cluster_endpoint, TODO: uncomment when standard clusters are supported
@@ -252,16 +242,20 @@ class DocumentDatabase(Construct):
         )
         security_group = create_restricted_security_group(
             scope=self,
-            name=self._namer("lambda-sg"),
+            name=self._namer("lambda"),
             description="The security group for the DocumentDB lambda.",
             vpc=self._config.vpc,
+        )
+        security_group.add_egress_rule(
+            peer=ec2.Peer.any_ipv4(),
+            connection=ec2.Port.tcp(443),
+            description="Allow outbound HTTPS traffic to Secrets Manager.",
         )
         create_interface_vpc_endpoint(
             scope=self,
             id="SecretsManagerEndpoint",
             vpc=self._config.vpc,
             service=ec2.InterfaceVpcEndpointAwsService.SECRETS_MANAGER,
-            security_groups=[security_group],
             subnet_type=self._config.subnet_type,
         )
         lambda_config = PythonLambdaConfigModel(
@@ -276,11 +270,11 @@ class DocumentDatabase(Construct):
                 CONSTRUCTS_DIR / "construct_config.py",
                 DOCUMENT_DB_CUSTOM_RESOURCE_DIR.parent / "custom_resource_interface.py",
             ],
-            timeout=Duration.minutes(3),
+            timeout=Duration.seconds(60),
             memory_size=128,
             ephemeral_storage_size=StorageSize.mebibytes(512),
             vpc=self._config.vpc,
             subnet_selection=ec2.SubnetSelection(subnet_type=self._config.subnet_type),
-            security_groups=[security_group, self.security_group],
+            security_groups=[security_group],
         )
         return lambda_config

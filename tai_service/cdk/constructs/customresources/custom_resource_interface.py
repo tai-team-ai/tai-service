@@ -62,7 +62,8 @@ class CustomResourceInterface(ABC):
                 "max_attempts": MAX_NUM_ATTEMPTS,
                 "mode": "standard",
             },
-            read_timeout=10,
+            connect_timeout=1,
+            read_timeout=1,
         )
         client = session.client(
             service_name="secretsmanager",
@@ -73,7 +74,8 @@ class CustomResourceInterface(ABC):
         try:
             secret = json.loads(secret)
         except json.JSONDecodeError:
-            return secret
+            logger.info("Secret is not a JSON string.")
+        return secret
 
     @abstractmethod
     def _create_database(self) -> None:
