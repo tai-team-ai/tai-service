@@ -12,6 +12,7 @@ from aws_cdk import (
 )
 from ...api.runtime_settings import TaiApiSettings, MongoDBUser, BaseDocumentDBSettings
 from .stack_config_models import StackConfigBaseModel
+from .stack_helpers  import add_tags
 from ..constructs.python_lambda_construct import (
     PythonLambda,
     PythonLambdaConfigModel,
@@ -55,6 +56,7 @@ class TaiApiStack(Stack):
         self._settings = api_settings
         self._vpc = get_vpc(self, vpc)
         self._python_lambda: PythonLambda = self._create_lambda_function(security_group_allowing_db_connections)
+        add_tags(self, config.tags)
 
     @property
     def lambda_function(self) -> _lambda.Function:

@@ -1,13 +1,13 @@
 """Define settings for instantiating search databases."""
 import os
 from dotenv import load_dotenv
-from tai_service.cdk.constructs.customresources.document_db.settings import (
+from taiservice.cdk.constructs.customresources.document_db.settings import (
     DocumentDBSettings,
     CollectionConfig,
     MongoDBUser,
     BuiltInMongoDBRoles,
 )
-from tai_service.cdk.constructs.customresources.pinecone_db.pinecone_db_custom_resource import (
+from taiservice.cdk.constructs.customresources.pinecone_db.pinecone_db_custom_resource import (
     PodType,
     PodSize,
     DistanceMetric,

@@ -6,7 +6,7 @@ project:Project = AwsCdkPythonApp(
     author_email="jacobpetterle+aiforu@gmail.com",
     author_name="Jacob Petterle",
     cdk_version="2.1.0",
-    module_name="tai_service",
+    module_name="taiservice",
     name="tai-service",
     version="0.1.0",
     venv_options=VenvOptions(envdir=".venv"),

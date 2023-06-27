@@ -2,14 +2,14 @@
 import os
 from aws_cdk import App
 from dotenv import load_dotenv
-from tai_service.cdk.stacks.search_database_stack import SearchServiceDatabases
-from tai_service.cdk.stacks.tai_api_stack import TaiApiStack
-from tai_service.cdk.stacks.search_databases_settings import (
+from taiservice.cdk.stacks.search_database_stack import SearchServiceDatabases
+from taiservice.cdk.stacks.tai_api_stack import TaiApiStack
+from taiservice.cdk.stacks.search_databases_settings import (
     DOCUMENT_DB_SETTINGS,
     PINECONE_DB_SETTINGS,
 )
-from tai_service.cdk.stacks.tai_api_settings import TAI_API_SETTINGS
-from tai_service.cdk.stacks.stack_config_models import (
+from taiservice.cdk.stacks.tai_api_settings import TAI_API_SETTINGS
+from taiservice.cdk.stacks.stack_config_models import (
     StackConfigBaseModel,
     AWSDeploymentSettings,
 )

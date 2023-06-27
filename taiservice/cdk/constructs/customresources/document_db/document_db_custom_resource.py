@@ -28,8 +28,10 @@ class DocumentDBCustomResource(CustomResourceInterface):
     def _connect_to_database(self) -> pymongo.MongoClient:
         logger.info("Creating MongoDB client")
         settings = self._settings
+        uri = f"mongodb://{self._admin_username}:{self._admin_password}@{settings.cluster_host_name}:{settings.cluster_port}/?tls=true&retryWrites=false"
+        logger.info(f"Connecting to cluster at {settings.cluster_host_name}:{settings.cluster_port}")
         mongo_client = pymongo.MongoClient(
-            f"mongodb://{self._admin_username}:{self._admin_password}@{settings.cluster_host_name}:{settings.cluster_port}/?tls=true&retryWrites=false",
+            uri,
             serverSelectionTimeoutMS=settings.server_selection_timeout_MS,
         )
         logger.info(mongo_client.server_info())

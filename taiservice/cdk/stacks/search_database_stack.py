@@ -78,7 +78,6 @@ class SearchServiceDatabases(Stack):
             subnet_configuration=subnet_configurations,
         )
         subnets = ec2.SubnetSelection(one_per_az=True)
-        print(subnets.subnet_type)
         ec2.InterfaceVpcEndpoint(
             scope=self,
             id="secrets-manager-endpoint",

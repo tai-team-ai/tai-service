@@ -136,24 +136,7 @@ class DocumentDatabase(Construct):
         db_config.vpc = get_vpc(self, db_config.vpc)
         self._config = db_config
         self._settings = db_setup_settings
-        self._db_security_group = create_restricted_security_group(
-            scope=self,
-            name=self._namer("cluster"),
-            description="Security group defining inbound connections for the document database.",
-            vpc=self._config.vpc,
-        )
-        self._config.security_groups.append(self._db_security_group)
-        self._security_group_for_connecting_to_cluster = create_restricted_security_group(
-            scope=self,
-            name=self._namer("connecting"),
-            description="The security group for connecting to the DocumentDB cluster.",
-            vpc=self._config.vpc,
-        )
-        self._security_group_for_connecting_to_cluster.add_egress_rule(
-            peer=ec2.Peer.any_ipv4(),
-            connection=ec2.Port.tcp(27017),
-            description="Allow outbound connections to the DocumentDB cluster.",
-        )
+        self._configure_security_groups()
         self._db_cluster = self._create_cluster()
         self.custom_resource = self._create_custom_resource()
         self.custom_resource.node.add_dependency(self.db_cluster)
@@ -176,6 +159,31 @@ class DocumentDatabase(Construct):
     def db_cluster(self) -> Union[docdb_elastic.CfnCluster, docdb.DatabaseCluster]:
         """Return the DocumentDB cluster."""
         return self._db_cluster
+
+    def _configure_security_groups(self) -> None:
+        self._db_security_group = create_restricted_security_group(
+            scope=self,
+            name=self._namer("cluster"),
+            description="Security group defining inbound connections for the document database.",
+            vpc=self._config.vpc,
+        )
+        self._config.security_groups.append(self._db_security_group)
+        self._security_group_for_connecting_to_cluster = create_restricted_security_group(
+            scope=self,
+            name=self._namer("connecting-to-db"),
+            description="The security group for connecting to the DocumentDB cluster.",
+            vpc=self._config.vpc,
+        )
+        self._db_security_group.add_ingress_rule(
+            peer=self._security_group_for_connecting_to_cluster,
+            connection=ec2.Port.tcp(27017),
+            description="Allow inbound connections from the security group for connecting to the DocumentDB cluster.",
+        )
+        self._security_group_for_connecting_to_cluster.add_egress_rule(
+            peer=ec2.Peer.any_ipv4(),
+            connection=ec2.Port.tcp(27017),
+            description="Allow outbound connections to the DocumentDB cluster.",
+        )
 
     def _create_cluster(self) -> Union[docdb_elastic.CfnCluster, docdb.DatabaseCluster]:
         """Create the DocumentDB cluster."""
@@ -251,8 +259,7 @@ class DocumentDatabase(Construct):
 
     def _get_lambda_config(self) -> PythonLambdaConfigModel:
         runtime_settings = RuntimeDocumentDBSettings(
-            # cluster_host_name=self.db_cluster.attr_cluster_endpoint, TODO: uncomment when standard clusters are supported
-            cluster_host_name="test",
+            cluster_host_name=self.db_cluster.attr_cluster_endpoint,
             **self._settings.dict(),
         )
         security_group = create_restricted_security_group(

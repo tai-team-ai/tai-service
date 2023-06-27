@@ -5,7 +5,7 @@ from aws_cdk import (
 )
 import boto3
 from constructs import Construct
-from tai_service.cdk.stacks.stack_config_models import AWSDeploymentSettings
+from taiservice.cdk.stacks.stack_config_models import AWSDeploymentSettings
 
 def add_tags(scope: Construct, tags: dict):
     """Add tags to a CDK stack.

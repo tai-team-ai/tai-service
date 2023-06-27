@@ -5,7 +5,7 @@ from pydantic import BaseModel, Field, validator
 
 # first imports are for local development, second imports are for deployment
 try:
-    from tai_service.cdk.constructs.construct_config import BasePydanticSettings
+    from taiservice.cdk.constructs.construct_config import BasePydanticSettings
 except ImportError:
     from construct_config import BasePydanticSettings
 
