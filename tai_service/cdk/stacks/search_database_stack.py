@@ -42,8 +42,18 @@ class SearchServiceDatabases(Stack):
         self._subnet_type_for_doc_db = ec2.SubnetType.PRIVATE_ISOLATED
         self.vpc = self._create_vpc()
         self.document_db = self._get_document_db(doc_db_settings=doc_db_settings)
+        self._security_group_for_connecting_to_doc_db = self.document_db.security_group_for_connecting_to_cluster
         self.pinecone_db = self._get_pinecone_db()
         add_tags(self, config.tags)
+
+    @property
+    def security_group_for_connecting_to_doc_db(self) -> ec2.SecurityGroup:
+        """
+        Return the security group for connecting to the document db.
+
+        If you want to connect to the document db from another stack, you need to use this security group.
+        """
+        return self._security_group_for_connecting_to_doc_db
 
     def _create_vpc(self) -> ec2.Vpc:
         subnet_configurations = []
@@ -66,6 +76,15 @@ class SearchServiceDatabases(Stack):
             max_azs=3,
             nat_gateways=0,
             subnet_configuration=subnet_configurations,
+        )
+        subnets = ec2.SubnetSelection(one_per_az=True)
+        print(subnets.subnet_type)
+        ec2.InterfaceVpcEndpoint(
+            scope=self,
+            id="secrets-manager-endpoint",
+            vpc=vpc,
+            service=ec2.InterfaceVpcEndpointAwsService.SECRETS_MANAGER,
+            subnets=subnets,
         )
         return vpc
 

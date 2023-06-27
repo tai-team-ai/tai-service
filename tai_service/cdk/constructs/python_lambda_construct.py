@@ -171,6 +171,7 @@ class PythonLambda(Construct):
         super().__init__(scope, construct_id, **kwargs)
         self._scope = scope
         config.vpc = get_vpc(scope, config.vpc)
+        self.security_groups = config.security_groups
         self._config = config
         self._build_context_folder = Path(f".build-{config.code_path.name}-{config.function_name}")
         self._initialize_build_folder()

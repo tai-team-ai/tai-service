@@ -8,12 +8,10 @@ from aws_cdk import (
     aws_ec2 as ec2,
     aws_docdbelastic as docdb_elastic,
     aws_docdb as docdb,
-    aws_iam as iam,
     custom_resources as cr,
     CustomResource,
     Duration,
     Size as StorageSize,
-    aws_lambda as _lambda,
 )
 from .construct_helpers import (
     validate_vpc,
@@ -22,7 +20,7 @@ from .construct_helpers import (
     get_secret_arn_from_name,
     get_vpc,
     create_restricted_security_group,
-    create_interface_vpc_endpoint,
+    vpc_interface_exists,
 )
 from .python_lambda_construct import (
     PythonLambda,
@@ -138,29 +136,46 @@ class DocumentDatabase(Construct):
         db_config.vpc = get_vpc(self, db_config.vpc)
         self._config = db_config
         self._settings = db_setup_settings
-        self.security_group = create_restricted_security_group(
+        self._db_security_group = create_restricted_security_group(
             scope=self,
-            name=self._namer("cluster-sg"),
-            description="The security group for the DocumentDB cluster.",
+            name=self._namer("cluster"),
+            description="Security group defining inbound connections for the document database.",
             vpc=self._config.vpc,
         )
-        self.security_group.add_ingress_rule(
-            peer=ec2.Peer.any_ipv4(),
-            connection=ec2.Port.tcp(self._settings.cluster_port),
-            description="Allow traffic from any IP address.",
+        self._config.security_groups.append(self._db_security_group)
+        self._security_group_for_connecting_to_cluster = create_restricted_security_group(
+            scope=self,
+            name=self._namer("connecting"),
+            description="The security group for connecting to the DocumentDB cluster.",
+            vpc=self._config.vpc,
         )
-        self._config.security_groups.append(self.security_group)
+        self._security_group_for_connecting_to_cluster.add_egress_rule(
+            peer=ec2.Peer.any_ipv4(),
+            connection=ec2.Port.tcp(27017),
+            description="Allow outbound connections to the DocumentDB cluster.",
+        )
         # self.db_cluster = self._create_cluster()
         self.custom_resource = self._create_custom_resource()
         # self.custom_resource.node.add_dependency(self.db_cluster)
 
-    def _add_security_group_rules_for_cluster(self) -> None:
-        """Add the security group rules for the cluster."""
-        self.security_group.add_ingress_rule(
-            peer=self.security_group,
-            connection=ec2.Port.tcp(self._settings.cluster_port),
-            description="Allow traffic from the VPC.",
-        )
+    @property
+    def db_security_group(self) -> ec2.SecurityGroup:
+        """Return the security group for the DocumentDB cluster."""
+        return self._db_security_group
+
+    @property
+    def security_group_for_connecting_to_cluster(self) -> ec2.SecurityGroup:
+        """
+        Return the security group for connecting to the DocumentDB cluster.
+
+        If you want to connect to the DocumentDB cluster, you must add your IP address to this security group.
+        """
+        return self._security_group_for_connecting_to_cluster
+
+    # @property
+    # def db_cluster(self) -> Union[docdb_elastic.CfnCluster, docdb.DatabaseCluster]:
+    #     """Return the DocumentDB cluster."""
+    #     return self.custom_resource.db_cluster
 
     def _create_cluster(self) -> Union[docdb_elastic.CfnCluster, docdb.DatabaseCluster]:
         """Create the DocumentDB cluster."""
@@ -243,7 +258,7 @@ class DocumentDatabase(Construct):
         security_group = create_restricted_security_group(
             scope=self,
             name=self._namer("lambda"),
-            description="The security group for the DocumentDB lambda.",
+            description="The security group for the DocumentDB custom resource lambda.",
             vpc=self._config.vpc,
         )
         security_group.add_egress_rule(
@@ -251,13 +266,8 @@ class DocumentDatabase(Construct):
             connection=ec2.Port.tcp(443),
             description="Allow outbound HTTPS traffic to Secrets Manager.",
         )
-        create_interface_vpc_endpoint(
-            scope=self,
-            id="SecretsManagerEndpoint",
-            vpc=self._config.vpc,
-            service=ec2.InterfaceVpcEndpointAwsService.SECRETS_MANAGER,
-            subnet_type=self._config.subnet_type,
-        )
+        assert vpc_interface_exists(ec2.InterfaceVpcEndpointAwsService.SECRETS_MANAGER, self._config.vpc),\
+            "The VPC must have an interface endpoint for Secrets Manager."
         lambda_config = PythonLambdaConfigModel(
             function_name="document-db-custom-resource",
             description="Custom resource for performing CRUD operations on the document database",
@@ -275,6 +285,6 @@ class DocumentDatabase(Construct):
             ephemeral_storage_size=StorageSize.mebibytes(512),
             vpc=self._config.vpc,
             subnet_selection=ec2.SubnetSelection(subnet_type=self._config.subnet_type),
-            security_groups=[security_group],
+            security_groups=[security_group, self._security_group_for_connecting_to_cluster],
         )
         return lambda_config

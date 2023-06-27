@@ -13,7 +13,7 @@ except ImportError:
 
 SETTINGS_STATE_ATTRIBUTE_NAME = "runtime_settings"
 
-class TaiApiSettings(MongoDBUser, BaseDocumentDBSettings):
+class TaiApiSettings(BaseDocumentDBSettings, MongoDBUser):
     """Define the configuration model for the TAI API service."""
 
     role: BuiltInMongoDBRoles = Field(

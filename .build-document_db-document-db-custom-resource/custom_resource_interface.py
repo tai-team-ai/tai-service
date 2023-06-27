@@ -70,12 +70,12 @@ class CustomResourceInterface(ABC):
             config=boto_config,
         )
         secret_value_response = client.get_secret_value(SecretId=secret_name)
-        print(secret_value_response)
         secret = secret_value_response["SecretString"]
         try:
             secret = json.loads(secret)
         except json.JSONDecodeError:
-            return secret
+            logger.info("Secret is not a JSON string.")
+        return secret
 
     @abstractmethod
     def _create_database(self) -> None:

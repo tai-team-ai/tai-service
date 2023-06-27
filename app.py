@@ -21,8 +21,8 @@ AWS_DEPLOYMENT_SETTINGS = AWSDeploymentSettings()
 TAGS = {'blame': 'jacob'}
 
 search_databases_config = StackConfigBaseModel(
-	stack_id="search-service-databases",
-	stack_name="search-service-databases",
+	stack_id="tai-search-service-databases",
+	stack_name="tai-search-service-databases",
 	description="Stack for the search service databases. This stack contains the document " \
     	"database and the pinecone database used by the tai search service.",
     deployment_settings=AWS_DEPLOYMENT_SETTINGS,
@@ -51,6 +51,7 @@ tai_api = TaiApiStack(
     config=tai_api_config,
     api_settings=TAI_API_SETTINGS,
     vpc=search_service_databases.vpc,
+    security_group_allowing_db_connections=search_service_databases.security_group_for_connecting_to_doc_db,
 )
 
 app.synth()

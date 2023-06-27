@@ -3,12 +3,13 @@ from fastapi import APIRouter, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from runtime_settings import TaiApiSettings, SETTINGS_STATE_ATTRIBUTE_NAME
 
+
 TITLE = "T.A.I. Service"
 DESCRIPTION = "A service for the T.A.I. project."
 
 ROUTER = APIRouter()
 
-ROUTER.get("health-check")(lambda: {"status": "ok"})
+ROUTER.get("/health-check")(lambda: {"status": "ok"})
 ROUTERS = [
     ROUTER
 ]

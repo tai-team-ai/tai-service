@@ -21,7 +21,7 @@ from ..constructs.construct_helpers import (
     get_secret_arn_from_name,
     create_restricted_security_group,
     get_vpc,
-    create_interface_vpc_endpoint,
+    vpc_interface_exists,
 )
 
 
@@ -40,6 +40,7 @@ class TaiApiStack(Stack):
         config: StackConfigBaseModel,
         api_settings: TaiApiSettings,
         vpc: Union[ec2.IVpc, ec2.Vpc, str],
+        security_group_allowing_db_connections: ec2.SecurityGroup,
     ) -> None:
         """Initialize the stack for the TAI API service."""
         super().__init__(
@@ -51,28 +52,28 @@ class TaiApiStack(Stack):
             tags=config.tags,
             termination_protection=config.termination_protection,
         )
-        self._settings: Union[MongoDBUser, BaseDocumentDBSettings] = api_settings
+        self._settings = api_settings
         self._vpc = get_vpc(self, vpc)
-        self._python_lambda = self._create_lambda_function()
+        self._python_lambda: PythonLambda = self._create_lambda_function(security_group_allowing_db_connections)
 
     @property
     def lambda_function(self) -> _lambda.Function:
         """Return the lambda function."""
         return self._python_lambda.lambda_function
 
-    def _create_lambda_function(self) -> PythonLambda:
-        config = self._get_lambda_config()
+    def _create_lambda_function(self, security_group_allowing_db_connections: ec2.SecurityGroup) -> PythonLambda:
+        config = self._get_lambda_config(security_group_allowing_db_connections)
         name = config.function_name
         python_lambda: PythonLambda = PythonLambda(
             self,
             construct_id=f"{name}-lambda",
             config=config,
         )
-        python_lambda.add_read_only_secrets_manager_access(get_secret_arn_from_name(self._settings.secret_name))
+        python_lambda.add_read_only_secrets_manager_access([get_secret_arn_from_name(self._settings.secret_name)])
         python_lambda.allow_public_invoke_of_function()
         return python_lambda
 
-    def _get_lambda_config(self) -> PythonLambdaConfigModel:
+    def _get_lambda_config(self, security_group_allowing_db_connections: ec2.SecurityGroup) -> PythonLambdaConfigModel:
         function_name = "tai-service-api"
         security_group_secrets = create_restricted_security_group(
             scope=self,
@@ -86,20 +87,14 @@ class TaiApiStack(Stack):
             description="Allow outbound HTTPS traffic to Secrets Manager.",
         )
         subnet_type = ec2.SubnetType.PUBLIC
-        create_interface_vpc_endpoint(
-            scope=self,
-            id="SecretsManagerEndpoint",
-            vpc=self._vpc,
-            service=ec2.InterfaceVpcEndpointAwsService.SECRETS_MANAGER,
-            security_groups=[security_group_secrets],
-            subnet_type=subnet_type,
-        )
+        assert vpc_interface_exists(ec2.InterfaceVpcEndpointAwsService.SECRETS_MANAGER, self._vpc),\
+            "The VPC must have an interface endpoint for Secrets Manager."
         lambda_config = PythonLambdaConfigModel(
             function_name=function_name,
             description="The lambda for the TAI API service.",
             code_path=API_DIR,
-            handler_module_name="main",
-            handler_name="lambda_handler",
+            handler_module_name="index",
+            handler_name="handler",
             runtime_environment=self._settings,
             requirements_file_path=API_DIR / "requirements.txt",
             files_to_copy_into_handler_dir=[
@@ -111,7 +106,11 @@ class TaiApiStack(Stack):
             ephemeral_storage_size=StorageSize.mebibytes(512),
             vpc=self._vpc,
             subnet_selection=ec2.SubnetSelection(subnet_type=subnet_type),
-            security_groups=[security_group_secrets],
-            function_url_config=LambdaURLConfigModel(allowed_headers=["*"], allowed_origins=["*"]),
+            security_groups=[security_group_secrets, security_group_allowing_db_connections],
+            function_url_config=LambdaURLConfigModel(
+                allowed_headers=["*"],
+                allowed_origins=["*"],
+                auth_type=_lambda.FunctionUrlAuthType.NONE,
+            ),
         )
         return lambda_config
