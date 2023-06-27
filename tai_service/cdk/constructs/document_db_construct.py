@@ -154,9 +154,9 @@ class DocumentDatabase(Construct):
             connection=ec2.Port.tcp(27017),
             description="Allow outbound connections to the DocumentDB cluster.",
         )
-        # self.db_cluster = self._create_cluster()
+        self.db_cluster = self._create_cluster()
         self.custom_resource = self._create_custom_resource()
-        # self.custom_resource.node.add_dependency(self.db_cluster)
+        self.custom_resource.node.add_dependency(self.db_cluster)
 
     @property
     def db_security_group(self) -> ec2.SecurityGroup:
@@ -172,10 +172,10 @@ class DocumentDatabase(Construct):
         """
         return self._security_group_for_connecting_to_cluster
 
-    # @property
-    # def db_cluster(self) -> Union[docdb_elastic.CfnCluster, docdb.DatabaseCluster]:
-    #     """Return the DocumentDB cluster."""
-    #     return self.custom_resource.db_cluster
+    @property
+    def db_cluster(self) -> Union[docdb_elastic.CfnCluster, docdb.DatabaseCluster]:
+        """Return the DocumentDB cluster."""
+        return self.custom_resource.db_cluster
 
     def _create_cluster(self) -> Union[docdb_elastic.CfnCluster, docdb.DatabaseCluster]:
         """Create the DocumentDB cluster."""
