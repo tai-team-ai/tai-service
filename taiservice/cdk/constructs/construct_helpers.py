@@ -158,7 +158,7 @@ def vpc_interface_exists(service: ec2.InterfaceVpcEndpointAwsService, vpc: ec2.I
     response = client.describe_vpcs(Filters=[{"Name": "tag:Name", "Values": [vpc_name]}])
     vpcs = response["Vpcs"]
     if vpcs and vpcs[0].get("VpcId"):
-        vpc_id = vpcs["VpcId"]
+        vpc_id = vpcs[0]["VpcId"]
         response = client.describe_vpc_endpoints(Filters=[{"Name": "vpc-id", "Values": [vpc_id]}])
         for endpoint in response["VpcEndpoints"]:
             current_service_short_name = endpoint["ServiceName"].split(".")[-1]
