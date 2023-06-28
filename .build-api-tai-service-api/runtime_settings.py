@@ -2,7 +2,7 @@ from pydantic import Field
 
 # first imports are for local development, second imports are for deployment
 try:
-    from tai_service.cdk.constructs.customresources.document_db.settings import (
+    from taiservice.cdk.constructs.customresources.document_db.settings import (
         BaseDocumentDBSettings,
         BuiltInMongoDBRoles,
         MongoDBUser,

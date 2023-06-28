@@ -30,11 +30,11 @@ PINECONE_DB_SETTINGS = PineconeDBSettings(indexes=INDEXES)
 
 COLLECTION_CONFIG = [
     CollectionConfig(
-        name="class-resource",
+        name="class_resource",
         fields_to_index=["class_id", "resource_id"],
     ),
     CollectionConfig(
-        name="class-resource-chunk",
+        name="class_resource_chunk",
         fields_to_index=["class_id", "resource_id", "chunk_id"],
     ),
 ]
@@ -53,6 +53,6 @@ DOCUMENT_DB_SETTINGS = DocumentDBSettings(
     secret_name=os.environ.get("DOC_DB_ADMIN_USER_PASSWORD_SECRET_NAME"),
     cluster_name="tai-service",
     collection_config=COLLECTION_CONFIG,
-    db_name="class-resources",
+    db_name="class_resources",
     user_config=USER_CONFIG,
 )

@@ -156,15 +156,15 @@ def vpc_interface_exists(service: ec2.InterfaceVpcEndpointAwsService, vpc: ec2.I
     # get the name form the Tags of the VPC
     vpc_name = vpc.to_string().split("/")[-1]
     response = client.describe_vpcs(Filters=[{"Name": "tag:Name", "Values": [vpc_name]}])
-    vpc_id = response["Vpcs"][0].get("VpcId")
-
-    if not vpc_id:
-        logger.warning(f"VPC ID not found for '{vpc_name}'. Cannot check if interface VPC endpoint exists.")
-        return True
-    response = client.describe_vpc_endpoints(Filters=[{"Name": "vpc-id", "Values": [vpc_id]}])
-    for endpoint in response["VpcEndpoints"]:
-        current_service_short_name = endpoint["ServiceName"].split(".")[-1]
-        if service.short_name == current_service_short_name:
-            logger.info(f"Interface VPC endpoint for {service.short_name} exists in '{vpc_name}' ({vpc_id})")
-            return True
-    return False
+    vpcs = response["Vpcs"]
+    if vpcs and vpcs[0].get("VpcId"):
+        vpc_id = vpcs["VpcId"]
+        response = client.describe_vpc_endpoints(Filters=[{"Name": "vpc-id", "Values": [vpc_id]}])
+        for endpoint in response["VpcEndpoints"]:
+            current_service_short_name = endpoint["ServiceName"].split(".")[-1]
+            if service.short_name == current_service_short_name:
+                logger.info(f"Interface VPC endpoint for {service.short_name} exists in '{vpc_name}' ({vpc_id})")
+                return True
+            return False
+    logger.warning(f"VPC ID not found for '{vpc_name}'. Cannot check if interface VPC endpoint exists.")
+    return True

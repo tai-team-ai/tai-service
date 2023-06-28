@@ -1,0 +1,12 @@
+{
+    "[python]": {
+        "editor.defaultFormatter": "ms-python.black-formatter"
+    },
+    "python.testing.pytestPath": "/home/ec2-user/tai-service/.venv/bin/pytest",
+    "python.formatting.provider": "none",
+    "python.testing.pytestArgs": [
+        "tests"
+    ],
+    "python.testing.unittestEnabled": false,
+    "python.testing.pytestEnabled": true
+}

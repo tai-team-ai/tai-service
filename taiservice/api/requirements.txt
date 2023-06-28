@@ -1,3 +1,4 @@
 loguru
 fastapi
 mangum
+pydantic
