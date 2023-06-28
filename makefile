@@ -1,8 +1,5 @@
-venv:
-	python3 -m venv venv
+.PHONY: all
+all:
 
-synth:
-	cdk synth --all
-
-deploy:
-	cdk deploy -all
+test:
+	python3 -m pytest -vv --cov=taiservice --cov-report=term-missing --cov-report=xml:test-reports/coverage.xml --cov-report=html:test-reports/coverage

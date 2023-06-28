@@ -1,6 +1,6 @@
 from projen.awscdk import AwsCdkPythonApp
-from projen.python import VenvOptions, PytestOptions
-from projen import Project
+from projen.python import VenvOptions
+from projen import Project, Makefile, Rule
 
 project:Project = AwsCdkPythonApp(
     author_email="jacobpetterle+aiforu@gmail.com",
@@ -27,9 +27,20 @@ project:Project = AwsCdkPythonApp(
         "aws-lambda-typing",
         "boto3-stubs[essential]",
         "pytest",
+        "pytest-cov",
     ]
 )
 
+make_file: Makefile = Makefile(
+    project,
+    "./makefile",
+)
+make_file.add_rule(
+    targets=["test"],
+    recipe=[
+        "python3 -m pytest -vv --cov=taiservice --cov-report=term-missing --cov-report=xml:test-reports/coverage.xml --cov-report=html:test-reports/coverage",
+    ]
+)
 
 project.add_git_ignore("/.build/*")
 

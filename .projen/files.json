@@ -1,5 +1,6 @@
 {
   "files": [
+    "./makefile",
     ".gitattributes",
     ".github/workflows/pull-request-lint.yml",
     ".gitignore",
