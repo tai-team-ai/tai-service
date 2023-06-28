@@ -1,6 +1,6 @@
 from projen.awscdk import AwsCdkPythonApp
 from projen.python import VenvOptions
-from projen import Project, Makefile, Rule
+from projen import Project, Makefile, TextFile
 
 project:Project = AwsCdkPythonApp(
     author_email="jacobpetterle+aiforu@gmail.com",
@@ -36,10 +36,23 @@ make_file: Makefile = Makefile(
     "./makefile",
 )
 make_file.add_rule(
+    targets=["deploy"],
+    prerequisites=["test"],
+    recipe=[
+        "cdk deploy --require-approval never",
+    ],
+)
+make_file.add_rule(
     targets=["test"],
     recipe=[
         "python3 -m pytest -vv --cov=taiservice --cov-report=term-missing --cov-report=xml:test-reports/coverage.xml --cov-report=html:test-reports/coverage",
     ]
+)
+env_file: TextFile = TextFile(
+    project,
+    "./.env",
+    committed=False,
+    readonly=False,
 )
 
 project.add_git_ignore("/.build/*")
