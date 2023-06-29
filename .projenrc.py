@@ -54,6 +54,6 @@ make_file.add_rule(
     ],
 )
 
-project.add_git_ignore("/.build/*")
+project.add_git_ignore("/.build*")
 
 project.synth()

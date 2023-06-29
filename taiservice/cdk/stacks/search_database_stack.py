@@ -38,7 +38,7 @@ class SearchServiceDatabases(Stack):
         self._pinecone_db_settings = pinecone_db_settings
         self._doc_db_settings = doc_db_settings
         self._config = config
-        self._namer = lambda name: f"{config.stack_id}-{name}"
+        self._namer = lambda name: f"{config.stack_name}-{name}"
         self._subnet_type_for_doc_db = ec2.SubnetType.PRIVATE_ISOLATED
         self.vpc = self._create_vpc()
         self.document_db = self._get_document_db(doc_db_settings=doc_db_settings)

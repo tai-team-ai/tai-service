@@ -2,15 +2,17 @@
 import copy
 from textwrap import dedent
 from enum import Enum
-from typing import Union
+from typing import Optional, Union
 from fastapi import APIRouter
 from pydantic import Field, validator
 
 # first imports are for local development, second imports are for deployment
 try:
+    from taiservice.api.taillm.schemas import TaiTutorName
     from taiservice.api.routers.base_schema import BasePydanticModel
 except ImportError:
-    from routers.base_schema import BasePydanticModel
+    from api.taillm.schemas import TaiTutorName
+    from api.routers.base_schema import BasePydanticModel
 
 
 ROUTER = APIRouter()
@@ -21,6 +23,15 @@ class ChatRole(str, Enum):
 
     TAI_TUTOR = "tai"
     USER = "user"
+
+
+class ResponseTechnicalLevel(str, Enum):
+    """Define the technical level of the response."""
+
+    EXPLAIN_LIKE_IM_5 = "explain_like_im_5"
+    EXPLAIN_LIKE_IM_IN_HIGH_SCHOOL = "explain_like_im_in_high_school"
+    EXPLAIN_LIKE_IM_IN_COLLEGE = "explain_like_im_in_college"
+    EXPLAIN_LIKE_IM_AN_EXPERT_IN_THE_FIELD = "explain_like_im_an_expert_in_the_field"
 
 
 class ClassResourceSnippet(BasePydanticModel):
@@ -127,8 +138,18 @@ class ChatSession(BasePydanticModel):
     )
 
 
+
 class ChatSessionRequest(ChatSession):
     """Define the request model for the chat endpoint."""
+
+    tai_tutor_name: TaiTutorName = Field(
+        ...,
+        description="The name of the TAI tutor.",
+    )
+    technical_level: Optional[ResponseTechnicalLevel] = Field(
+        default=None,
+        description="The technical level of the response.",
+    )
 
     @validator("chats")
     def validate_user_is_last_chat(cls, chats: list[Union[UserChat, TaiChat]]) -> list[Union[UserChat, TaiChat]]:

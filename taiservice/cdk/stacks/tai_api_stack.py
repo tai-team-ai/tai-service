@@ -53,6 +53,7 @@ class TaiApiStack(Stack):
             tags=config.tags,
             termination_protection=config.termination_protection,
         )
+        self._namer = lambda name: f"{config.stack_name}-{name}"
         self._settings = api_settings
         self._vpc = get_vpc(self, vpc)
         self._python_lambda: PythonLambda = self._create_lambda_function(security_group_allowing_db_connections)
@@ -76,7 +77,7 @@ class TaiApiStack(Stack):
         return python_lambda
 
     def _get_lambda_config(self, security_group_allowing_db_connections: ec2.SecurityGroup) -> PythonLambdaConfigModel:
-        function_name = "tai-service-api"
+        function_name = self._namer("tai-api-service")
         security_group_secrets = create_restricted_security_group(
             scope=self,
             name=function_name + "-sg",

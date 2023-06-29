@@ -8,7 +8,7 @@ try:
         MongoDBUser,
     )
 except ImportError:
-    from settings import BaseDocumentDBSettings, BuiltInMongoDBRoles, MongoDBUser
+    from api.settings import BaseDocumentDBSettings, BuiltInMongoDBRoles, MongoDBUser
 
 
 SETTINGS_STATE_ATTRIBUTE_NAME = "runtime_settings"

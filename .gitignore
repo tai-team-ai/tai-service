@@ -87,4 +87,4 @@ cython_debug/
 /cdk.out/
 .cdk.staging/
 !/./makefile
-/.build/*
+/.build*

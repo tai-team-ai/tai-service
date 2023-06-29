@@ -8,8 +8,10 @@ from pydantic import Field, validator
 
 # first imports are for local development, second imports are for deployment
 try:
+    from taiservice.api.taillm.schemas import TaiTutorName
     from taiservice.api.routers.base_schema import BasePydanticModel
 except ImportError:
+    from taillm.schemas import TaiTutorName
     from routers.base_schema import BasePydanticModel
 
 
@@ -127,8 +129,14 @@ class ChatSession(BasePydanticModel):
     )
 
 
+
 class ChatSessionRequest(ChatSession):
     """Define the request model for the chat endpoint."""
+
+    tai_tutor_name: TaiTutorName = Field(
+        ...,
+        description="The name of the TAI tutor.",
+    )
 
     @validator("chats")
     def validate_user_is_last_chat(cls, chats: list[Union[UserChat, TaiChat]]) -> list[Union[UserChat, TaiChat]]:
