@@ -14,7 +14,6 @@ from taiservice.cdk.constructs.customresources.pinecone_db.pinecone_db_custom_re
     PineconeIndexConfig,
     PineconeDBSettings,
 )
-
 INDEXES = [
     PineconeIndexConfig(
         name="tai-index",

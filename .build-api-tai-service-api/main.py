@@ -2,8 +2,14 @@
 from fastapi import APIRouter, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from loguru import logger
-from runtime_settings import TaiApiSettings, SETTINGS_STATE_ATTRIBUTE_NAME
-from routers.ai_responses import ROUTER as AI_RESPONSES_ROUTER
+
+# first imports are for local development, second imports are for deployment
+try:
+    from taiservice.api.routers.tai import ROUTER as AI_RESPONSES_ROUTER
+    from taiservice.api.runtime_settings import TaiApiSettings, SETTINGS_STATE_ATTRIBUTE_NAME
+except ImportError:
+    from runtime_settings import TaiApiSettings, SETTINGS_STATE_ATTRIBUTE_NAME
+    from routers.tai import ROUTER as AI_RESPONSES_ROUTER
 
 
 TITLE = "T.A.I. Service"

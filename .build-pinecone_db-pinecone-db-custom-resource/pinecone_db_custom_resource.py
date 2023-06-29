@@ -8,12 +8,12 @@ import pinecone
 # first imports are for local development, second imports are for deployment
 try:
     from ..custom_resource_interface import CustomResourceInterface
-    from ...construct_config import BasePydanticSettings
+    from ...construct_config import BaseDeploymentSettings
     from aws_lambda_powertools.utilities.typing import LambdaContext
     from aws_lambda_typing.events import CloudFormationCustomResourceEvent
 except ImportError:
     from custom_resource_interface import CustomResourceInterface
-    from construct_config import BasePydanticSettings
+    from construct_config import BaseDeploymentSettings
     LambdaContext = CloudFormationCustomResourceEvent = Any
 
 
@@ -53,7 +53,7 @@ class PineConeEnvironment(str, Enum):
     EAST_1 = "us-east-1-aws"
 
 
-class BasePineconeDBSettings(BasePydanticSettings):
+class BasePineconeDBSettings(BaseDeploymentSettings):
     """Define the settings for initializing the Pinecone database."""
 
     api_key_secret_name: str = Field(
@@ -65,7 +65,7 @@ class BasePineconeDBSettings(BasePydanticSettings):
         description="The environment to use for the Pinecone project.",
     )
 
-    class Config:
+    class Config():
         """Define the Pydantic config."""
 
         env_prefix = "PINECONE_DB_"

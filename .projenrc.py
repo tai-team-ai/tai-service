@@ -1,6 +1,6 @@
 from projen.awscdk import AwsCdkPythonApp
 from projen.python import VenvOptions
-from projen import Project, Makefile, TextFile
+from projen import Project, Makefile
 
 project:Project = AwsCdkPythonApp(
     author_email="jacobpetterle+aiforu@gmail.com",
@@ -30,29 +30,29 @@ project:Project = AwsCdkPythonApp(
         "pytest-cov",
     ]
 )
-
 make_file: Makefile = Makefile(
     project,
     "./makefile",
 )
 make_file.add_rule(
-    targets=["deploy"],
+    targets=["deploy-all"],
     prerequisites=["test"],
     recipe=[
-        "cdk deploy --require-approval never",
+        "cdk deploy --all --require-approval never",
     ],
 )
+#specify the test directory as tests
 make_file.add_rule(
     targets=["test"],
     recipe=[
-        "python3 -m pytest -vv --cov=taiservice --cov-report=term-missing --cov-report=xml:test-reports/coverage.xml --cov-report=html:test-reports/coverage",
+        "python3 -m pytest -vv tests --cov=taiservice --cov-report=term-missing --cov-report=xml:test-reports/coverage.xml --cov-report=html:test-reports/coverage",
     ]
 )
-env_file: TextFile = TextFile(
-    project,
-    "./.env",
-    committed=False,
-    readonly=False,
+make_file.add_rule(
+    targets=["start-docker"],
+    recipe=[
+        "sudo systemctl start docker",
+    ],
 )
 
 project.add_git_ignore("/.build/*")

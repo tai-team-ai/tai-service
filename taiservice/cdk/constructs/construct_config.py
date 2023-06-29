@@ -3,7 +3,7 @@ import json
 from pydantic import BaseSettings
 
 
-class BasePydanticSettings(BaseSettings):
+class BaseDeploymentSettings(BaseSettings):
     """Define the base settings for the package."""
 
     def dict(self, *args, for_environment: bool=False, **kwargs):
@@ -27,4 +27,3 @@ class BasePydanticSettings(BaseSettings):
         use_enum_values = True
         env_file = ".env"
         env_file_encoding = "utf-8"
-

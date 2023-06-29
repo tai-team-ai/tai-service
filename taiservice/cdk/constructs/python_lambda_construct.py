@@ -17,7 +17,7 @@ from aws_cdk import (
     aws_iam as iam,
 )
 from loguru import logger
-from.construct_config import BasePydanticSettings
+from.construct_config import BaseDeploymentSettings
 from .construct_helpers import get_vpc, sanitize_name, validate_vpc
 
 
@@ -79,7 +79,7 @@ class PythonLambdaConfigModel(BaseModel):
         ...,
         description="The name of the handler function. This is the entry point to the Lambda code.",
     )
-    runtime_environment: BasePydanticSettings = Field(
+    runtime_environment: BaseDeploymentSettings = Field(
         ...,
         description="The runtime environment for the Lambda function.",
     )

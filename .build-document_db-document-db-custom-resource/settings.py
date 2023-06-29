@@ -5,9 +5,9 @@ from pydantic import BaseModel, Field, validator
 
 # first imports are for local development, second imports are for deployment
 try:
-    from taiservice.cdk.constructs.construct_config import BasePydanticSettings
+    from taiservice.cdk.constructs.construct_config import BaseDeploymentSettings
 except ImportError:
-    from construct_config import BasePydanticSettings
+    from construct_config import BaseDeploymentSettings
 
 
 class BuiltInMongoDBRoles(str, Enum):
@@ -18,7 +18,7 @@ class BuiltInMongoDBRoles(str, Enum):
     ROOT = "root"
 
 
-class BaseDocumentDBSettings(BasePydanticSettings):
+class BaseDocumentDBSettings(BaseDeploymentSettings):
     """Define the base settings for the document database."""
 
     cluster_name: str = Field(
