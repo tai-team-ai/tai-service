@@ -8,7 +8,6 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-
     steps:
     - name: Checkout code
       uses: actions/checkout@v2
@@ -32,7 +31,7 @@ jobs:
         make test
     - name: Deploy to AWS
       env:
-        AWS_REGION: ${{ vars.AWS_REGION }}
+        AWS_DEFAULT_REGION: ${{ vars.AWS_REGION }}
         AWS_ACCESS_KEY_ID: ${{ vars.DEV_AWS_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.DEV_AWS_SECRET_ACCESS_KEY }}
         PINECONE_DB_ENVIRONMENT: ${{ vars.PINECONE_DB_ENVIRONMENT }}
