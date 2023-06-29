@@ -12,10 +12,20 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v2
 
+    # Cache the .venv directory
+    - name: Cache dependencies
+      uses: actions/cache@v2
+      with:
+        path: .venv
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+
     - name: Setup Python
       uses: actions/setup-python@v2
       with:
         python-version: '3.10' # change this to the correct python version you are using
+      
     - name: Install dependencies
       run: |
         npm install -g aws-cdk && \
@@ -24,6 +34,7 @@ jobs:
         projen && \
         source .venv/bin/activate && \
         pip list
+
     - name: Run Tests
       run: |
         source .venv/bin/activate && \
