@@ -1,7 +1,7 @@
 .PHONY: all
 all:
 
-deploy-all: test
+deploy-all:
 	cdk deploy --all --require-approval never
 
 test:

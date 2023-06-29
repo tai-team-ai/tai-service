@@ -25,6 +25,11 @@ jobs:
         projen && \
         source .venv/bin/activate && \
         pip list
+    - name: Run Tests
+      run: |
+        source .venv/bin/activate && \
+        export PATH=.venv/bin:$PATH && \
+        make test
     - name: Deploy to AWS
       env:
         AWS_REGION: ${{ vars.AWS_REGION }}

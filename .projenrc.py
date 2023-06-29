@@ -36,7 +36,6 @@ make_file: Makefile = Makefile(
 )
 make_file.add_rule(
     targets=["deploy-all"],
-    prerequisites=["test"],
     recipe=[
         "cdk deploy --all --require-approval never",
     ],
