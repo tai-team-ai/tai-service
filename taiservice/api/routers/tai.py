@@ -23,7 +23,6 @@ ROUTER = APIRouter()
 class ChatRole(str, Enum):
     """Define the built-in MongoDB roles."""
 
-    TAI_SEARCH = "tai_search"
     TAI_TUTOR = "tai_tutor"
     STUDENT = "student"
 
@@ -96,11 +95,6 @@ class StudentChat(Chat):
 class TaiSearchResponse(Chat):
     """Define the model for the TAI chat message."""
 
-    role: ChatRole = Field(
-        default=ChatRole.TAI_SEARCH,
-        const=True,
-        description="The role of the creator of the chat message.",
-    )
     class_resources: list[ClassResourceSnippet] = Field(
         ...,
         description="The class resources that were used to generate the response.",
@@ -252,7 +246,6 @@ EXAMPLE_SEARCH_ANSWER = copy.deepcopy(EXAMPLE_SEARCH_QUERY)
 EXAMPLE_SEARCH_ANSWER["chats"].append(
     {
         "message": "Here are some resources on Python.",
-        "role": "tai_search",
         "classResources": [
             {
                 "resourceId": "123",
@@ -265,6 +258,25 @@ EXAMPLE_SEARCH_ANSWER["chats"].append(
     },
 )
 
+class ResourceType(str, Enum):
+    """
+    Define the resource type.
+
+    *NOTE:* These likely are not correct rn.
+    """
+
+    VIDEO = "video"
+    ARTICLE = "article"
+    BOOK = "book"
+    TEXTBOOK = "textbook"
+
+class SearchFilters(BasePydanticModel):
+    """Define the search filters."""
+
+    resource_types: list[ResourceType] = Field(
+        default_factory=lambda: [resource_type for resource_type in ResourceType],
+        description="The resource types to filter by.",
+    )
 
 class ResourceSearchQuery(BaseChatSession):
     dedent("""
@@ -278,6 +290,10 @@ class ResourceSearchQuery(BaseChatSession):
         ...,
         max_items=1,
         description="The search query from the student.",
+    )
+    filters: SearchFilters = Field(
+        default_factory=SearchFilters,
+        description="The search filters.",
     )
 
     class Config:
@@ -294,13 +310,6 @@ class ResourceSearchAnswer(BaseChatSession):
         ...,
         description="The chat session message history.",
     )
-
-    @validator("chats")
-    def validate_tai_is_last_chat(cls, chats: list[Union[StudentChat, TaiSearchResponse]]) -> list[Union[StudentChat, TaiSearchResponse]]:
-        """Validate that the TAI tutor is the last chat message."""
-        if chats[-1].role != ChatRole.TAI_SEARCH:
-            raise ValueError("The TAI tutor must be the last chat message.")
-        return chats
 
     class Config:
         """Define the configuration for the search answer."""
