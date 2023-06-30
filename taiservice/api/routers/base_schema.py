@@ -1,7 +1,8 @@
 """Define the base schema for the API models."""
-from pydantic import BaseModel
+from pydantic import BaseModel, Extra
 
 def to_camel_case(string: str) -> str:
+    """Convert a string to camel case."""
     init, *temp = string.split('_')
     return ''.join([init.lower(), *map(str.title, temp)])
 
@@ -14,3 +15,4 @@ class BasePydanticModel(BaseModel):
         alias_generator = to_camel_case
         allow_population_by_field_name = True
         validate_assignment = True
+        extra = Extra.forbid

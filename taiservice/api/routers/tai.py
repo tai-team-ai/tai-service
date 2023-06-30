@@ -127,7 +127,17 @@ class TaiTutorChat(TaiSearchChat):
         description="The technical level of the response.",
     )
 
+class BaseChatSession(BasePydanticModel):
+    """Define the request model for the chat endpoint."""
 
+    id: str = Field(
+        ...,
+        description="The ID of the chat session.",
+    )
+    chats: list[Chat] = Field(
+        ...,
+        description="The chat session message history.",
+    )
 
 EXAMPLE_CHAT_SESSION_REQUEST = {
     "id": "1234",
@@ -162,22 +172,13 @@ EXAMPLE_CHAT_SESSION_RESPONSE["chats"].append(
 )
 
 
-class ChatSession(BasePydanticModel):
+class ChatSessionRequest(BaseChatSession):
     """Define the request model for the chat endpoint."""
 
-    id: str = Field(
-        ...,
-        description="The ID of the chat session.",
-    )
-    chats: list[Chat] = Field(
+    chats: list[Union[StudentChat, TaiSearchChat]] = Field(
         ...,
         description="The chat session message history.",
     )
-
-
-
-class ChatSessionRequest(ChatSession):
-    """Define the request model for the chat endpoint."""
 
     class Config:
         """Define the configuration for the chat session."""
@@ -187,8 +188,13 @@ class ChatSessionRequest(ChatSession):
         }
 
 
-class ChatSessionResponse(ChatSession):
+class ChatSessionResponse(BaseChatSession):
     """Define the response model for the chat endpoint."""
+
+    chats: list[Union[StudentChat, TaiTutorChat]] = Field(
+        ...,
+        description="The chat session message history.",
+    )
 
     @validator("chats")
     def validate_tai_is_last_chat(cls, chats: list[Union[StudentChat, TaiTutorChat]]) -> list[Union[StudentChat, TaiTutorChat]]:
@@ -266,7 +272,7 @@ EXAMPLE_SEARCH_ANSWER["chats"].append(
 )
 
 
-class ResourceSearchQuery(ChatSession):
+class ResourceSearchQuery(BaseChatSession):
     dedent("""
     Define the request model for the search endpoint.
 
@@ -287,12 +293,12 @@ class ResourceSearchQuery(ChatSession):
             "example": EXAMPLE_SEARCH_QUERY,
         }
 
-class ResourceSearchAnswer(ChatSession):
+class ResourceSearchAnswer(BaseChatSession):
     """Define the response model for the search endpoint."""
 
-    chats: list[Chat] = Field(
+    chats: list[Union[Chat, TaiSearchChat]] = Field(
         ...,
-        description="The search answer from the TAI.",
+        description="The chat session message history.",
     )
 
     @validator("chats")
