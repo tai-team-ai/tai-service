@@ -1,6 +1,6 @@
 from projen.awscdk import AwsCdkPythonApp
 from projen.python import VenvOptions
-from projen import Project, Makefile
+from projen import Project, Makefile, TextFile
 
 project:Project = AwsCdkPythonApp(
     author_email="jacobpetterle+aiforu@gmail.com",
@@ -30,6 +30,18 @@ project:Project = AwsCdkPythonApp(
         "pytest-cov",
     ]
 )
+env_file: TextFile = TextFile(
+    project,
+    "./.env",
+    lines=[
+        'PINECONE_DB_API_KEY_SECRET_NAME="dev/tai_service/pinecone_db/api_key"',
+        'PINECONE_DB_ENVIRONMENT="us-east-1-aws"',
+        'DOC_DB_READ_ONLY_USER_PASSWORD_SECRET_NAME="dev/tai_service/document_DB/read_ONLY_user_password"',
+        'DOC_DB_READ_WRITE_USER_PASSWORD_SECRET_NAME="dev/tai_service/document_DB/read_write_user_password"',
+        'DOC_DB_ADMIN_USER_PASSWORD_SECRET_NAME="dev/tai_service/document_DB/admin_password"',
+        'AWS_DEPLOYMENT_ACCOUNT_ID="645860363137"',
+    ]
+)
 make_file: Makefile = Makefile(
     project,
     "./makefile",
@@ -40,12 +52,15 @@ make_file.add_rule(
         "cdk deploy --all --require-approval never",
     ],
 )
-#specify the test directory as tests
 make_file.add_rule(
     targets=["test"],
     recipe=[
         "python3 -m pytest -vv tests --cov=taiservice --cov-report=term-missing --cov-report=xml:test-reports/coverage.xml --cov-report=html:test-reports/coverage",
     ]
+)
+make_file.add_rule(
+    targets=["test-deploy-all"],
+    prerequisites=["test", "deploy-all"],
 )
 make_file.add_rule(
     targets=["start-docker"],
@@ -54,6 +69,6 @@ make_file.add_rule(
     ],
 )
 
-project.add_git_ignore("/.build/*")
+project.add_git_ignore("/.build*")
 
 project.synth()

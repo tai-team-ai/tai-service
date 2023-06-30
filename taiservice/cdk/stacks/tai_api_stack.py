@@ -30,7 +30,10 @@ CDK_DIR = Path(__file__).parent.parent
 API_DIR = CDK_DIR.parent / "api"
 CONSTRUCT_DIR = CDK_DIR / "constructs"
 DOC_DB_CUSTOM_RESOURCE_DIR = CONSTRUCT_DIR / "customresources" / "document_db"
-
+MODULES_TO_COPY_INTO_API_DIR = [
+    CONSTRUCT_DIR / "construct_config.py",
+    DOC_DB_CUSTOM_RESOURCE_DIR / "settings.py",
+]
 
 class TaiApiStack(Stack):
     """Define the stack for the TAI API service."""
@@ -53,6 +56,7 @@ class TaiApiStack(Stack):
             tags=config.tags,
             termination_protection=config.termination_protection,
         )
+        self._namer = lambda name: f"{config.stack_name}-{name}"
         self._settings = api_settings
         self._vpc = get_vpc(self, vpc)
         self._python_lambda: PythonLambda = self._create_lambda_function(security_group_allowing_db_connections)
@@ -76,7 +80,7 @@ class TaiApiStack(Stack):
         return python_lambda
 
     def _get_lambda_config(self, security_group_allowing_db_connections: ec2.SecurityGroup) -> PythonLambdaConfigModel:
-        function_name = "tai-service-api"
+        function_name = self._namer("tai-api-service")
         security_group_secrets = create_restricted_security_group(
             scope=self,
             name=function_name + "-sg",
@@ -99,10 +103,7 @@ class TaiApiStack(Stack):
             handler_name="handler",
             runtime_environment=self._settings,
             requirements_file_path=API_DIR / "requirements.txt",
-            files_to_copy_into_handler_dir=[
-                CONSTRUCT_DIR / "construct_config.py",
-                DOC_DB_CUSTOM_RESOURCE_DIR / "settings.py",
-            ],
+            files_to_copy_into_handler_dir=MODULES_TO_COPY_INTO_API_DIR,
             timeout=Duration.minutes(3),
             memory_size=128,
             ephemeral_storage_size=StorageSize.mebibytes(512),

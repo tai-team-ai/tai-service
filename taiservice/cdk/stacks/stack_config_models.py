@@ -95,6 +95,13 @@ class StackConfigBaseModel(BaseModel):
         ...,
         description="The AWS deployment settings.",
     )
+    duplicate_stack_for_development: bool = Field(
+        default=True,
+        description="""
+            Whether or not to duplicate the stack for development. This will rename all 
+            resources to include the staging stack suffix.
+        """,
+    )
     stack_id: str = Field(
         ...,
         description="The ID of the stack.",
@@ -112,13 +119,6 @@ class StackConfigBaseModel(BaseModel):
     termination_protection: bool = Field(
         default=True,
         description="Whether or not to enable termination protection for the stack.",
-    )
-    duplicate_stack_for_development: bool = Field(
-        default=True,
-        description="""
-            Whether or not to duplicate the stack for development. This will rename all 
-            resources to include the staging stack suffix.
-        """,
     )
     tags: dict = Field(
         default_factory=dict,

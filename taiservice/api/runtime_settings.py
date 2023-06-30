@@ -8,6 +8,7 @@ try:
         MongoDBUser,
     )
 except ImportError:
+    # this module must be copied to the root of the lambda for deployment
     from settings import BaseDocumentDBSettings, BuiltInMongoDBRoles, MongoDBUser
 
 

@@ -1,18 +1,14 @@
 """Define the API for the tai service."""
-import sys
-from pathlib import Path
 from typing import Any
 from mangum import Mangum
-from main import create_app
+# first imports are for local development, second imports are for deployment
 try:
+    from taiservice.api.main import create_app
     from aws_lambda_typing.context import Context
     from aws_lambda_typing.events import APIGatewayProxyEventV2
 except ImportError:
+    from main import create_app
     Context = APIGatewayProxyEventV2 = Any
-
-# add router directory to sys path for importing routers
-base_dir = Path(__file__).parent
-sys.path.insert(0, str(base_dir.resolve()))
 
 
 def handler(event: APIGatewayProxyEventV2, context: Context) -> dict[str, str]:
