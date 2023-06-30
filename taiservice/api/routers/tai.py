@@ -274,7 +274,7 @@ class SearchFilters(BasePydanticModel):
     """Define the search filters."""
 
     resource_types: list[ResourceType] = Field(
-        default_factory=list(ResourceType),
+        default_factory=lambda: [resource_type for resource_type in ResourceType],
         description="The resource types to filter by.",
     )
 
