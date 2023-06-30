@@ -69,10 +69,6 @@ class Chat(BasePydanticModel):
         ...,
         description="The contents of the chat message. You can send an empty string to get a response from the TAI tutor.",
     )
-    role: ChatRole = Field(
-        ...,
-        description="The role of the creator of the chat message.",
-    )
     render_chat: bool = Field(
         default=True,
         description="Whether or not to render the chat message. If false, the chat message will be hidden from the student.",
@@ -97,7 +93,7 @@ class StudentChat(Chat):
     )
 
 
-class TaiSearchChat(Chat):
+class TaiSearchResponse(Chat):
     """Define the model for the TAI chat message."""
 
     role: ChatRole = Field(
@@ -110,7 +106,7 @@ class TaiSearchChat(Chat):
         description="The class resources that were used to generate the response.",
     )
 
-class TaiTutorChat(TaiSearchChat):
+class TaiTutorChat(TaiSearchResponse):
     """Define the model for the TAI Tutor chat message."""
 
     role: ChatRole = Field(
@@ -171,11 +167,10 @@ EXAMPLE_CHAT_SESSION_RESPONSE["chats"].append(
     },
 )
 
-
 class ChatSessionRequest(BaseChatSession):
     """Define the request model for the chat endpoint."""
 
-    chats: list[Union[StudentChat, TaiSearchChat]] = Field(
+    chats: list[Union[StudentChat, TaiSearchResponse]] = Field(
         ...,
         description="The chat session message history.",
     )
@@ -250,7 +245,6 @@ EXAMPLE_SEARCH_QUERY = {
     "chats": [
         {
             "message": "I'm looking for some resources on Python.",
-            "role": "student"
         },
     ],
 }
@@ -296,13 +290,13 @@ class ResourceSearchQuery(BaseChatSession):
 class ResourceSearchAnswer(BaseChatSession):
     """Define the response model for the search endpoint."""
 
-    chats: list[Union[Chat, TaiSearchChat]] = Field(
+    chats: list[Union[Chat, TaiSearchResponse]] = Field(
         ...,
         description="The chat session message history.",
     )
 
     @validator("chats")
-    def validate_tai_is_last_chat(cls, chats: list[Union[StudentChat, TaiSearchChat]]) -> list[Union[StudentChat, TaiSearchChat]]:
+    def validate_tai_is_last_chat(cls, chats: list[Union[StudentChat, TaiSearchResponse]]) -> list[Union[StudentChat, TaiSearchResponse]]:
         """Validate that the TAI tutor is the last chat message."""
         if chats[-1].role != ChatRole.TAI_SEARCH:
             raise ValueError("The TAI tutor must be the last chat message.")
@@ -322,11 +316,8 @@ def search(search_query: ResourceSearchQuery):
     dummy_response = ResourceSearchAnswer(
         id=search_query.id,
         chats=[
-            Chat(
-                message="Hi TAI, I'm looking for some resources on Python.",
-                role=ChatRole.STUDENT,
-            ),
-            TaiSearchChat(
+            Chat(message="Hi TAI, I'm looking for some resources on Python."),
+            TaiSearchResponse(
                 message="Here's some cool resources for you!",
                 class_resources=[
                     ClassResourceSnippet(
