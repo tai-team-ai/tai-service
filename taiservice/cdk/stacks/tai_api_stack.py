@@ -30,7 +30,10 @@ CDK_DIR = Path(__file__).parent.parent
 API_DIR = CDK_DIR.parent / "api"
 CONSTRUCT_DIR = CDK_DIR / "constructs"
 DOC_DB_CUSTOM_RESOURCE_DIR = CONSTRUCT_DIR / "customresources" / "document_db"
-
+MODULES_TO_COPY_INTO_API_DIR = [
+    CONSTRUCT_DIR / "construct_config.py",
+    DOC_DB_CUSTOM_RESOURCE_DIR / "settings.py",
+]
 
 class TaiApiStack(Stack):
     """Define the stack for the TAI API service."""
@@ -100,10 +103,7 @@ class TaiApiStack(Stack):
             handler_name="handler",
             runtime_environment=self._settings,
             requirements_file_path=API_DIR / "requirements.txt",
-            files_to_copy_into_handler_dir=[
-                CONSTRUCT_DIR / "construct_config.py",
-                DOC_DB_CUSTOM_RESOURCE_DIR / "settings.py",
-            ],
+            files_to_copy_into_handler_dir=MODULES_TO_COPY_INTO_API_DIR,
             timeout=Duration.minutes(3),
             memory_size=128,
             ephemeral_storage_size=StorageSize.mebibytes(512),

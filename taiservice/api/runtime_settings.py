@@ -8,7 +8,8 @@ try:
         MongoDBUser,
     )
 except ImportError:
-    from api.settings import BaseDocumentDBSettings, BuiltInMongoDBRoles, MongoDBUser
+    # this module must be copied to the root of the lambda for deployment
+    from settings import BaseDocumentDBSettings, BuiltInMongoDBRoles, MongoDBUser
 
 
 SETTINGS_STATE_ATTRIBUTE_NAME = "runtime_settings"

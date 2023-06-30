@@ -1,5 +1,6 @@
 """Define the API endpoints for the AI responses."""
 import copy
+import sys
 from textwrap import dedent
 from enum import Enum
 from typing import Optional, Union
@@ -7,12 +8,13 @@ from fastapi import APIRouter
 from pydantic import Field, validator
 
 # first imports are for local development, second imports are for deployment
+print(sys.path)
 try:
     from taiservice.api.taillm.schemas import TaiTutorName
     from taiservice.api.routers.base_schema import BasePydanticModel
 except ImportError:
-    from api.taillm.schemas import TaiTutorName
-    from api.routers.base_schema import BasePydanticModel
+    from taillm.schemas import TaiTutorName
+    from routers.base_schema import BasePydanticModel
 
 
 ROUTER = APIRouter()
@@ -21,8 +23,9 @@ ROUTER = APIRouter()
 class ChatRole(str, Enum):
     """Define the built-in MongoDB roles."""
 
-    TAI_TUTOR = "tai"
-    USER = "user"
+    TAI_SEARCH = "tai_search"
+    TAI_TUTOR = "tai_tutor"
+    STUDENT = "student"
 
 
 class ResponseTechnicalLevel(str, Enum):
@@ -70,23 +73,35 @@ class Chat(BasePydanticModel):
         ...,
         description="The role of the creator of the chat message.",
     )
-
-
-class UserChat(Chat):
-    """Define the model for the user chat message."""
-
-    role: ChatRole = Field(
-        default=ChatRole.USER,
-        const=True,
-        description="The role of the creator of the chat message.",
+    render_chat: bool = Field(
+        default=True,
+        description="Whether or not to render the chat message. If false, the chat message will be hidden from the student.",
     )
 
 
-class TaiChat(Chat):
+class StudentChat(Chat):
+    """Define the model for the student chat message."""
+
+    role: ChatRole = Field(
+        default=ChatRole.STUDENT,
+        const=True,
+        description="The role of the creator of the chat message.",
+    )
+    requested_tai_tutor: Optional[TaiTutorName] = Field(
+        ...,
+        description="The name of the TAI tutor to use in the response.",
+    )
+    requested_technical_level: Optional[ResponseTechnicalLevel] = Field(
+        default=ResponseTechnicalLevel.EXPLAIN_LIKE_IM_IN_HIGH_SCHOOL,
+        description="The technical level expected of the response.",
+    )
+
+
+class TaiSearchChat(Chat):
     """Define the model for the TAI chat message."""
 
     role: ChatRole = Field(
-        default=ChatRole.TAI_TUTOR,
+        default=ChatRole.TAI_SEARCH,
         const=True,
         description="The role of the creator of the chat message.",
     )
@@ -94,23 +109,45 @@ class TaiChat(Chat):
         ...,
         description="The class resources that were used to generate the response.",
     )
-    render_chat: bool = Field(
+
+class TaiTutorChat(TaiSearchChat):
+    """Define the model for the TAI Tutor chat message."""
+
+    role: ChatRole = Field(
+        default=ChatRole.TAI_TUTOR,
+        const=True,
+        description="The role of the creator of the chat message.",
+    )
+    tai_tutor: TaiTutorName = Field(
         ...,
-        description="Whether or not to render the chat message. If false, the chat message will be hidden from the user.",
+        description="The name of the TAI tutor that generated the response.",
+    )
+    technical_level: ResponseTechnicalLevel = Field(
+        ...,
+        description="The technical level of the response.",
     )
 
 
-EXAMPLE_CHAT_SESSION_USER_REQUEST = {
+
+EXAMPLE_CHAT_SESSION_REQUEST = {
     "id": "1234",
     "chats": [
-        {"message": "I'm stuck on this problem.", "role": "user"},
+        {
+            "message": "I'm stuck on this problem.",
+            "role": "student",
+            "requestedTaiTutor": TaiTutorName.ALEX,
+            "requestedTechnicalLevel": ResponseTechnicalLevel.EXPLAIN_LIKE_IM_IN_HIGH_SCHOOL,
+            "renderChat": True,
+        },
     ],
 }
-EXAMPLE_CHAT_SESSION_TAI_RESPONSE = copy.deepcopy(EXAMPLE_CHAT_SESSION_USER_REQUEST)
-EXAMPLE_CHAT_SESSION_TAI_RESPONSE["chats"].append(
+EXAMPLE_CHAT_SESSION_RESPONSE = copy.deepcopy(EXAMPLE_CHAT_SESSION_REQUEST)
+EXAMPLE_CHAT_SESSION_RESPONSE["chats"].append(
     {
         "message": "I can help you with that!",
-        "role": "tai",
+        "role": "tai_tutor",
+        "taiTutor": TaiTutorName.ALEX,
+        "technicalLevel": ResponseTechnicalLevel.EXPLAIN_LIKE_IM_IN_HIGH_SCHOOL,
         "classResources": [
             {
                 "resourceId": "123",
@@ -132,7 +169,7 @@ class ChatSession(BasePydanticModel):
         ...,
         description="The ID of the chat session.",
     )
-    chats: list[Union[UserChat, TaiChat]] = Field(
+    chats: list[Chat] = Field(
         ...,
         description="The chat session message history.",
     )
@@ -142,27 +179,11 @@ class ChatSession(BasePydanticModel):
 class ChatSessionRequest(ChatSession):
     """Define the request model for the chat endpoint."""
 
-    tai_tutor_name: TaiTutorName = Field(
-        ...,
-        description="The name of the TAI tutor.",
-    )
-    technical_level: Optional[ResponseTechnicalLevel] = Field(
-        default=None,
-        description="The technical level of the response.",
-    )
-
-    @validator("chats")
-    def validate_user_is_last_chat(cls, chats: list[Union[UserChat, TaiChat]]) -> list[Union[UserChat, TaiChat]]:
-        """Validate that the user is the last chat message."""
-        if chats[-1].role != ChatRole.USER:
-            raise ValueError("The user must be the last chat message.")
-        return chats
-
     class Config:
         """Define the configuration for the chat session."""
 
         schema_extra = {
-            "example": EXAMPLE_CHAT_SESSION_USER_REQUEST,
+            "example": EXAMPLE_CHAT_SESSION_REQUEST,
         }
 
 
@@ -170,7 +191,7 @@ class ChatSessionResponse(ChatSession):
     """Define the response model for the chat endpoint."""
 
     @validator("chats")
-    def validate_tai_is_last_chat(cls, chats: list[Union[UserChat, TaiChat]]) -> list[Union[UserChat, TaiChat]]:
+    def validate_tai_is_last_chat(cls, chats: list[Union[StudentChat, TaiTutorChat]]) -> list[Union[StudentChat, TaiTutorChat]]:
         """Validate that the TAI tutor is the last chat message."""
         if chats[-1].role != ChatRole.TAI_TUTOR:
             raise ValueError("The TAI tutor must be the last chat message.")
@@ -180,7 +201,7 @@ class ChatSessionResponse(ChatSession):
         """Define the configuration for the chat session."""
 
         schema_extra = {
-            "example": EXAMPLE_CHAT_SESSION_TAI_RESPONSE,
+            "example": EXAMPLE_CHAT_SESSION_RESPONSE,
         }
 
 
@@ -188,13 +209,21 @@ class ChatSessionResponse(ChatSession):
 def chat(chat_session: ChatSessionRequest):
     """Define the chat endpoint."""
     dummy_response = ChatSessionResponse(
-        chat_session_id=chat_session.id,
-        chat=[
-            UserChat(
+        id=chat_session.id,
+        chats=[
+            StudentChat(
                 message="I'm stuck on this problem.",
+                role=ChatRole.STUDENT,
+                requested_tai_tutor=TaiTutorName.ALEX,
+                requested_technical_level=ResponseTechnicalLevel.EXPLAIN_LIKE_IM_IN_HIGH_SCHOOL,
+                render_chat=True,
             ),
-            TaiChat(
+            TaiTutorChat(
                 message="I can help you with that!",
+                role=ChatRole.TAI_TUTOR,
+                tai_tutor=TaiTutorName.ALEX,
+                technical_level=ResponseTechnicalLevel.EXPLAIN_LIKE_IM_IN_HIGH_SCHOOL,
+                render_chat=True,
                 class_resources=[
                     ClassResourceSnippet(
                         resource_id="123",
@@ -213,9 +242,28 @@ def chat(chat_session: ChatSessionRequest):
 EXAMPLE_SEARCH_QUERY = {
     "id": "1234",
     "chats": [
-        {"message": "I'm looking for some resources on Python.", "role": "user"},
+        {
+            "message": "I'm looking for some resources on Python.",
+            "role": "student"
+        },
     ],
 }
+EXAMPLE_SEARCH_ANSWER = copy.deepcopy(EXAMPLE_SEARCH_QUERY)
+EXAMPLE_SEARCH_ANSWER["chats"].append(
+    {
+        "message": "Here are some resources on Python.",
+        "role": "tai_search",
+        "classResources": [
+            {
+                "resourceId": "123",
+                "resourceTitle": "Hello World",
+                "resourceSnippet": "Hello World",
+                "resourcePreviewImageUrl": "https://www.google.com",
+                "fullResourceUrl": "https://www.google.com",
+            }
+        ],
+    },
+)
 
 
 class ResourceSearchQuery(ChatSession):
@@ -223,13 +271,13 @@ class ResourceSearchQuery(ChatSession):
     Define the request model for the search endpoint.
 
     *NOTE:* This is identical to the chat session request model except that 
-    this requires that only one user chat message is sent.
+    this requires that only one student chat message is sent.
     """)
 
-    chats: list[UserChat] = Field(
+    chats: list[Chat] = Field(
         ...,
         max_items=1,
-        description="The search query from the user.",
+        description="The search query from the student.",
     )
 
     class Config:
@@ -239,17 +287,40 @@ class ResourceSearchQuery(ChatSession):
             "example": EXAMPLE_SEARCH_QUERY,
         }
 
+class ResourceSearchAnswer(ChatSession):
+    """Define the response model for the search endpoint."""
 
-@ROUTER.post("/search", response_model=ChatSessionResponse)
+    chats: list[Chat] = Field(
+        ...,
+        description="The search answer from the TAI.",
+    )
+
+    @validator("chats")
+    def validate_tai_is_last_chat(cls, chats: list[Union[StudentChat, TaiSearchChat]]) -> list[Union[StudentChat, TaiSearchChat]]:
+        """Validate that the TAI tutor is the last chat message."""
+        if chats[-1].role != ChatRole.TAI_SEARCH:
+            raise ValueError("The TAI tutor must be the last chat message.")
+        return chats
+
+    class Config:
+        """Define the configuration for the search answer."""
+
+        schema_extra = {
+            "example": EXAMPLE_SEARCH_ANSWER,
+        }
+
+
+@ROUTER.post("/search", response_model=ResourceSearchAnswer)
 def search(search_query: ResourceSearchQuery):
     """Define the search endpoint."""
-    dummy_response = ChatSession(
-        chat_session_id=search_query.id,
-        chat=[
-            UserChat(
+    dummy_response = ResourceSearchAnswer(
+        id=search_query.id,
+        chats=[
+            Chat(
                 message="Hi TAI, I'm looking for some resources on Python.",
+                role=ChatRole.STUDENT,
             ),
-            TaiChat(
+            TaiSearchChat(
                 message="Here's some cool resources for you!",
                 class_resources=[
                     ClassResourceSnippet(
