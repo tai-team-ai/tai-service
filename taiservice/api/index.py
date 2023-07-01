@@ -3,7 +3,7 @@ from typing import Any
 from mangum import Mangum
 # first imports are for local development, second imports are for deployment
 try:
-    from taiservice.api.main import create_app
+    from .main import create_app
     from aws_lambda_typing.context import Context
     from aws_lambda_typing.events import APIGatewayProxyEventV2
 except ImportError:

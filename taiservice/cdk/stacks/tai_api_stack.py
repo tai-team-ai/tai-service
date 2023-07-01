@@ -5,12 +5,11 @@ from constructs import Construct
 from aws_cdk import (
     Stack,
     aws_lambda as _lambda,
-    aws_iam as iam,
     aws_ec2 as ec2,
     Duration,
     Size as StorageSize,
 )
-from ...api.runtime_settings import TaiApiSettings, MongoDBUser, BaseDocumentDBSettings
+from ...api.runtime_settings import TaiApiSettings
 from .stack_config_models import StackConfigBaseModel
 from .stack_helpers  import add_tags
 from ..constructs.python_lambda_construct import (
