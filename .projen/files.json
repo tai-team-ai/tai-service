@@ -8,6 +8,7 @@
     ".projen/deps.json",
     ".projen/files.json",
     ".projen/tasks.json",
+    ".vscode/launch.json",
     "cdk.json",
     "requirements-dev.txt",
     "requirements.txt"

@@ -1,7 +1,16 @@
 from projen.awscdk import AwsCdkPythonApp
 from projen.python import VenvOptions
-from projen import Project, Makefile, TextFile
+from projen.vscode import (
+    VsCode,
+    VsCodeLaunchConfig,
+)
+from projen import (
+    Project,
+    Makefile,
+    TextFile,
+)
 
+VENV_DIR = ".venv"
 project:Project = AwsCdkPythonApp(
     author_email="jacobpetterle+aiforu@gmail.com",
     author_name="Jacob Petterle",
@@ -9,7 +18,7 @@ project:Project = AwsCdkPythonApp(
     module_name="taiservice",
     name="tai-service",
     version="0.1.0",
-    venv_options=VenvOptions(envdir=".venv"),
+    venv_options=VenvOptions(envdir=VENV_DIR),
     deps=[
         "pydantic",
         "loguru",
@@ -28,6 +37,7 @@ project:Project = AwsCdkPythonApp(
         "boto3-stubs[essential]",
         "pytest",
         "pytest-cov",
+        "uvicorn",
     ]
 )
 env_file: TextFile = TextFile(
@@ -67,6 +77,24 @@ make_file.add_rule(
     recipe=[
         "sudo systemctl start docker",
     ],
+)
+vscode = VsCode(project)
+vscode_launch_config: VsCodeLaunchConfig = VsCodeLaunchConfig(vscode)
+vscode_launch_config.add_configuration(
+    name="FastAPI",
+    type="python",
+    request="launch",
+    program="${workspaceFolder}/.venv/bin/uvicorn",
+    args=[
+        "taiservice.api.main:create_app",
+        "--reload",
+        "--factory"
+    ],
+    env={
+        "DOC_DB_SECRET_NAME": "your_secret_name",
+        "DOC_DB_CLUSTER_NAME": "your_cluster_name",
+        "DOC_DB_DB_NAME": "your_db_name"
+    },
 )
 
 project.add_git_ignore("/.build*")

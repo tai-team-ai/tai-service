@@ -88,4 +88,5 @@ cython_debug/
 .cdk.staging/
 !/./.env
 !/./makefile
+!/.vscode/launch.json
 /.build*
