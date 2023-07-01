@@ -1,25 +1,17 @@
 """Define tests for testing the indexer."""
 import pytest
-from pydantic import BaseModel, ValidationError
-
+from pydantic import ValidationError
+from tests.unittests.api.databases.test_shared_schemas import (
+    assert_schema_inherits,
+    EXAMPLE_METADATA,
+)
 from taiservice.api.taibackend.database.document_db_schemas import (
     ClassResourceProcessingStatus,
-    Metadata,
     BaseClassResourceDocument,
     ClassResourceDocument,
-    ChunkMetadata,
     ClassResourceChunkDocument,
 )
 
-def assert_schema_inherits(schema1: BaseModel, schema2: BaseModel) -> None:
-    """Assert that schema is a subset of another schema."""
-    dict_1 = schema1.schema()
-    dict_2 = schema2.schema()
-    assert all(key in dict_2 for key in dict_1)
-
-def test_chunk_metadata_schema():
-    """Ensure the schema doesn't change for ChunkMetadata."""
-    assert_schema_inherits(ChunkMetadata, Metadata)
 
 def test_class_resource_chunk_document_schema():
     """Ensure the schema doesn't change for ClassResourceChunkDocument."""
@@ -47,28 +39,13 @@ def test_if_completed_must_have_vector_ids():
             **EXAMPLE_BASE_CLASS_RESOURCE_DOCUMENT
         )
 
-EXAMPLE_METADATA = {
-    "title": "Example Title",
-    "description": "Example Description",
-    "tags": ["tag1", "tag2"],
-    "resource_type": "pdf",
-    "total_page_count": 10
-}
+
 EXAMPLE_BASE_CLASS_RESOURCE_DOCUMENT = {
     "id": "123e4567-e89b-12d3-a456-426614174000",
     "class_id": "123e4567-e89b-12d3-a456-426614174000",
     "full_resource_url": "https://example.com/resource",
     "metadata": EXAMPLE_METADATA
 }
-
-def test_metadata_model():
-    """Define test for Metadata model."""
-    metadata = Metadata(**EXAMPLE_METADATA)
-    assert metadata.title == EXAMPLE_METADATA["title"]
-    assert metadata.description == EXAMPLE_METADATA["description"]
-    assert metadata.tags == EXAMPLE_METADATA["tags"]
-    assert metadata.resource_type == EXAMPLE_METADATA["resource_type"]
-    assert metadata.total_page_count == EXAMPLE_METADATA["total_page_count"]
 
 def test_base_class_resource_document_model():
     """Define test for BaseClassResourceDocument model."""
