@@ -6,9 +6,17 @@ from pydantic import BaseModel, Field, root_validator, validator
 
 # first imports for dev, second for prod
 try:
-    from taiservice.api.taibackend.database.shared_schemas import ChunkMetadata, Metadata
+    from taiservice.api.taibackend.database.shared_schemas import (
+        ChunkMetadata,
+        Metadata,
+        BasePydanticModel,
+    )
 except ImportError:
-    from taibackend.database.shared_schemas import ChunkMetadata, Metadata
+    from taibackend.database.shared_schemas import (
+        ChunkMetadata,
+        Metadata,
+        BasePydanticModel,
+    )
 
 
 class ClassResourceProcessingStatus(str, Enum):
@@ -20,8 +28,7 @@ class ClassResourceProcessingStatus(str, Enum):
     COMPLETED = "completed"
 
 
-
-class BaseClassResourceDocument(BaseModel):
+class BaseClassResourceDocument(BasePydanticModel):
     """Define the base model of the class resource."""
 
     id: UUID = Field(

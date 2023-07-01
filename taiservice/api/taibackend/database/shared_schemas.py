@@ -13,7 +13,17 @@ class ClassResourceType(str, Enum):
     # AUDIO = "audio"
     PDF = "pdf"
 
-class Metadata(BaseModel):
+class BasePydanticModel(BaseModel):
+    """Define the base model of the Pydantic model."""
+
+    def dict(self, *args, **kwargs):
+        """Convert all objects to strs."""
+        super_result = super().dict(*args, **kwargs)
+        for key, value in super_result.items():
+            super_result[key] = str(value)
+        return super_result
+
+class Metadata(BasePydanticModel):
     """Define the metadata of the class resource."""
 
     title: str = Field(
