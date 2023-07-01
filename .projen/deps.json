@@ -26,6 +26,10 @@
       "type": "devenv"
     },
     {
+      "name": "uvicorn",
+      "type": "devenv"
+    },
+    {
       "name": "aws-cdk-lib",
       "version": "^2.85.0",
       "type": "runtime"

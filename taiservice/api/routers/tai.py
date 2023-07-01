@@ -12,9 +12,11 @@ print(sys.path)
 try:
     from taiservice.api.taillm.schemas import TaiTutorName
     from taiservice.api.routers.base_schema import BasePydanticModel
+    from taiservice.api.routers.class_resources import ClassResource, ResourceType, Metadata
 except ImportError:
     from taillm.schemas import TaiTutorName
     from routers.base_schema import BasePydanticModel
+    from routers.class_resources import ClassResource, ResourceType,Metadata
 
 
 ROUTER = APIRouter()
@@ -36,28 +38,12 @@ class ResponseTechnicalLevel(str, Enum):
     EXPLAIN_LIKE_IM_AN_EXPERT_IN_THE_FIELD = "explain_like_im_an_expert_in_the_field"
 
 
-class ClassResourceSnippet(BasePydanticModel):
+class ClassResourceSnippet(ClassResource):
     """Define the request model for the class resource snippet."""
 
-    resource_id: str = Field(
-        ...,
-        description="The ID of the class resource.",
-    )
-    resource_title: str = Field(
-        ...,
-        description="The title of the class resource.",
-    )
     resource_snippet: str = Field(
         ...,
         description="The snippet of the class resource. This is analogous to Google search snippets.",
-    )
-    resource_preview_image_url: str = Field(
-        ...,
-        description="The URL of the class resource preview image.",
-    )
-    full_resource_url: str = Field(
-        ...,
-        description="The URL of the class resource. This is the url to the raw resource in s3.",
     )
 
 
@@ -95,7 +81,7 @@ class StudentChat(Chat):
 class TaiSearchResponse(Chat):
     """Define the model for the TAI chat message."""
 
-    class_resources: list[ClassResourceSnippet] = Field(
+    class_resource_snippets: list[ClassResourceSnippet] = Field(
         ...,
         description="The class resources that were used to generate the response.",
     )
@@ -124,6 +110,10 @@ class BaseChatSession(BasePydanticModel):
         ...,
         description="The ID of the chat session.",
     )
+    class_id: str = Field(
+        ...,
+        description="The ID of the class that the chat session is for.",
+    )
     chats: list[Chat] = Field(
         ...,
         description="The chat session message history.",
@@ -131,6 +121,7 @@ class BaseChatSession(BasePydanticModel):
 
 EXAMPLE_CHAT_SESSION_REQUEST = {
     "id": "1234",
+    "classId": "1234",
     "chats": [
         {
             "message": "I'm stuck on this problem.",
@@ -141,6 +132,9 @@ EXAMPLE_CHAT_SESSION_REQUEST = {
         },
     ],
 }
+
+
+
 EXAMPLE_CHAT_SESSION_RESPONSE = copy.deepcopy(EXAMPLE_CHAT_SESSION_REQUEST)
 EXAMPLE_CHAT_SESSION_RESPONSE["chats"].append(
     {
@@ -148,14 +142,20 @@ EXAMPLE_CHAT_SESSION_RESPONSE["chats"].append(
         "role": "tai_tutor",
         "taiTutor": TaiTutorName.ALEX,
         "technicalLevel": ResponseTechnicalLevel.EXPLAIN_LIKE_IM_IN_HIGH_SCHOOL,
-        "classResources": [
+        "classResourceSnippets": [
             {
-                "resourceId": "123",
-                "resourceTitle": "Hello World",
-                "resourceSnippet": "Hello World",
-                "resourcePreviewImageUrl": "https://www.google.com",
+                "id": "1234",
+                "classId": "1234",
+                "resourceSnippet": "Molecules are made up of atoms.",
                 "fullResourceUrl": "https://www.google.com",
-            }
+                "previewImageUrl": "https://www.google.com",
+                "metadata": {
+                    "title": "Molecules",
+                    "description": "Molecules are made up of atoms.",
+                    "tags": ["molecules", "atoms"],
+                    "resourceType": "pdf",
+                },
+            },
         ],
         "renderChat": True,
     },
@@ -175,6 +175,13 @@ class ChatSessionRequest(BaseChatSession):
         schema_extra = {
             "example": EXAMPLE_CHAT_SESSION_REQUEST,
         }
+
+    @validator("chats")
+    def validate_student_is_last_chat(cls, chats: list[Union[StudentChat, TaiSearchResponse]]) -> list[Union[StudentChat, TaiSearchResponse]]:
+        """Validate that the student is the last chat message."""
+        if chats[-1].role != ChatRole.STUDENT:
+            raise ValueError("The student must be the last chat message.")
+        return chats
 
 
 class ChatSessionResponse(BaseChatSession):
@@ -203,39 +210,37 @@ class ChatSessionResponse(BaseChatSession):
 @ROUTER.post("/chat", response_model=ChatSessionResponse)
 def chat(chat_session: ChatSessionRequest):
     """Define the chat endpoint."""
-    dummy_response = ChatSessionResponse(
-        id=chat_session.id,
-        chats=[
-            StudentChat(
-                message="I'm stuck on this problem.",
-                role=ChatRole.STUDENT,
-                requested_tai_tutor=TaiTutorName.ALEX,
-                requested_technical_level=ResponseTechnicalLevel.EXPLAIN_LIKE_IM_IN_HIGH_SCHOOL,
-                render_chat=True,
-            ),
-            TaiTutorChat(
-                message="I can help you with that!",
-                role=ChatRole.TAI_TUTOR,
-                tai_tutor=TaiTutorName.ALEX,
-                technical_level=ResponseTechnicalLevel.EXPLAIN_LIKE_IM_IN_HIGH_SCHOOL,
-                render_chat=True,
-                class_resources=[
-                    ClassResourceSnippet(
-                        resource_id="123",
-                        resource_title="Hello World",
-                        resource_snippet="Hello World",
-                        resource_preview_image_url="https://www.google.com",
-                        full_resource_url="https://www.google.com",
+    chats = chat_session.chats
+    chats.append(
+        TaiTutorChat(
+            message="I can help you with that!",
+            role=ChatRole.TAI_TUTOR,
+            tai_tutor=TaiTutorName.ALEX,
+            technical_level=ResponseTechnicalLevel.EXPLAIN_LIKE_IM_IN_HIGH_SCHOOL,
+            render_chat=True,
+            class_resource_snippets=[
+                ClassResourceSnippet(
+                    id="1234",
+                    class_id="1234",
+                    resource_snippet="Molecules are made up of atoms.",
+                    full_resource_url="https://www.google.com",
+                    preview_image_url="https://www.google.com",
+                    metadata=Metadata(
+                        title="Molecules",
+                        description="Chemistry textbook snippet.",
+                        tags=["molecules", "atoms"],
+                        resource_type=ResourceType.PDF,
                     )
-                ],
-            ),
-        ],
+                ),
+            ],
+        ),
     )
-    return dummy_response
+    return ChatSessionResponse.parse_obj(chat_session)
 
 
 EXAMPLE_SEARCH_QUERY = {
     "id": "1234",
+    "classId": "1234",
     "chats": [
         {
             "message": "I'm looking for some resources on Python.",
@@ -246,29 +251,24 @@ EXAMPLE_SEARCH_ANSWER = copy.deepcopy(EXAMPLE_SEARCH_QUERY)
 EXAMPLE_SEARCH_ANSWER["chats"].append(
     {
         "message": "Here are some resources on Python.",
-        "classResources": [
+        "classResourceSnippets": [
             {
-                "resourceId": "123",
-                "resourceTitle": "Hello World",
-                "resourceSnippet": "Hello World",
-                "resourcePreviewImageUrl": "https://www.google.com",
+                "id": "1234",
+                "classId": "1234",
+                "resourceSnippet": "Molecules are made up of atoms.",
                 "fullResourceUrl": "https://www.google.com",
-            }
+                "previewImageUrl": "https://www.google.com",
+                "metadata": {
+                    "title": "Molecules",
+                    "description": "Molecules are made up of atoms.",
+                    "tags": ["molecules", "atoms"],
+                    "resourceType": "pdf",
+                },
+            },
         ],
     },
 )
 
-class ResourceType(str, Enum):
-    """
-    Define the resource type.
-
-    *NOTE:* These likely are not correct rn.
-    """
-
-    VIDEO = "video"
-    ARTICLE = "article"
-    BOOK = "book"
-    TEXTBOOK = "textbook"
 
 class SearchFilters(BasePydanticModel):
     """Define the search filters."""
@@ -279,12 +279,12 @@ class SearchFilters(BasePydanticModel):
     )
 
 class ResourceSearchQuery(BaseChatSession):
-    dedent("""
+    """
     Define the request model for the search endpoint.
 
     *NOTE:* This is identical to the chat session request model except that 
     this requires that only one student chat message is sent.
-    """)
+    """
 
     chats: list[Chat] = Field(
         ...,
@@ -318,26 +318,41 @@ class ResourceSearchAnswer(BaseChatSession):
             "example": EXAMPLE_SEARCH_ANSWER,
         }
 
+    @validator("chats")
+    def validate_tai_is_last_chat(cls, chats: list[Union[Chat, TaiSearchResponse]]) -> list[Union[Chat, TaiSearchResponse]]:
+        """Validate that the TAI tutor is the last chat message."""
+        if isinstance(chats[-1], TaiSearchResponse):
+            return chats
+        raise ValueError("The TAI must be the last chat message for the search response.")
+
 
 @ROUTER.post("/search", response_model=ResourceSearchAnswer)
 def search(search_query: ResourceSearchQuery):
     """Define the search endpoint."""
+    chats = search_query.chats
+    chats.append(
+        TaiSearchResponse(
+            message="Here's some cool resources for you!",
+            class_resource_snippets=[
+                ClassResourceSnippet(
+                    id="1234",
+                    class_id="1234",
+                    resource_snippet="Molecules are made up of atoms.",
+                    full_resource_url="https://www.google.com",
+                    preview_image_url="https://www.google.com",
+                    metadata=Metadata(
+                        title="Molecules",
+                        description="Chemistry textbook snippet.",
+                        tags=["molecules", "atoms"],
+                        resource_type=ResourceType.PDF,
+                    ),
+                ),
+            ],
+        ),
+    )
     dummy_response = ResourceSearchAnswer(
         id=search_query.id,
-        chats=[
-            Chat(message="Hi TAI, I'm looking for some resources on Python."),
-            TaiSearchResponse(
-                message="Here's some cool resources for you!",
-                class_resources=[
-                    ClassResourceSnippet(
-                        resource_id="123",
-                        resource_title="Hello World",
-                        resource_snippet="Hello World",
-                        resource_preview_image_url="https://www.google.com",
-                        full_resource_url="https://www.google.com",
-                    )
-                ],
-            ),
-        ],
+        class_id=search_query.class_id,
+        chats=chats,
     )
     return dummy_response

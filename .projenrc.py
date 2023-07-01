@@ -1,6 +1,14 @@
 from projen.awscdk import AwsCdkPythonApp
 from projen.python import VenvOptions
-from projen import Project, Makefile, TextFile
+from projen.vscode import (
+    VsCode,
+    VsCodeLaunchConfig,
+)
+from projen import (
+    Project,
+    Makefile,
+    TextFile,
+)
 
 project:Project = AwsCdkPythonApp(
     author_email="jacobpetterle+aiforu@gmail.com",
@@ -28,6 +36,7 @@ project:Project = AwsCdkPythonApp(
         "boto3-stubs[essential]",
         "pytest",
         "pytest-cov",
+        "uvicorn",
     ]
 )
 env_file: TextFile = TextFile(
@@ -68,6 +77,15 @@ make_file.add_rule(
         "sudo systemctl start docker",
     ],
 )
+
+vscode = VsCode(project)
+vscode_launch_config: VsCodeLaunchConfig = VsCodeLaunchConfig(vscode)
+# vscode_launch_config.add_configuration(
+#     name="FastAPI",
+#     type="python",
+#     request="launch",
+#     args="[\"${workspaceFolder}/taiservice/api/main.py\", \"--reload\"]",
+# )
 
 project.add_git_ignore("/.build*")
 
