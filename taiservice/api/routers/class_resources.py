@@ -2,16 +2,20 @@
 from enum import Enum
 from textwrap import dedent
 from typing import Optional
+from uuid import UUID, uuid4
 from fastapi import APIRouter
-from pydantic import BaseModel, Field, HttpUrl
+from pydantic import Field, HttpUrl
 try:
-    from taiservice.api.routers.base_schema import BasePydanticModel
+    from .base_schema import BasePydanticModel
+    from ..taibackend.database.document_db_schemas import ClassResourceProcessingStatus
 except ImportError:
     from routers.base_schema import BasePydanticModel
+    from taiservice.api.taibackend.database.document_db_schemas import ClassResourceProcessingStatus
+
 
 ROUTER = APIRouter()
 
-class ResourceType(str, Enum):
+class ClassResourceType(str, Enum):
     """Define the built-in MongoDB roles."""
 
     # VIDEO = "video"
@@ -35,34 +39,19 @@ class Metadata(BasePydanticModel):
         default_factory=list,
         description="The tags of the class resource.",
     )
-    resource_type: ResourceType = Field(
+    resource_type: ClassResourceType = Field(
         ...,
-        description=f"The type of the class resource. Valid values are: {', '.join([role.value for role in ResourceType])}",
+        description=f"The type of the class resource. Valid values are: {', '.join([role.value for role in ClassResourceType])}",
     )
 
-#example of pdf resource in s3
-EXAMPLE_CLASS_RESOURCE = {
-    "id": "1",
-    "class_id": "1",
-    "full_resource_url": "https://tai-class-resources.s3.amazonaws.com/1/1/1.pdf",
-    "preview_image_url": "https://tai-class-resources.s3.amazonaws.com/1/1/1.png",
-    "metadata": {
-        "title": "1.pdf",
-        "description": "This is a pdf resource.",
-        "tags": ["pdf", "resource"],
-        "resource_type": "pdf",
-    },
-}
-
-
-class ClassResource(BasePydanticModel):
+class BaseClassResource(BasePydanticModel):
     """Define the base model of the class resource."""
 
-    id: str = Field(
+    id: UUID = Field(
         ...,
         description="The ID of the class resource.",
     )
-    class_id: str = Field(
+    class_id: UUID = Field(
         ...,
         description="The ID of the class that the resource belongs to.",
     )
@@ -84,6 +73,37 @@ class ClassResource(BasePydanticModel):
         default_factory=Metadata,
         description="The metadata of the class resource.",
     )
+
+EXAMPLE_CLASS_RESOURCE = {
+    # example pdf resource
+    "id": uuid4(),
+    "classId": uuid4(),
+    "fullResourceUrl": "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf",
+    "previewImageUrl": "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf",
+    "status": ClassResourceProcessingStatus.PROCESSING,
+    "metadata": {
+        "title": "dummy.pdf",
+        "description": "This is a dummy pdf file.",
+        "tags": ["dummy", "pdf"],
+        "resourceType": ClassResourceType.PDF,
+    },
+}
+
+class ClassResource(BaseClassResource):
+    """Define the complete model of the class resource."""
+
+    status: ClassResourceProcessingStatus = Field(
+        ...,
+        description=f"The status of the class resource. Valid values are: {', '.join([status.value for status in ClassResourceProcessingStatus])}",
+    )
+
+    class Config:
+        """Configure the Pydantic model."""
+
+        schema_extra = {
+            "example": EXAMPLE_CLASS_RESOURCE,
+        }
+
 
 
 class ClassResources(BasePydanticModel):

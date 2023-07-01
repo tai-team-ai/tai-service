@@ -7,7 +7,7 @@ from loguru import logger
 ROUTERS_DIR_NAME = "routers"
 # first imports are for local development, second imports are for deployment
 try:
-    from taiservice.api.runtime_settings import TaiApiSettings, SETTINGS_STATE_ATTRIBUTE_NAME
+    from .runtime_settings import TaiApiSettings, SETTINGS_STATE_ATTRIBUTE_NAME
     PACKAGE_PREFIX = f"taiservice.api.{ROUTERS_DIR_NAME}"
 except ImportError:
     from runtime_settings import TaiApiSettings, SETTINGS_STATE_ATTRIBUTE_NAME

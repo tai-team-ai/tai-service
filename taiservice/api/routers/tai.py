@@ -1,7 +1,7 @@
 """Define the API endpoints for the AI responses."""
 import copy
 import sys
-from textwrap import dedent
+from uuid import uuid4, UUID
 from enum import Enum
 from typing import Optional, Union
 from fastapi import APIRouter
@@ -10,13 +10,13 @@ from pydantic import Field, validator
 # first imports are for local development, second imports are for deployment
 print(sys.path)
 try:
-    from taiservice.api.taillm.schemas import TaiTutorName
+    from taiservice.api.taibackend.shared_schemas import TaiTutorName
     from taiservice.api.routers.base_schema import BasePydanticModel
-    from taiservice.api.routers.class_resources import ClassResource, ResourceType, Metadata
+    from taiservice.api.routers.class_resources import BaseClassResource, ClassResourceType, Metadata
 except ImportError:
-    from taillm.schemas import TaiTutorName
+    from taiservice.api.taibackend.shared_schemas import TaiTutorName
     from routers.base_schema import BasePydanticModel
-    from routers.class_resources import ClassResource, ResourceType,Metadata
+    from routers.class_resources import BaseClassResource, ClassResourceType, Metadata
 
 
 ROUTER = APIRouter()
@@ -38,7 +38,7 @@ class ResponseTechnicalLevel(str, Enum):
     EXPLAIN_LIKE_IM_AN_EXPERT_IN_THE_FIELD = "explain_like_im_an_expert_in_the_field"
 
 
-class ClassResourceSnippet(ClassResource):
+class ClassResourceSnippet(BaseClassResource):
     """Define the request model for the class resource snippet."""
 
     resource_snippet: str = Field(
@@ -106,11 +106,11 @@ class TaiTutorChat(TaiSearchResponse):
 class BaseChatSession(BasePydanticModel):
     """Define the request model for the chat endpoint."""
 
-    id: str = Field(
+    id: UUID = Field(
         ...,
         description="The ID of the chat session.",
     )
-    class_id: str = Field(
+    class_id: UUID = Field(
         ...,
         description="The ID of the class that the chat session is for.",
     )
@@ -120,8 +120,8 @@ class BaseChatSession(BasePydanticModel):
     )
 
 EXAMPLE_CHAT_SESSION_REQUEST = {
-    "id": "1234",
-    "classId": "1234",
+    "id": uuid4(),
+    "classId": uuid4(),
     "chats": [
         {
             "message": "I'm stuck on this problem.",
@@ -134,7 +134,6 @@ EXAMPLE_CHAT_SESSION_REQUEST = {
 }
 
 
-
 EXAMPLE_CHAT_SESSION_RESPONSE = copy.deepcopy(EXAMPLE_CHAT_SESSION_REQUEST)
 EXAMPLE_CHAT_SESSION_RESPONSE["chats"].append(
     {
@@ -144,8 +143,8 @@ EXAMPLE_CHAT_SESSION_RESPONSE["chats"].append(
         "technicalLevel": ResponseTechnicalLevel.EXPLAIN_LIKE_IM_IN_HIGH_SCHOOL,
         "classResourceSnippets": [
             {
-                "id": "1234",
-                "classId": "1234",
+                "id": uuid4(),
+                "classId": uuid4(),
                 "resourceSnippet": "Molecules are made up of atoms.",
                 "fullResourceUrl": "https://www.google.com",
                 "previewImageUrl": "https://www.google.com",
@@ -164,7 +163,7 @@ EXAMPLE_CHAT_SESSION_RESPONSE["chats"].append(
 class ChatSessionRequest(BaseChatSession):
     """Define the request model for the chat endpoint."""
 
-    chats: list[Union[StudentChat, TaiSearchResponse]] = Field(
+    chats: list[Union[StudentChat, TaiTutorChat]] = Field(
         ...,
         description="The chat session message history.",
     )
@@ -220,8 +219,8 @@ def chat(chat_session: ChatSessionRequest):
             render_chat=True,
             class_resource_snippets=[
                 ClassResourceSnippet(
-                    id="1234",
-                    class_id="1234",
+                    id=uuid4(),
+                    class_id=uuid4(),
                     resource_snippet="Molecules are made up of atoms.",
                     full_resource_url="https://www.google.com",
                     preview_image_url="https://www.google.com",
@@ -229,7 +228,7 @@ def chat(chat_session: ChatSessionRequest):
                         title="Molecules",
                         description="Chemistry textbook snippet.",
                         tags=["molecules", "atoms"],
-                        resource_type=ResourceType.PDF,
+                        resource_type=ClassResourceType.PDF,
                     )
                 ),
             ],
@@ -239,8 +238,8 @@ def chat(chat_session: ChatSessionRequest):
 
 
 EXAMPLE_SEARCH_QUERY = {
-    "id": "1234",
-    "classId": "1234",
+    "id": uuid4(),
+    "classId": uuid4(),
     "chats": [
         {
             "message": "I'm looking for some resources on Python.",
@@ -253,8 +252,8 @@ EXAMPLE_SEARCH_ANSWER["chats"].append(
         "message": "Here are some resources on Python.",
         "classResourceSnippets": [
             {
-                "id": "1234",
-                "classId": "1234",
+                "id": uuid4(),
+                "classId": uuid4(),
                 "resourceSnippet": "Molecules are made up of atoms.",
                 "fullResourceUrl": "https://www.google.com",
                 "previewImageUrl": "https://www.google.com",
@@ -273,8 +272,8 @@ EXAMPLE_SEARCH_ANSWER["chats"].append(
 class SearchFilters(BasePydanticModel):
     """Define the search filters."""
 
-    resource_types: list[ResourceType] = Field(
-        default_factory=lambda: [resource_type for resource_type in ResourceType],
+    resource_types: list[ClassResourceType] = Field(
+        default_factory=lambda: [resource_type for resource_type in ClassResourceType],
         description="The resource types to filter by.",
     )
 
@@ -335,8 +334,8 @@ def search(search_query: ResourceSearchQuery):
             message="Here's some cool resources for you!",
             class_resource_snippets=[
                 ClassResourceSnippet(
-                    id="1234",
-                    class_id="1234",
+                    id=uuid4(),
+                    class_id=uuid4(),
                     resource_snippet="Molecules are made up of atoms.",
                     full_resource_url="https://www.google.com",
                     preview_image_url="https://www.google.com",
@@ -344,7 +343,7 @@ def search(search_query: ResourceSearchQuery):
                         title="Molecules",
                         description="Chemistry textbook snippet.",
                         tags=["molecules", "atoms"],
-                        resource_type=ResourceType.PDF,
+                        resource_type=ClassResourceType.PDF,
                     ),
                 ),
             ],
