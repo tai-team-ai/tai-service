@@ -80,6 +80,7 @@ EXAMPLE_CLASS_RESOURCE = {
     "classId": uuid4(),
     "fullResourceUrl": "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf",
     "previewImageUrl": "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf",
+    "status": ClassResourceProcessingStatus.PROCESSING,
     "metadata": {
         "title": "dummy.pdf",
         "description": "This is a dummy pdf file.",
@@ -91,8 +92,8 @@ EXAMPLE_CLASS_RESOURCE = {
 class ClassResource(BaseClassResource):
     """Define the complete model of the class resource."""
 
-    status: Optional[ClassResourceProcessingStatus] = Field(
-        default=None,
+    status: ClassResourceProcessingStatus = Field(
+        ...,
         description=f"The status of the class resource. Valid values are: {', '.join([status.value for status in ClassResourceProcessingStatus])}",
     )
 
