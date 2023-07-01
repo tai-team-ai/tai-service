@@ -4,6 +4,12 @@ from typing import Optional
 from uuid import UUID
 from pydantic import BaseModel, Field, root_validator, validator
 
+# first imports for dev, second for prod
+try:
+    from taiservice.api.taibackend.database.shared_schemas import ChunkMetadata, Metadata
+except ImportError:
+    from taibackend.database.shared_schemas import ChunkMetadata, Metadata
+
 
 class ClassResourceProcessingStatus(str, Enum):
     """Define the document status."""
@@ -13,38 +19,7 @@ class ClassResourceProcessingStatus(str, Enum):
     FAILED = "failed"
     COMPLETED = "completed"
 
-class ClassResourceType(str, Enum):
-    """Define the built-in MongoDB roles."""
 
-    # VIDEO = "video"
-    # TEXT = "text"
-    # IMAGE = "image"
-    # AUDIO = "audio"
-    PDF = "pdf"
-
-class Metadata(BaseModel):
-    """Define the metadata of the class resource."""
-
-    title: str = Field(
-        ...,
-        description="The title of the class resource. This can be the file name or url if no title is provided.",
-    )
-    description: str = Field(
-        ...,
-        description="The description of the class resource.",
-    )
-    tags: list = Field(
-        default_factory=list,
-        description="The tags of the class resource.",
-    )
-    resource_type: str = Field(
-        ...,
-        description="The type of the class resource.",
-    )
-    total_page_count: Optional[int] = Field(
-        default=None,
-        description="The page count of the class resource.",
-    )
 
 class BaseClassResourceDocument(BaseModel):
     """Define the base model of the class resource."""
@@ -53,7 +28,7 @@ class BaseClassResourceDocument(BaseModel):
         ...,
         description="The ID of the class resource.",
     )
-    class_id: str = Field(
+    class_id: UUID = Field(
         ...,
         description="The ID of the class that the resource belongs to.",
     )
@@ -74,39 +49,24 @@ class ClassResourceDocument(BaseClassResourceDocument):
         ...,
         description=f"The processing status of the class resource. Valid values are: {', '.join([status.value for status in ClassResourceProcessingStatus])}",
     )
+    chunk_vector_ids: list[UUID] = Field(
+        default_factory=list,
+        description="The IDs of the chunk vectors.",
+    )
     class_resource_chunk_ids: list[UUID] = Field(
         default_factory=list,
         description="The IDs of the class resource chunks.",
     )
 
-    @validator("class_resource_chunk_ids")
-    def validate_class_resource_chunk_ids(cls, ids: list[UUID], values: dict) -> list[UUID]:
+    @validator("class_resource_chunk_ids", "chunk_vector_ids")
+    def validate_class_resource_chunk_and_vector_ids(cls, ids: list[UUID], values: dict) -> list[UUID]:
         """Validate the class resource chunk ids."""
         completed_status = ClassResourceProcessingStatus.COMPLETED
-        if values.get("status") == completed_status:
-            if not ids:
-                raise ValueError(f"The class resource chunk ids must NOT be empty if the status is {completed_status}.")
-        else:
-            if ids:
-                raise ValueError(f"The class resource chunk ids must be empty if the status is NOT {completed_status}.")
+        if values.get("status") == completed_status and not ids:
+            raise ValueError(f"Both the class resource chunk ids and chunk vector "\
+                f"ids must not be empty if the status is {completed_status}. Values you provided: {values}"
+            )
         return ids
-
-
-class ChunkMetadata(Metadata):
-    """Define the metadata of the class resource chunk."""
-
-    class_id: str = Field(
-        ...,
-        description="The ID of the class that the resource belongs to.",
-    )
-    page_number: Optional[int] = Field(
-        default=None,
-        description="The page number of the class resource.",
-    )
-    time_stamp: Optional[int] = Field(
-        default=None,
-        description="The time stamp of the class resource.",
-    )
 
 
 class ClassResourceChunkDocument(BaseClassResourceDocument):
@@ -114,7 +74,7 @@ class ClassResourceChunkDocument(BaseClassResourceDocument):
 
     chunk: str = Field(
         ...,
-        description="The chunk of the class resource.",
+        description="The text chunk of the class resource.",
     )
     metadata: ChunkMetadata = Field(
         ...,

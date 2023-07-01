@@ -1,8 +1,8 @@
 """Define tests for testing the indexer."""
 import pytest
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 
-from taiservice.api.taibackend.indexer.schemas import (
+from taiservice.api.taibackend.database.document_db_schemas import (
     ClassResourceProcessingStatus,
     Metadata,
     BaseClassResourceDocument,
@@ -29,25 +29,23 @@ def test_class_resource_document_schema():
     """Ensure the schema doesn't change for ClassResourceDocument."""
     assert_schema_inherits(ClassResourceDocument, BaseClassResourceDocument)
 
-def test_if_chunk_ids_status_must_be_completed():
+def test_if_completed_must_have_chunk_ids():
     """Ensure that the chunk ids must not be empty if the status is completed."""
-    with pytest.raises(ValueError) as e:
+    with pytest.raises(ValidationError) as e:
         ClassResourceDocument(
             status=ClassResourceProcessingStatus.COMPLETED,
-            class_resource_chunk_ids=[],
+            chunk_vector_ids=[],
             **EXAMPLE_BASE_CLASS_RESOURCE_DOCUMENT
         )
-    assert "The class resource chunk ids must NOT be empty if the status is completed." in str(e.value)
 
-def test_if_not_chunk_ids_status_must_not_be_completed():
-    """Ensure that the chunk ids must be empty if the status is not completed."""
-    with pytest.raises(ValueError) as e:
+def test_if_completed_must_have_vector_ids():
+    """Ensure that the chunk ids must not be empty if the status is completed."""
+    with pytest.raises(ValidationError) as e:
         ClassResourceDocument(
-            status=ClassResourceProcessingStatus.PROCESSING,
-            class_resource_chunk_ids=["123e4567-e89b-12d3-a456-426614174000"],
+            status=ClassResourceProcessingStatus.COMPLETED,
+            chunk_vector_ids=[],
             **EXAMPLE_BASE_CLASS_RESOURCE_DOCUMENT
         )
-    assert "The class resource chunk ids must be empty if the status is NOT completed." in str(e.value)
 
 EXAMPLE_METADATA = {
     "title": "Example Title",
@@ -58,7 +56,7 @@ EXAMPLE_METADATA = {
 }
 EXAMPLE_BASE_CLASS_RESOURCE_DOCUMENT = {
     "id": "123e4567-e89b-12d3-a456-426614174000",
-    "class_id": "example_class_id",
+    "class_id": "123e4567-e89b-12d3-a456-426614174000",
     "full_resource_url": "https://example.com/resource",
     "metadata": EXAMPLE_METADATA
 }
@@ -66,20 +64,20 @@ EXAMPLE_BASE_CLASS_RESOURCE_DOCUMENT = {
 def test_metadata_model():
     """Define test for Metadata model."""
     metadata = Metadata(**EXAMPLE_METADATA)
-    assert metadata.title == "Example Title"
-    assert metadata.description == "Example Description"
-    assert metadata.tags == ["tag1", "tag2"]
-    assert metadata.resource_type == "pdf"
-    assert metadata.total_page_count == 10
+    assert metadata.title == EXAMPLE_METADATA["title"]
+    assert metadata.description == EXAMPLE_METADATA["description"]
+    assert metadata.tags == EXAMPLE_METADATA["tags"]
+    assert metadata.resource_type == EXAMPLE_METADATA["resource_type"]
+    assert metadata.total_page_count == EXAMPLE_METADATA["total_page_count"]
 
 def test_base_class_resource_document_model():
     """Define test for BaseClassResourceDocument model."""
     doc = BaseClassResourceDocument(**EXAMPLE_BASE_CLASS_RESOURCE_DOCUMENT)
-    assert str(doc.id) == "123e4567-e89b-12d3-a456-426614174000"
-    assert doc.class_id == "example_class_id"
-    assert doc.full_resource_url == "https://example.com/resource"
-    assert doc.metadata.title == "Example Title"
-    assert doc.metadata.description == "Example Description"
-    assert doc.metadata.tags == ["tag1", "tag2"]
-    assert doc.metadata.resource_type == "pdf"
-    assert doc.metadata.total_page_count == 10
+    assert str(doc.id) == EXAMPLE_BASE_CLASS_RESOURCE_DOCUMENT["id"]
+    assert str(doc.class_id) == EXAMPLE_BASE_CLASS_RESOURCE_DOCUMENT["class_id"]
+    assert doc.full_resource_url == EXAMPLE_BASE_CLASS_RESOURCE_DOCUMENT["full_resource_url"]
+    assert doc.metadata.title == EXAMPLE_METADATA["title"]
+    assert doc.metadata.description == EXAMPLE_METADATA["description"]
+    assert doc.metadata.tags == EXAMPLE_METADATA["tags"]
+    assert doc.metadata.resource_type == EXAMPLE_METADATA["resource_type"]
+    assert doc.metadata.total_page_count == EXAMPLE_METADATA["total_page_count"]

@@ -7,10 +7,10 @@ from fastapi import APIRouter
 from pydantic import Field, HttpUrl
 try:
     from .base_schema import BasePydanticModel
-    from ..taibackend.indexer.schemas import ClassResourceProcessingStatus
+    from ..taibackend.database.document_db_schemas import ClassResourceProcessingStatus
 except ImportError:
     from routers.base_schema import BasePydanticModel
-    from taibackend.indexer.schemas import ClassResourceProcessingStatus
+    from taiservice.api.taibackend.database.document_db_schemas import ClassResourceProcessingStatus
 
 
 ROUTER = APIRouter()
