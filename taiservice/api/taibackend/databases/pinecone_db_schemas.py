@@ -61,6 +61,7 @@ class PineconeDocuments(BasePydanticModel):
     def ensure_all_have_same_class_id_and_set_namespace(cls, values: Dict) -> Dict:
         """Ensure that all documents have the same class id."""
         class_id = set()
+        print(values)
         for document in values["documents"]:
             class_id.add(document["metadata"]["class_id"])
         if len(class_id) != 1:
