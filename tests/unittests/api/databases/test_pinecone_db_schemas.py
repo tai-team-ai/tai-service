@@ -47,6 +47,7 @@ EXAMPLE_PINECONE_DOCUMENTS = {
 
 def test_pinecone_documents_model():
     """Define test for PineconeDocuments model."""
+    print(EXAMPLE_PINECONE_DOCUMENTS)
     docs = PineconeDocuments(**EXAMPLE_PINECONE_DOCUMENTS)
     assert str(docs.documents[0].id) == EXAMPLE_PINECONE_DOCUMENT["id"]
     assert docs.documents[0].values == EXAMPLE_PINECONE_DOCUMENT["values"]
