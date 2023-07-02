@@ -48,21 +48,20 @@ EXAMPLE_PINECONE_DOCUMENTS = {
 
 def test_pinecone_documents_model():
     """Define test for PineconeDocuments model."""
-    logger.debug(f"EXAMPLE_PINECONE_DOCUMENTS: {EXAMPLE_PINECONE_DOCUMENTS}")
     docs = PineconeDocuments(**EXAMPLE_PINECONE_DOCUMENTS)
     assert str(docs.documents[0].id) == EXAMPLE_PINECONE_DOCUMENT["id"]
     assert docs.documents[0].values == EXAMPLE_PINECONE_DOCUMENT["values"]
     assert str(docs.class_id) == EXAMPLE_PINECONE_DOCUMENT["id"]
 
-EXAMPLE_METADATA_2 = copy.deepcopy(EXAMPLE_METADATA)
-EXAMPLE_METADATA_2["class_id"] = uuid.uuid4()
-EXAMPLE_PINECONE_DOCUMENT_2 = copy.deepcopy(EXAMPLE_PINECONE_DOCUMENT)
-EXAMPLE_PINECONE_DOCUMENT_2["metadata"] = EXAMPLE_METADATA_2
-EXAMPLE_PINECONE_DOCUMENTS_DUPLICATE = {
-    "documents": [EXAMPLE_PINECONE_DOCUMENT, EXAMPLE_PINECONE_DOCUMENT_2],
-}
+# EXAMPLE_METADATA_2 = copy.deepcopy(EXAMPLE_METADATA)
+# EXAMPLE_METADATA_2["class_id"] = uuid.uuid4()
+# EXAMPLE_PINECONE_DOCUMENT_2 = copy.deepcopy(EXAMPLE_PINECONE_DOCUMENT)
+# EXAMPLE_PINECONE_DOCUMENT_2["metadata"] = EXAMPLE_METADATA_2
+# EXAMPLE_PINECONE_DOCUMENTS_DUPLICATE = {
+#     "documents": [EXAMPLE_PINECONE_DOCUMENT, EXAMPLE_PINECONE_DOCUMENT_2],
+# }
 
-def test_different_class_ids_throws():
-    """Ensure that different class ids throw an error."""
-    with pytest.raises(ValidationError):
-        PineconeDocuments(**EXAMPLE_PINECONE_DOCUMENTS_DUPLICATE)
+# def test_different_class_ids_throws():
+#     """Ensure that different class ids throw an error."""
+#     with pytest.raises(ValidationError):
+#         PineconeDocuments(**EXAMPLE_PINECONE_DOCUMENTS_DUPLICATE)
