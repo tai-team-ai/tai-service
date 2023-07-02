@@ -1,7 +1,6 @@
 """Define schemas for Pinecone database models."""
 from typing import Dict, Optional
 from uuid import UUID
-from loguru import logger
 from pydantic import Field, root_validator, Extra
 # first imports are for local development, second imports are for deployment
 try:

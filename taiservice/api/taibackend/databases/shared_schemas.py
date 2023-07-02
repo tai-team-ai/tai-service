@@ -19,22 +19,19 @@ class BasePydanticModel(BaseModel):
 
     This model extends the default dict method to convert all objects to strs.
     This is useful when using python packages that expect a serializable dict.
-    This is parameterized by the Config class.
     """
 
     def dict(self, *args, **kwargs):
         """Convert all objects to strs."""
         super_result = super().dict(*args, **kwargs)
-        if self.Config.serializable_dict_values:
-            for key, value in super_result.items():
-                super_result[key] = str(value)
+        for key, value in super_result.items():
+            super_result[key] = str(value)
         return super_result
 
     class Config:
         """Define the configuration for the Pydantic model."""
 
         use_enum_values = True
-        serializable_dict_values = True
 
 class Metadata(BasePydanticModel):
     """Define the metadata of the class resource."""
