@@ -2,7 +2,7 @@
 from datetime import datetime
 from uuid import UUID
 from enum import Enum
-from typing import Optional
+from typing import Dict, Optional
 from pydantic import BaseModel, Field, Extra
 
 
@@ -23,7 +23,7 @@ class BasePydanticModel(BaseModel):
     This is useful when using python packages that expect a serializable dict.
     """
 
-    def _recurse_and_convert(self, obj: dict) -> dict:
+    def _recurse_and_convert(self, obj: Dict) -> Dict:
         """Recursively convert all objects to strs."""
         for key, value in obj.items():
             # recursively convert all objects to strs
@@ -47,6 +47,7 @@ class BasePydanticModel(BaseModel):
 
         use_enum_values = True
         serializable_dict_values = True
+
 
 class Metadata(BasePydanticModel):
     """Define the metadata of the class resource."""
