@@ -1,7 +1,7 @@
 """Define tests for the pinecone db schemas."""
 import copy
+import datetime
 import uuid
-from loguru import logger
 import pytest
 from pydantic import ValidationError
 from taiservice.api.taibackend.databases.pinecone_db_schemas import (
@@ -47,7 +47,7 @@ def test_pinecone_document_model():
     doc = PineconeDocument(**EXAMPLE_PINECONE_DOCUMENT)
     assert str(doc.id) == EXAMPLE_PINECONE_DOCUMENT["id"]
     assert doc.values == EXAMPLE_PINECONE_DOCUMENT["values"]
-    assert doc.metadata.dict() == EXAMPLE_CHUNK_METADATA
+    assert doc.metadata.dict(serialize_dates=True) == EXAMPLE_CHUNK_METADATA
 
 
 EXAMPLE_PINECONE_DOCUMENTS = {

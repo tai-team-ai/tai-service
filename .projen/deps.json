@@ -13,6 +13,10 @@
       "type": "devenv"
     },
     {
+      "name": "ipykernel",
+      "type": "devenv"
+    },
+    {
       "name": "langchain",
       "type": "devenv"
     },
@@ -23,6 +27,10 @@
     {
       "name": "projen",
       "version": "0.71.72",
+      "type": "devenv"
+    },
+    {
+      "name": "pymongo",
       "type": "devenv"
     },
     {

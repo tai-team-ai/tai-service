@@ -42,7 +42,8 @@ project:Project = AwsCdkPythonApp(
         "pinecone-client[grpc]",
         "langchain",
         "ipykernel",
-    ]
+        "pymongo",
+    ],
 )
 env_file: TextFile = TextFile(
     project,

@@ -2,7 +2,7 @@
 from datetime import datetime
 from uuid import UUID
 from enum import Enum
-from typing import Dict, Optional
+from typing import Any, Dict, Optional
 from pydantic import BaseModel, Field, Extra
 
 
@@ -23,30 +23,32 @@ class BasePydanticModel(BaseModel):
     This is useful when using python packages that expect a serializable dict.
     """
 
-    def _recurse_and_convert(self, obj: Dict) -> Dict:
+    def _recurse_and_convert(self, obj: Any, types_to_serialize: tuple) -> Any:
         """Recursively convert all objects to strs."""
-        for key, value in obj.items():
-            # recursively convert all objects to strs
-            if isinstance(value, UUID):
-                obj[key] = str(value)
-            elif isinstance(value, Enum):
-                obj[key] = value.value
-            elif isinstance(value, datetime):
-                obj[key] = value.isoformat()
-            elif isinstance(value, dict):
-                self._recurse_and_convert(value)
+        def serialize(v):
+            if isinstance(v, types_to_serialize):
+                return str(v)
+            return v
+        if isinstance(obj, dict):
+            obj = {k: self._recurse_and_convert(v, types_to_serialize) for k, v in obj.items()}
+        elif isinstance(obj, (list, tuple)):
+            obj = [self._recurse_and_convert(v, types_to_serialize) for v in obj]
+        else:
+            obj = serialize(obj)
         return obj
 
-    def dict(self, *args, **kwargs):
+    def dict(self, *args, serialize_dates: bool = True, **kwargs):
         """Convert all objects to strs."""
         super_result = super().dict(*args, **kwargs)
-        return self._recurse_and_convert(super_result)
+        types_to_serialize = (UUID, Enum)
+        if serialize_dates:
+            types_to_serialize += (datetime,)
+        return self._recurse_and_convert(super_result, types_to_serialize)
 
     class Config:
         """Define the configuration for the Pydantic model."""
 
         use_enum_values = True
-        serializable_dict_values = True
 
 
 class Metadata(BasePydanticModel):
@@ -76,7 +78,7 @@ class Metadata(BasePydanticModel):
 class ChunkMetadata(Metadata):
     """Define the metadata of the class resource chunk."""
 
-    class_id: str = Field(
+    class_id: UUID = Field(
         ...,
         description="The ID of the class that the resource belongs to.",
     )
