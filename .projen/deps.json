@@ -13,6 +13,14 @@
       "type": "devenv"
     },
     {
+      "name": "langchain",
+      "type": "devenv"
+    },
+    {
+      "name": "pinecone-client[grpc]",
+      "type": "devenv"
+    },
+    {
       "name": "projen",
       "version": "0.71.72",
       "type": "devenv"

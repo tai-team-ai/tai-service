@@ -1,6 +1,6 @@
 """Define tests to test the shared schemas."""
 from pydantic import BaseModel
-from taiservice.api.taibackend.database.shared_schemas import (
+from taiservice.api.taibackend.databases.shared_schemas import (
     Metadata,
     ChunkMetadata,
 )

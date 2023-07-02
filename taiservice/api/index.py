@@ -10,7 +10,6 @@ except ImportError:
     from main import create_app
     Context = APIGatewayProxyEventV2 = Any
 
-
 def handler(event: APIGatewayProxyEventV2, context: Context) -> dict[str, str]:
     """Handle API Gateway event."""
     app = create_app()

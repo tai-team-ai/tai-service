@@ -2,3 +2,4 @@ loguru
 fastapi
 mangum
 pydantic
+pinecone-client[grpc]

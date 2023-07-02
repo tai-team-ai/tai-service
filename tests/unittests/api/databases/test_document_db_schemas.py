@@ -5,7 +5,7 @@ from tests.unittests.api.databases.test_shared_schemas import (
     assert_schema_inherits,
     EXAMPLE_METADATA,
 )
-from taiservice.api.taibackend.database.document_db_schemas import (
+from taiservice.api.taibackend.databases.document_db_schemas import (
     ClassResourceProcessingStatus,
     BaseClassResourceDocument,
     ClassResourceDocument,

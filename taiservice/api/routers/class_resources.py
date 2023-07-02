@@ -5,12 +5,13 @@ from typing import Optional
 from uuid import UUID, uuid4
 from fastapi import APIRouter
 from pydantic import Field, HttpUrl
+# first imports are for local development, second imports are for deployment
 try:
-    from .base_schema import BasePydanticModel
-    from ..taibackend.database.document_db_schemas import ClassResourceProcessingStatus
+    from ..routers.base_schema import BasePydanticModel
+    from ..taibackend.databases.document_db_schemas import ClassResourceProcessingStatus
 except ImportError:
-    from routers.base_schema import BasePydanticModel
-    from taiservice.api.taibackend.database.document_db_schemas import ClassResourceProcessingStatus
+    from routers.base_schema import BasePydanticModel   
+    from taibackend.databases.document_db_schemas import ClassResourceProcessingStatus
 
 
 ROUTER = APIRouter()

@@ -89,4 +89,5 @@ cython_debug/
 !/./.env
 !/./makefile
 !/.vscode/launch.json
+!/.vscode/settings.json
 /.build*
