@@ -2,18 +2,18 @@
 from pydantic import BaseModel
 from taiservice.api.taibackend.databases.shared_schemas import (
     Metadata,
-    ChunkMetadata,
+    BasePydanticModel,
 )
 
-def assert_schema_inherits(schema1: BaseModel, schema2: BaseModel) -> None:
+def assert_schema2_inherits_from_schema1(schema1: BaseModel, schema2: BaseModel) -> None:
     """Assert that schema is a subset of another schema."""
-    dict_1 = schema1.schema()
-    dict_2 = schema2.schema()
-    assert all(key in dict_2 for key in dict_1)
+    schema1_attrs = set(schema1.__fields__.keys())
+    schema2_attrs = set(schema2.__fields__.keys())
+    assert schema2_attrs.issubset(schema1_attrs)
 
-def test_chunk_metadata_schema():
-    """Ensure the schema doesn't change for ChunkMetadata."""
-    assert_schema_inherits(ChunkMetadata, Metadata)
+def test_metadata_schema():
+    """Ensure the schema doesn't change for Metadata."""
+    assert_schema2_inherits_from_schema1(Metadata, BasePydanticModel)
 
 EXAMPLE_METADATA = {
     "title": "Example Title",

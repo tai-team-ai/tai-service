@@ -47,14 +47,19 @@ class PineconeDB:
         """Return the pinecone index."""
         return pinecone.Index(self._index_name)
 
-    def _get_batches(self, vectors: PineconeDocuments) -> List[PineconeDocuments]:
+    def _export_documents(self, documents: PineconeDocuments) -> List[dict]:
+        docs = [doc.dict() for doc in documents.documents]
+        return docs
+
+    def _get_exported_batches(self, documents: PineconeDocuments) -> List[PineconeDocuments]:
         batches = []
-        for i in range(0, len(vectors), self._max_vectors_per_operation):
-            batches.append(vectors[i : i + self._max_vectors_per_operation])
+        documents = self._export_documents(documents)
+        for i in range(0, len(documents), self._max_vectors_per_operation):
+            batches.append(documents[i : i + self._max_vectors_per_operation])
         return batches
 
     def _execute_async_pinecone_operation(self, index_operation_name: str, documents: PineconeDocuments) -> None:
-        batches = self._get_batches(documents)
+        batches = self._get_exported_batches(documents)
         with pinecone.Index(self._index_name, pool_threads=self._number_threads) as index:
             async_results = []
             operation = getattr(index, index_operation_name)
