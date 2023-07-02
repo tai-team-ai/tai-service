@@ -28,6 +28,7 @@ def test_pinecone_documents_schema():
 EXAMPLE_CHUNK_METADATA = {
     "class_id": "123e4567-e89b-12d3-a456-426614174000",
     "page_number": 1,
+    "timestamp": "2021-01-01T00:00:00",
 }
 EXAMPLE_CHUNK_METADATA.update(EXAMPLE_METADATA)
 EXAMPLE_PINECONE_DOCUMENT = {
@@ -48,24 +49,24 @@ def test_pinecone_document_model():
     assert doc.values == EXAMPLE_PINECONE_DOCUMENT["values"]
     assert doc.metadata.dict() == EXAMPLE_CHUNK_METADATA
 
+
 EXAMPLE_PINECONE_DOCUMENTS = {
     "documents": [EXAMPLE_PINECONE_DOCUMENT],
 }
-
 def test_pinecone_documents_model():
     """Define test for PineconeDocuments model."""
     docs = PineconeDocuments(**EXAMPLE_PINECONE_DOCUMENTS)
     assert docs.documents[0].metadata.class_id == EXAMPLE_CHUNK_METADATA["class_id"]
 
+
 EXAMPLE_METADATA_2 = copy.deepcopy(EXAMPLE_METADATA)
 EXAMPLE_METADATA_2["class_id"] = uuid.uuid4()
 EXAMPLE_PINECONE_DOCUMENT_2 = copy.deepcopy(EXAMPLE_PINECONE_DOCUMENT)
 EXAMPLE_PINECONE_DOCUMENT_2["metadata"] = EXAMPLE_METADATA_2
-EXAMPLE_PINECONE_DOCUMENTS_DUPLICATE = {
+EXAMPLE_PINECONE_DOCUMENTS_WITH_DUPLICATEs = {
     "documents": [EXAMPLE_PINECONE_DOCUMENT, EXAMPLE_PINECONE_DOCUMENT_2],
 }
-
 def test_different_class_ids_throws():
     """Ensure that different class ids throw an error."""
     with pytest.raises(ValidationError):
-        PineconeDocuments(**EXAMPLE_PINECONE_DOCUMENTS_DUPLICATE)
+        PineconeDocuments(**EXAMPLE_PINECONE_DOCUMENTS_WITH_DUPLICATEs)
