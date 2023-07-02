@@ -41,6 +41,7 @@ project:Project = AwsCdkPythonApp(
         "uvicorn",
         "pinecone-client[grpc]",
         "langchain",
+        "ipykernel",
     ]
 )
 env_file: TextFile = TextFile(
