@@ -1,41 +1,18 @@
 """Define schemas for Pinecone database models."""
 from typing import Dict, Optional
 from uuid import UUID
-from pydantic import Field, root_validator, validator, Extra
+from pydantic import Field, root_validator, Extra
 # first imports are for local development, second imports are for deployment
 try:
     from ...taibackend.databases.shared_schemas import (
-        Metadata,
+        ChunkMetadata,
         BasePydanticModel,
     )
 except ImportError:
     from taibackend.databases.shared_schemas import (
-        Metadata,
+        ChunkMetadata,
         BasePydanticModel,
     )
-
-
-class ChunkMetadata(Metadata):
-    """Define the metadata of the class resource chunk."""
-
-    class_id: str = Field(
-        ...,
-        description="The ID of the class that the resource belongs to.",
-    )
-    page_number: Optional[int] = Field(
-        default=None,
-        description="The page number of the class resource.",
-    )
-    time_stamp: Optional[int] = Field(
-        default=None,
-        description="The time stamp of the class resource.",
-    )
-
-    class Config:
-        """Define the configuration for the Pydantic model."""
-
-        extra = Extra.allow
-
 
 # This conforms to the pinecone document schema for a vector
 # https://docs.pinecone.io/docs/python-client#indexupsert

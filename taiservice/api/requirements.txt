@@ -1,5 +1,5 @@
 loguru
-fastapi
+fastapi<=0.98.0
 mangum
-pydantic
+pydantic<=1.10.10
 pinecone-client[grpc]

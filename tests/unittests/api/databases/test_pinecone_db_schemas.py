@@ -2,6 +2,7 @@
 import copy
 import uuid
 import pytest
+from pydantic import ValidationError
 from taiservice.api.taibackend.databases.pinecone_db_schemas import (
     BasePydanticModel,
     PineconeDocument,
@@ -54,11 +55,13 @@ def test_pinecone_documents_model():
 EXAMPLE_METADATA_2 = copy.deepcopy(EXAMPLE_METADATA)
 # change the class id for this example
 EXAMPLE_METADATA_2["class_id"] = uuid.uuid4()
+EXAMPLE_PINCONE_DOCUMENT_2 = copy.deepcopy(EXAMPLE_PINECONE_DOCUMENT)
+EXAMPLE_PINCONE_DOCUMENT_2["metadata"] = EXAMPLE_METADATA_2
 EXAMPLE_PINECONE_DOCUMENTS = {
-    "documents": [EXAMPLE_PINECONE_DOCUMENT, EXAMPLE_PINECONE_DOCUMENT],
+    "documents": [EXAMPLE_PINECONE_DOCUMENT, EXAMPLE_PINCONE_DOCUMENT_2],
 }
 
 def test_different_class_ids_throws():
     """Ensure that different class ids throw an error."""
-    with pytest.raises(ValueError):
+    with pytest.raises(ValidationError):
         PineconeDocuments(**EXAMPLE_PINECONE_DOCUMENTS)

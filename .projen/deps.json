@@ -52,7 +52,7 @@
       "type": "runtime"
     },
     {
-      "name": "fastapi",
+      "name": "fastapi<=0.98.0",
       "type": "runtime"
     },
     {

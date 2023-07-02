@@ -1,7 +1,7 @@
 """Define shared schemas for database models."""
 from enum import Enum
 from typing import Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, Extra
 
 
 class ClassResourceType(str, Enum):
@@ -59,3 +59,24 @@ class Metadata(BasePydanticModel):
         default=None,
         description="The page count of the class resource.",
     )
+
+class ChunkMetadata(Metadata):
+    """Define the metadata of the class resource chunk."""
+
+    class_id: str = Field(
+        ...,
+        description="The ID of the class that the resource belongs to.",
+    )
+    page_number: Optional[int] = Field(
+        default=None,
+        description="The page number of the class resource.",
+    )
+    time_stamp: Optional[int] = Field(
+        default=None,
+        description="The time stamp of the class resource.",
+    )
+
+    class Config:
+        """Define the configuration for the Pydantic model."""
+
+        extra = Extra.allow

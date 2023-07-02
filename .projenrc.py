@@ -29,7 +29,7 @@ project:Project = AwsCdkPythonApp(
         "pygit2",
         "pinecone-client[grpc]",
         "pydantic[dotenv]",
-        "fastapi",
+        "fastapi<=0.98.0",
         "mangum",
     ],
     dev_deps=[
