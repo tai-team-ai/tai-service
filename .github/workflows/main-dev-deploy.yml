@@ -12,6 +12,11 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v2
 
+    - name: Dump GitHub context
+      env:
+        GITHUB_CONTEXT: ${{ toJson(github) }}
+      run: echo "$GITHUB_CONTEXT"
+
     # Cache the .venv directory
     - name: Cache dependencies
       uses: actions/cache@v2
