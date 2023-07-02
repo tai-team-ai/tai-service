@@ -25,12 +25,10 @@ jobs:
 
     # Cache the .venv directory
     - name: Cache dependencies
-      uses: actions/cache@v2
+      uses: actions/cache@v3
       with:
         path: .venv
         key: ${{ runner.os }}-pip-${{ hashFiles('.projenrc.py') }}
-        restore-keys: |
-          ${{ runner.os }}-pip-${{ hashFiles('.projenrc.py') }}
 
     - name: Setup Python
       uses: actions/setup-python@v2
