@@ -2,6 +2,8 @@
 aws-lambda-powertools
 aws-lambda-typing
 boto3-stubs[essential]
+langchain
+pinecone-client[grpc]
 projen==0.71.72
 pytest
 pytest-cov

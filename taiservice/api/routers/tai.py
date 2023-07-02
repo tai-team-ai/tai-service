@@ -6,21 +6,16 @@ from enum import Enum
 from typing import Optional, Union
 from fastapi import APIRouter
 from pydantic import Field, validator
-
-# first imports are for local development, second imports are for deployment
-print(sys.path)
 try:
-    from taiservice.api.taibackend.shared_schemas import TaiTutorName
-    from taiservice.api.routers.base_schema import BasePydanticModel
-    from taiservice.api.routers.class_resources import BaseClassResource, ClassResourceType, Metadata
+    from ..taibackend.shared_schemas import TaiTutorName
+    from ..routers.base_schema import BasePydanticModel
+    from ..routers.class_resources import BaseClassResource, ClassResourceType, Metadata
 except ImportError:
-    from taiservice.api.taibackend.shared_schemas import TaiTutorName
+    from taibackend.shared_schemas import TaiTutorName
     from routers.base_schema import BasePydanticModel
     from routers.class_resources import BaseClassResource, ClassResourceType, Metadata
 
-
 ROUTER = APIRouter()
-
 
 class ChatRole(str, Enum):
     """Define the built-in MongoDB roles."""

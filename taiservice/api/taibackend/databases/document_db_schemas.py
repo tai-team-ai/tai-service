@@ -1,23 +1,20 @@
 """Define the shared schemas used by the backend."""
 from enum import Enum
-from typing import Optional
 from uuid import UUID
-from pydantic import BaseModel, Field, root_validator, validator
-
-# first imports for dev, second for prod
+from pydantic import Field, root_validator, validator
+# first imports are for local development, second imports are for deployment
 try:
-    from taiservice.api.taibackend.database.shared_schemas import (
+    from ...taibackend.databases.shared_schemas import (
         ChunkMetadata,
         Metadata,
         BasePydanticModel,
     )
 except ImportError:
-    from taibackend.database.shared_schemas import (
+    from taibackend.databases.shared_schemas import (
         ChunkMetadata,
         Metadata,
         BasePydanticModel,
     )
-
 
 class ClassResourceProcessingStatus(str, Enum):
     """Define the document status."""

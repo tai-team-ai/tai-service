@@ -3,6 +3,7 @@ from projen.python import VenvOptions
 from projen.vscode import (
     VsCode,
     VsCodeLaunchConfig,
+    VsCodeSettings,
 )
 from projen import (
     Project,
@@ -28,7 +29,7 @@ project:Project = AwsCdkPythonApp(
         "pygit2",
         "pinecone-client[grpc]",
         "pydantic[dotenv]",
-        "fastapi",
+        "fastapi<=0.98.0",
         "mangum",
     ],
     dev_deps=[
@@ -38,6 +39,8 @@ project:Project = AwsCdkPythonApp(
         "pytest",
         "pytest-cov",
         "uvicorn",
+        "pinecone-client[grpc]",
+        "langchain",
     ]
 )
 env_file: TextFile = TextFile(
@@ -96,6 +99,11 @@ vscode_launch_config.add_configuration(
         "DOC_DB_DB_NAME": "your_db_name"
     },
 )
+vscode_settings: VsCodeSettings = VsCodeSettings(vscode)
+vscode_settings.add_setting("python.formatting.provider", "none")
+vscode_settings.add_setting("python.testing.pytestEnabled", True)
+vscode_settings.add_setting("python.testing.pytestArgs", ["tests"])
+vscode_settings.add_setting("editor.formatOnSave", True)
 
 project.add_git_ignore("/.build*")
 

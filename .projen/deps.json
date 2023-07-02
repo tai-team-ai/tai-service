@@ -13,6 +13,14 @@
       "type": "devenv"
     },
     {
+      "name": "langchain",
+      "type": "devenv"
+    },
+    {
+      "name": "pinecone-client[grpc]",
+      "type": "devenv"
+    },
+    {
       "name": "projen",
       "version": "0.71.72",
       "type": "devenv"
@@ -44,7 +52,7 @@
       "type": "runtime"
     },
     {
-      "name": "fastapi",
+      "name": "fastapi<=0.98.0",
       "type": "runtime"
     },
     {
