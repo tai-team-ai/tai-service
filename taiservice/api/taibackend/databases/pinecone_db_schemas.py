@@ -63,8 +63,8 @@ class PineconeDocuments(BasePydanticModel):
         """Ensure that all documents have the same class id."""
         class_id = set()
         for document in values["documents"]:
-            class_id.add(str(document["metadata"]["class_id"]))
+            class_id.add(document["metadata"]["class_id"])
         if len(class_id) != 1:
-            raise ValueError("All documents must have the same class id.")
+            raise ValueError(f"All documents must have the same class id. Provided values: {values}")
         values.update({"class_id": class_id.pop()})
         return values
