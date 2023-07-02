@@ -1,6 +1,7 @@
 """Define tests for the pinecone db schemas."""
 import copy
 import uuid
+from loguru import logger
 import pytest
 from pydantic import ValidationError
 from taiservice.api.taibackend.databases.pinecone_db_schemas import (
@@ -47,19 +48,18 @@ EXAMPLE_PINECONE_DOCUMENTS = {
 
 def test_pinecone_documents_model():
     """Define test for PineconeDocuments model."""
-    print(EXAMPLE_PINECONE_DOCUMENTS)
+    logger.debug(f"EXAMPLE_PINECONE_DOCUMENTS: {EXAMPLE_PINECONE_DOCUMENTS}")
     docs = PineconeDocuments(**EXAMPLE_PINECONE_DOCUMENTS)
     assert str(docs.documents[0].id) == EXAMPLE_PINECONE_DOCUMENT["id"]
     assert docs.documents[0].values == EXAMPLE_PINECONE_DOCUMENT["values"]
     assert str(docs.class_id) == EXAMPLE_PINECONE_DOCUMENT["id"]
 
 EXAMPLE_METADATA_2 = copy.deepcopy(EXAMPLE_METADATA)
-# change the class id for this example
 EXAMPLE_METADATA_2["class_id"] = uuid.uuid4()
-EXAMPLE_PINCONE_DOCUMENT_2 = copy.deepcopy(EXAMPLE_PINECONE_DOCUMENT)
-EXAMPLE_PINCONE_DOCUMENT_2["metadata"] = EXAMPLE_METADATA_2
+EXAMPLE_PINECONE_DOCUMENT_2 = copy.deepcopy(EXAMPLE_PINECONE_DOCUMENT)
+EXAMPLE_PINECONE_DOCUMENT_2["metadata"] = EXAMPLE_METADATA_2
 EXAMPLE_PINECONE_DOCUMENTS_DUPLICATE = {
-    "documents": [EXAMPLE_PINECONE_DOCUMENT, EXAMPLE_PINCONE_DOCUMENT_2],
+    "documents": [EXAMPLE_PINECONE_DOCUMENT, EXAMPLE_PINECONE_DOCUMENT_2],
 }
 
 def test_different_class_ids_throws():
