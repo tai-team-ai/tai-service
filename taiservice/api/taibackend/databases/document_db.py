@@ -71,7 +71,6 @@ class DocumentDB:
         self._doc_models = [
             ClassResourceChunkDocument,
             ClassResourceDocument,
-            BaseClassResourceDocument,
         ]
         self._collection = self._client[config.database_name][config.collection_name]
 
@@ -94,15 +93,15 @@ class DocumentDB:
     def upsert_class_resources(
         self,
         documents: list[BaseClassResourceDocument],
-        chunks: Optional[dict[UUID, ClassResourceChunkDocument]] = None, # pylint: disable=unused-argument
+        chunk_mapping: Optional[dict[UUID, ClassResourceChunkDocument]] = None, # pylint: disable=unused-argument
     ) -> list[BaseClassResourceDocument]:
         """Upsert the full class resources."""
         failed_documents = []
         def upsert_document(document: BaseClassResourceDocument) -> None:
-            self._upsert_document(document)
+            # self._upsert_document(document)
             if isinstance(document, ClassResourceDocument):
                 try:
-                    chunks = [chunks[id] for id in document.class_resource_chunk_ids]
+                    chunks = [chunk_mapping[id] for id in document.class_resource_chunk_ids]
                 except KeyError as e:
                     logger.error(f"Failed to find chunk: {e} for document: {document}")
                     raise e
@@ -143,9 +142,9 @@ class DocumentDB:
         ids = [str(id) for id in ids]
         self._collection.delete_many({"_id": {"$in": ids}})
 
-    def _delete_document(self, ids: UUID) -> None:
+    def _delete_document(self, id_: UUID) -> None:
         """Delete the chunks of the class resource."""
-        self._collection.delete_many({"_id": {"$in": ids}})
+        self._collection.delete_one({"_id": str(id_)})
 
     def _upsert_documents(self, documents: list[BaseClassResourceDocument]) -> None:
         """Upsert the chunks of the class resource."""
@@ -156,6 +155,6 @@ class DocumentDB:
         """Upsert the chunks of the class resource."""
         self._collection.update_one(
             {"_id": document.id},
-            {"$set": document.dict()},
+            {"$set": document.dict(serialize_dates=False)},
             upsert=True,
         )

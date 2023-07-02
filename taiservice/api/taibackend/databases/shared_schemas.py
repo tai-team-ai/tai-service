@@ -23,16 +23,16 @@ class BasePydanticModel(BaseModel):
     This is useful when using python packages that expect a serializable dict.
     """
 
-    def _recurse_and_convert(self, obj: Any, types_to_serialize: tuple) -> Any:
+    def _recurse_and_serialize(self, obj: Any, types_to_serialize: tuple) -> Any:
         """Recursively convert all objects to strs."""
         def serialize(v):
             if isinstance(v, types_to_serialize):
                 return str(v)
             return v
         if isinstance(obj, dict):
-            obj = {k: self._recurse_and_convert(v, types_to_serialize) for k, v in obj.items()}
+            obj = {k: self._recurse_and_serialize(v, types_to_serialize) for k, v in obj.items()}
         elif isinstance(obj, (list, tuple)):
-            obj = [self._recurse_and_convert(v, types_to_serialize) for v in obj]
+            obj = [self._recurse_and_serialize(v, types_to_serialize) for v in obj]
         else:
             obj = serialize(obj)
         return obj
@@ -43,7 +43,8 @@ class BasePydanticModel(BaseModel):
         types_to_serialize = (UUID, Enum)
         if serialize_dates:
             types_to_serialize += (datetime,)
-        return self._recurse_and_convert(super_result, types_to_serialize)
+        result = self._recurse_and_serialize(super_result, types_to_serialize)
+        return result
 
     class Config:
         """Define the configuration for the Pydantic model."""

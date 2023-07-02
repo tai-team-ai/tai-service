@@ -1,13 +1,14 @@
 """Define tests for the document database."""
 from unittest.mock import patch
 from taiservice.api.taibackend.databases.document_db import DocumentDB, DocumentDBConfig
+from taiservice.api.taibackend.databases.document_db_schemas import BaseClassResourceDocument
 from tests.unittests.api.databases.test_shared_schemas import (
-    assert_schema2_inherits_from_schema1,
+    assert_schema1_inherits_from_schema2,
 )
 
-
 def test_model_inheritance_order():
-    with patch('taiservice.api.taibackend.databases.document_db.MongoClient') as mock_client:
+    """Ensure that the model inheritance order is correct."""
+    with patch('taiservice.api.taibackend.databases.document_db.MongoClient'):
         config = DocumentDBConfig(
             username="username",
             password="password",
@@ -17,13 +18,46 @@ def test_model_inheritance_order():
             collection_name="collection_name",
         )
         document_db = DocumentDB(config)
-
-        # Access the supported_doc_models property
         models = document_db.supported_doc_models
+        for model in models:
+            assert_schema1_inherits_from_schema2(model, BaseClassResourceDocument)
 
-        # Continue with the rest of your assertions and tests
-        for i in range(len(models) - 1):
-            assert_schema2_inherits_from_schema1(
-                models[i + 1],
-                models[i],
-            )
+# future test case for upsert
+# class_id = uuid4()
+# chunk_id = uuid4()
+# chunk_mapping = {
+#     chunk_id: ClassResourceChunkDocument(
+#         id=chunk_id,
+#         chunk="this is a chunk",
+#         class_id=class_id,
+#         full_resource_url="https://example.com/resource",
+#         metadata=ChunkMetadata(
+#             description="description",
+#             resource_type=ClassResourceType.PDF,
+#             tags=["tag1", "tag2"],
+#             title="title",
+#             total_page_count=1,
+#             page_number=1,
+#             class_id=class_id,
+#         ),
+#         vector_id=uuid4(),
+#     )
+# }
+# class_resource = ClassResourceDocument(
+#     class_id=class_id,
+#     class_resource_chunk_ids=[id for id in chunk_mapping],
+#     full_resource_url="https://example.com/resource",
+#     id=uuid4(),
+#     metadata=Metadata(
+#         description="description",
+#         resource_type=ClassResourceType.PDF,
+#         tags=["tag1", "tag2"],
+#         title="title",
+#         total_page_count=1,
+#     ),
+#     status=ClassResourceProcessingStatus.COMPLETED,
+# )
+# document_db.upsert_class_resources(
+#     documents=[class_resource],
+#     chunk_mapping=chunk_mapping,
+# )

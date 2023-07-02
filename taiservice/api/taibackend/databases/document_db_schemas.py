@@ -99,8 +99,11 @@ class ClassResourceChunkDocument(BaseClassResourceDocument):
         description="The metadata of the class resource chunk.",
     )
 
-    @root_validator(pre=True)
-    def add_class_id_to_metadata(cls, values: dict) -> dict:
-        """Add the class id to the metadata."""
-        values['metadata']['class_id'] = values['class_id']
-        return values
+    @validator("metadata")
+    def ensure_same_class_id(cls, metadata: ChunkMetadata, values: dict) -> ChunkMetadata:
+        """Ensure the same class id."""
+        assert metadata.class_id == values.get("class_id"), \
+            "The class id of the metadata must be the same as the class id " \
+            f"of the class resource. Id of the metadata: {metadata.class_id}, " \
+            f"id of the class resource: {values.get('class_id')}"
+        return metadata

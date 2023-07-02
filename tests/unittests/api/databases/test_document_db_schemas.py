@@ -4,7 +4,7 @@ import datetime
 import pytest
 from pydantic import ValidationError
 from tests.unittests.api.databases.test_shared_schemas import (
-    assert_schema2_inherits_from_schema1,
+    assert_schema1_inherits_from_schema2,
     EXAMPLE_METADATA,
 )
 from taiservice.api.taibackend.databases.document_db_schemas import (
@@ -17,11 +17,11 @@ from taiservice.api.taibackend.databases.document_db_schemas import (
 
 def test_class_resource_chunk_document_schema():
     """Ensure the schema doesn't change for ClassResourceChunkDocument."""
-    assert_schema2_inherits_from_schema1(ClassResourceChunkDocument, BaseClassResourceDocument)
+    assert_schema1_inherits_from_schema2(ClassResourceChunkDocument, BaseClassResourceDocument)
 
 def test_class_resource_document_schema():
     """Ensure the schema doesn't change for ClassResourceDocument."""
-    assert_schema2_inherits_from_schema1(ClassResourceDocument, BaseClassResourceDocument)
+    assert_schema1_inherits_from_schema2(ClassResourceDocument, BaseClassResourceDocument)
 
 
 EXAMPLE_BASE_CLASS_RESOURCE_DOCUMENT = {
@@ -43,7 +43,7 @@ def test_if_completed_must_have_chunk_ids():
     with pytest.raises(ValidationError):
         ClassResourceDocument(
             status=ClassResourceProcessingStatus.COMPLETED,
-            chunk_vector_ids=[],
+            class_resource_chunk_ids=[],
             **EXAMPLE_BASE_CLASS_RESOURCE_DOCUMENT
         )
 
@@ -52,7 +52,7 @@ def test_if_completed_must_have_vector_ids():
     with pytest.raises(ValidationError):
         ClassResourceDocument(
             status=ClassResourceProcessingStatus.COMPLETED,
-            chunk_vector_ids=[],
+            class_resource_chunk_ids=[],
             **EXAMPLE_BASE_CLASS_RESOURCE_DOCUMENT
         )
 
