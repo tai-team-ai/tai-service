@@ -36,11 +36,17 @@ EXAMPLE_PINECONE_DOCUMENT = {
     "metadata": EXAMPLE_CHUNK_METADATA,
 }
 
+def test_chunk_metadata_model():
+    """Define test for ChunkMetadata model."""
+    metadata = ChunkMetadata(**EXAMPLE_CHUNK_METADATA)
+    assert str(metadata.class_id) == EXAMPLE_CHUNK_METADATA["class_id"]
+
 def test_pinecone_document_model():
     """Define test for PineconeDocument model."""
     doc = PineconeDocument(**EXAMPLE_PINECONE_DOCUMENT)
     assert str(doc.id) == EXAMPLE_PINECONE_DOCUMENT["id"]
     assert doc.values == EXAMPLE_PINECONE_DOCUMENT["values"]
+    assert doc.metadata.dict() == EXAMPLE_CHUNK_METADATA
 
 EXAMPLE_PINECONE_DOCUMENTS = {
     "documents": [EXAMPLE_PINECONE_DOCUMENT],
