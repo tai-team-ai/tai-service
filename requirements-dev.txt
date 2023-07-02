@@ -2,9 +2,11 @@
 aws-lambda-powertools
 aws-lambda-typing
 boto3-stubs[essential]
+ipykernel
 langchain
 pinecone-client[grpc]
 projen==0.71.72
+pymongo
 pytest
 pytest-cov
 uvicorn

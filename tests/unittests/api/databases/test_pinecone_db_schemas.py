@@ -1,7 +1,7 @@
 """Define tests for the pinecone db schemas."""
 import copy
+import datetime
 import uuid
-from loguru import logger
 import pytest
 from pydantic import ValidationError
 from taiservice.api.taibackend.databases.pinecone_db_schemas import (
@@ -11,24 +11,24 @@ from taiservice.api.taibackend.databases.pinecone_db_schemas import (
     ChunkMetadata,
 )
 from taiservice.api.taibackend.databases.shared_schemas import Metadata
-from .test_shared_schemas import EXAMPLE_METADATA, assert_schema2_inherits_from_schema1
+from .test_shared_schemas import EXAMPLE_METADATA, assert_schema1_inherits_from_schema2
 
 def test_chunk_metadata_schema():
     """Ensure the schema doesn't change for ChunkMetadata."""
-    assert_schema2_inherits_from_schema1(ChunkMetadata, Metadata)
+    assert_schema1_inherits_from_schema2(ChunkMetadata, Metadata)
 
 def test_pinecone_document_schema():
     """Ensure the schema doesn't change for PineconeDocument."""
-    assert_schema2_inherits_from_schema1(PineconeDocument, BasePydanticModel)
+    assert_schema1_inherits_from_schema2(PineconeDocument, BasePydanticModel)
 
 def test_pinecone_documents_schema():
     """Ensure the schema doesn't change for PineconeDocuments."""
-    assert_schema2_inherits_from_schema1(PineconeDocuments, BasePydanticModel)
+    assert_schema1_inherits_from_schema2(PineconeDocuments, BasePydanticModel)
 
 EXAMPLE_CHUNK_METADATA = {
     "class_id": "123e4567-e89b-12d3-a456-426614174000",
     "page_number": 1,
-    "timestamp": "2021-01-01T00:00:00",
+    "timestamp": "2021-01-01 00:00:00",
 }
 EXAMPLE_CHUNK_METADATA.update(EXAMPLE_METADATA)
 EXAMPLE_PINECONE_DOCUMENT = {
@@ -47,7 +47,7 @@ def test_pinecone_document_model():
     doc = PineconeDocument(**EXAMPLE_PINECONE_DOCUMENT)
     assert str(doc.id) == EXAMPLE_PINECONE_DOCUMENT["id"]
     assert doc.values == EXAMPLE_PINECONE_DOCUMENT["values"]
-    assert doc.metadata.dict() == EXAMPLE_CHUNK_METADATA
+    assert doc.metadata.dict(serialize_dates=True) == EXAMPLE_CHUNK_METADATA
 
 
 EXAMPLE_PINECONE_DOCUMENTS = {
@@ -56,7 +56,7 @@ EXAMPLE_PINECONE_DOCUMENTS = {
 def test_pinecone_documents_model():
     """Define test for PineconeDocuments model."""
     docs = PineconeDocuments(**EXAMPLE_PINECONE_DOCUMENTS)
-    assert docs.documents[0].metadata.class_id == EXAMPLE_CHUNK_METADATA["class_id"]
+    assert str(docs.class_id) == EXAMPLE_CHUNK_METADATA["class_id"]
 
 
 EXAMPLE_METADATA_2 = copy.deepcopy(EXAMPLE_METADATA)

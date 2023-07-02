@@ -1,4 +1,5 @@
 """Define the shared schemas used by the backend."""
+from datetime import datetime
 from enum import Enum
 from uuid import UUID
 from pydantic import Field, root_validator, validator
@@ -44,6 +45,19 @@ class BaseClassResourceDocument(BasePydanticModel):
         ...,
         description="The metadata of the class resource.",
     )
+    create_timestamp: datetime = Field(
+        default_factory=datetime.utcnow,
+        description="The timestamp when the class resource was created.",
+    )
+    modified_timestamp: datetime = Field(
+        default_factory=datetime.utcnow,
+        description="The timestamp when the class resource was last modified.",
+    )
+
+    @validator("modified_timestamp", pre=True)
+    def set_modified_timestamp(cls, _: datetime) -> datetime:
+        """Set the modified timestamp."""
+        return datetime.utcnow()
 
 
 class ClassResourceDocument(BaseClassResourceDocument):
@@ -53,16 +67,12 @@ class ClassResourceDocument(BaseClassResourceDocument):
         ...,
         description=f"The processing status of the class resource. Valid values are: {', '.join([status.value for status in ClassResourceProcessingStatus])}",
     )
-    chunk_vector_ids: list[UUID] = Field(
-        default_factory=list,
-        description="The IDs of the chunk vectors.",
-    )
     class_resource_chunk_ids: list[UUID] = Field(
         default_factory=list,
         description="The IDs of the class resource chunks.",
     )
 
-    @validator("class_resource_chunk_ids", "chunk_vector_ids")
+    @validator("class_resource_chunk_ids")
     def validate_class_resource_chunk_and_vector_ids(cls, ids: list[UUID], values: dict) -> list[UUID]:
         """Validate the class resource chunk ids."""
         completed_status = ClassResourceProcessingStatus.COMPLETED
@@ -80,13 +90,20 @@ class ClassResourceChunkDocument(BaseClassResourceDocument):
         ...,
         description="The text chunk of the class resource.",
     )
+    vector_id: UUID = Field(
+        default_factory=list,
+        description="The ID of the class resource chunk vector.",
+    )
     metadata: ChunkMetadata = Field(
         ...,
         description="The metadata of the class resource chunk.",
     )
 
-    @root_validator(pre=True)
-    def add_class_id_to_metadata(cls, values: dict) -> dict:
-        """Add the class id to the metadata."""
-        values['metadata']['class_id'] = values['class_id']
-        return values
+    @validator("metadata")
+    def ensure_same_class_id(cls, metadata: ChunkMetadata, values: dict) -> ChunkMetadata:
+        """Ensure the same class id."""
+        assert metadata.class_id == values.get("class_id"), \
+            "The class id of the metadata must be the same as the class id " \
+            f"of the class resource. Id of the metadata: {metadata.class_id}, " \
+            f"id of the class resource: {values.get('class_id')}"
+        return metadata
