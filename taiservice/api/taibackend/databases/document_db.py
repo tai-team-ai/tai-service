@@ -21,7 +21,6 @@ except ImportError:
 
 class DocumentDBConfig(BaseModel):
     """Define the document database config."""
-
     username: str = Field(
         ...,
         description="The username of the document db.",
@@ -47,6 +46,7 @@ class DocumentDBConfig(BaseModel):
         description="The name of the collection in the document db.",
     )
 
+
 class DocumentDB:
     """
     Define the document database.
@@ -57,7 +57,6 @@ class DocumentDB:
     class resources. This ensures that we still have pointers to the
     chunks in the class resources if failure occurs (allows us to retry)
     """
-
     def __init__(self, config: DocumentDBConfig) -> None:
         """Initialize document db."""
         self._client = MongoClient(

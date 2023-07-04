@@ -12,7 +12,7 @@ from langchain.text_splitter import TextSplitter
 from langchain.schema import Document
 from pinecone_text.sparse import SpladeEncoder
 try:
-    from taiservice.api.taibackend.indexer.data_ingestors import (
+    from .data_ingestors import (
         InputDataIngestStrategy,
         InputDocument,
         S3ObjectIngestor,
@@ -23,15 +23,15 @@ try:
         get_page_number,
         get_total_page_count,
     )
-    from taiservice.api.taibackend.databases.shared_schemas import ChunkMetadata
-    from taiservice.api.taibackend.databases.pinecone_db import PineconeDBConfig, PineconeDB
-    from taiservice.api.taibackend.databases.pinecone_db_schemas import (
+    from ..databases.shared_schemas import ChunkMetadata
+    from ..databases.pinecone_db import PineconeDBConfig, PineconeDB
+    from ..databases.pinecone_db_schemas import (
         PineconeDocuments,
         PineconeDocument,
         SparseVector,
     )
-    from taiservice.api.taibackend.databases.document_db import DocumentDBConfig, DocumentDB
-    from taiservice.api.taibackend.databases.document_db_schemas import (
+    from ..databases.document_db import DocumentDBConfig, DocumentDB
+    from ..databases.document_db_schemas import (
         ClassResourceChunkDocument,
         ClassResourceDocument,
         ClassResourceProcessingStatus,
