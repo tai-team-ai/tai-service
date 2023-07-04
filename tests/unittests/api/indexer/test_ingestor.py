@@ -28,7 +28,7 @@ def test_that_mismatched_loading_strategy_raises_error():
             input_format=InputFormat.PDF,
             metadata=Metadata(
                 description="",
-                resource_type=ClassResourceType.PDF,
+                resource_type=ClassResourceType.TEXTBOOK,
                 title="",
                 tags=[],
                 total_page_count=0,
