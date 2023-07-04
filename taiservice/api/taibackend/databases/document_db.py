@@ -110,6 +110,10 @@ class DocumentDB:
             self._execute_operation(upsert_document, document, failed_documents=failed_documents)
         return failed_documents
 
+    def update_document(self, document: BaseClassResourceDocument) -> None:
+        """Update the document."""
+        self._collection.update_one({"_id": document.id}, {"$set": document.dict()})
+
     def delete_class_resources(self, documents: list[BaseClassResourceDocument]) -> list[BaseClassResourceDocument]:
         """Delete the full class resources."""
         failed_documents = []

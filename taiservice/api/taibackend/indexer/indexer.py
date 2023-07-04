@@ -1,6 +1,5 @@
 """Define the indexer module."""
 from concurrent.futures import ThreadPoolExecutor
-import copy
 from typing import Optional
 from uuid import UUID, uuid4
 import traceback
@@ -12,9 +11,6 @@ from langchain.document_loaders.base import BaseLoader
 from langchain.text_splitter import TextSplitter
 from langchain.schema import Document
 from pinecone_text.sparse import SpladeEncoder
-from pinecone_text.hybrid import hybrid_convex_scale
-
-
 try:
     from taiservice.api.taibackend.indexer.data_ingestors import (
         InputDataIngestStrategy,
@@ -69,7 +65,6 @@ except ImportError:
 
 class OpenAIConfig(BaseModel):
     """Define the OpenAI config."""
-
     api_key: str = Field(
         ...,
         description="The API key of the OpenAI API.",
@@ -86,9 +81,9 @@ class OpenAIConfig(BaseModel):
         description="The batch size for requests to the OpenAI API.",
     )
 
+
 class IndexerConfig(BaseModel):
     """Define the indexer config."""
-
     pinecone_db_config: PineconeDBConfig = Field(
         ...,
         description="The pinecone db config.",
@@ -102,9 +97,9 @@ class IndexerConfig(BaseModel):
         description="The OpenAI config.",
     )
 
+
 class Indexer:
     """Define the indexer class."""
-
     def __init__(
         self,
         indexer_config: IndexerConfig,
@@ -130,6 +125,8 @@ class Indexer:
         )
         self._load_class_resources_to_db(class_resource_document, chunk_documents)
         self._load_vectors_to_vector_store(vector_documents)
+        class_resource_document.status = ClassResourceProcessingStatus.COMPLETED
+        self._document_db.update_document(class_resource_document)
 
     def _load_vectors_to_vector_store(self, vector_documents: PineconeDocuments) -> None:
         """Load vectors to vector store."""
