@@ -46,22 +46,6 @@ class BaseClassResourceDocument(BasePydanticModel):
         ...,
         description="The metadata of the class resource.",
     )
-    child_resource_id: Optional[UUID] = Field(
-        default=None,
-        description=("The ID of the child resource. This is useful when the provided "
-            "resource is a webpage and the user wants to crawl the website for resources. "
-            "In this case, the child resource ID of all child resources that are scraped "
-            "from the webpage."
-        ),
-    )
-    parent_resource_id: Optional[UUID] = Field(
-        default=None,
-        description=("The ID of the parent resource. This field must be populated if the "
-            "resource is a child of another resource. For example, if the resource is a "
-            "webpage, then the parent resource ID is the ID of the webpage that contains "
-            "the parent resource."
-        ),
-    )
     create_timestamp: datetime = Field(
         default_factory=datetime.utcnow,
         description="The timestamp when the class resource was created.",
@@ -83,6 +67,22 @@ class ClassResourceDocument(BaseClassResourceDocument):
     status: ClassResourceProcessingStatus = Field(
         ...,
         description=f"The processing status of the class resource. Valid values are: {', '.join([status.value for status in ClassResourceProcessingStatus])}",
+    )
+    child_resource_id: Optional[UUID] = Field(
+        default=None,
+        description=("The ID of the child resource. This is useful when the provided "
+            "resource is a webpage and the user wants to crawl the website for resources. "
+            "In this case, the child resource ID of all child resources that are scraped "
+            "from the webpage."
+        ),
+    )
+    parent_resource_id: Optional[UUID] = Field(
+        default=None,
+        description=("The ID of the parent resource. This field must be populated if the "
+            "resource is a child of another resource. For example, if the resource is a "
+            "webpage, then the parent resource ID is the ID of the webpage that contains "
+            "the parent resource."
+        ),
     )
     class_resource_chunk_ids: list[UUID] = Field(
         default_factory=list,

@@ -29,7 +29,15 @@
       "type": "devenv"
     },
     {
+      "name": "openai",
+      "type": "devenv"
+    },
+    {
       "name": "pinecone-client[grpc]",
+      "type": "devenv"
+    },
+    {
+      "name": "pinecone-text",
       "type": "devenv"
     },
     {
@@ -47,6 +55,10 @@
     },
     {
       "name": "pytest-cov",
+      "type": "devenv"
+    },
+    {
+      "name": "tiktoken",
       "type": "devenv"
     },
     {

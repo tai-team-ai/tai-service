@@ -1,14 +1,19 @@
 """Define data ingestors used by the indexer."""
 from abc import ABC
+from functools import partial
 from enum import Enum
 from pathlib import Path
 import traceback
-from typing import Any
+from typing import Any, Optional
 import filetype
 from bs4 import BeautifulSoup
 import boto3
 from loguru import logger
 from pydantic import Field, validator
+from langchain.text_splitter import Language
+from langchain.text_splitter import TextSplitter, RecursiveCharacterTextSplitter
+from langchain import text_splitter
+from langchain.schema import Document
 import requests
 # first imports are for local development, second imports are for deployment
 try:
@@ -53,11 +58,56 @@ class LatexExtension(str, Enum):
 class LoadingStrategy(str, Enum):
     """Define the loading strategies."""
 
-    PyMuPDF = "PyMuPDF"
+    PyMuPDFLoader = "PyMuPDFLoader"
+    UnstructuredMarkdownLoader = "UnstructuredMarkdownLoader"
+    UnstructuredHTMLLoader = "UnstructuredHTMLLoader"
+
+class SplitterStrategy(str, Enum):
+    """Define the splitter strategies."""
+
+    RecursiveCharacterTextSplitter = "RecursiveCharacterTextSplitter"
+    LatexTextSplitter = "LatexTextSplitter"
+    MarkdownTextSplitter = "MarkdownTextSplitter"
 
 LOADING_STRATEGY_MAPPING = {
-    SupportedInputFormat.PDF: LoadingStrategy.PyMuPDF,
+    SupportedInputFormat.PDF: LoadingStrategy.PyMuPDFLoader,
+    SupportedInputFormat.GENERIC_TEXT: LoadingStrategy.UnstructuredMarkdownLoader,
+    SupportedInputFormat.LATEX: LoadingStrategy.UnstructuredMarkdownLoader,
+    SupportedInputFormat.MARKDOWN: LoadingStrategy.UnstructuredMarkdownLoader,
+    SupportedInputFormat.HTML: LoadingStrategy.UnstructuredHTMLLoader,
 }
+
+SPLITTER_STRATEGY_MAPPING = {
+    SupportedInputFormat.PDF: SplitterStrategy.RecursiveCharacterTextSplitter,
+    SupportedInputFormat.GENERIC_TEXT: SplitterStrategy.RecursiveCharacterTextSplitter,
+    SupportedInputFormat.LATEX: Language.LATEX,
+    SupportedInputFormat.MARKDOWN: Language.MARKDOWN,
+    SupportedInputFormat.HTML: Language.HTML,
+}
+TOTAL_PAGE_COUNT_STRINGS = ["total_pages", "total_page_count", "total_page_counts", "page_count"]
+PAGE_NUMBER_STRINGS = ["page_number", "page_numbers", "page_num", "page_nums", "page"]
+
+def get_splitter_text_splitter(input_format: SupportedInputFormat) -> TextSplitter:
+    """Get the splitter strategy."""
+    strategy_instructions = SPLITTER_STRATEGY_MAPPING.get(input_format)
+    if strategy_instructions is None:
+        raise ValueError("The input format is not supported.")
+    if strategy_instructions in Language:
+        return RecursiveCharacterTextSplitter()
+    return getattr(text_splitter, strategy_instructions)()
+
+def get_total_page_count(docs: list[Document]) -> Optional[int]:
+    """Get the page count and total page count."""
+    for doc in docs:
+        for key in TOTAL_PAGE_COUNT_STRINGS:
+            if key in doc.metadata:
+                return doc.metadata[key]
+
+def get_page_number(doc: Document) -> Optional[int]:
+    """Get the page number."""
+    for key in PAGE_NUMBER_STRINGS:
+        if key in doc.metadata:
+            return doc.metadata[key]
 
 class InputDataIngestStrategy(str, Enum):
     """Define the input types."""

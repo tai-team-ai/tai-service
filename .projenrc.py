@@ -46,6 +46,9 @@ project:Project = AwsCdkPythonApp(
         "filetype",
         "boto3-stubs[essential]",
         "beautifulsoup4",
+        "openai",
+        "tiktoken",
+        "pinecone-text",
     ],
 )
 env_file: TextFile = TextFile(

@@ -92,10 +92,6 @@ class ChunkMetadata(Metadata):
         default=None,
         description="The page number of the class resource.",
     )
-    timestamp: datetime = Field(
-        default_factory=datetime.utcnow,
-        description="The time stamp of the class resource.",
-    )
 
     class Config:
         """Define the configuration for the model."""
