@@ -91,8 +91,8 @@ class ClassResourceDocument(BaseClassResourceDocument):
         """Validate the class resource chunk ids."""
         completed_status = ClassResourceProcessingStatus.COMPLETED
         if values.get("status") == completed_status and not ids:
-            raise ValueError(f"Both the class resource chunk ids and chunk vector "\
-                f"ids must not be empty if the status is {completed_status}. Values you provided: {values}"
+            raise ValueError("The class resource chunk ids must NOT " \
+                f"be empty if the status is {completed_status}. Values you provided: {values}"
             )
         return ids
 

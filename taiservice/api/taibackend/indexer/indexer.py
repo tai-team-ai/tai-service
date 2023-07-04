@@ -115,18 +115,23 @@ class Indexer:
 
     def index_resource(self, document: InputDocument) -> None:
         """Index a document."""
-        ingested_document = self._ingest_document(document)
-        chunk_documents = self._load_and_split_document(ingested_document)
-        vector_documents = self._embed_documents(chunk_documents, document.class_id)
         class_resource_document = ClassResourceDocument(
             status=ClassResourceProcessingStatus.PROCESSING,
-            class_resource_chunk_ids=[doc.id for doc in chunk_documents],
-            **ingested_document.dict(),
+            **document.dict(),
         )
-        self._load_class_resources_to_db(class_resource_document, chunk_documents)
-        self._load_vectors_to_vector_store(vector_documents)
-        class_resource_document.status = ClassResourceProcessingStatus.COMPLETED
-        self._document_db.update_document(class_resource_document)
+        try:
+            ingested_document = self._ingest_document(document)
+            chunk_documents = self._load_and_split_document(ingested_document)
+            class_resource_document.class_resource_chunk_ids = [chunk_doc.id for chunk_doc in chunk_documents]
+            vector_documents = self._embed_documents(chunk_documents, document.class_id)
+            self._load_class_resources_to_db(class_resource_document, chunk_documents)
+            self._load_vectors_to_vector_store(vector_documents)
+            class_resource_document.status = ClassResourceProcessingStatus.COMPLETED
+            self._document_db.update_document(class_resource_document)
+        except Exception as e:
+            class_resource_document.status = ClassResourceProcessingStatus.FAILED
+            self._document_db.update_document(class_resource_document)
+            raise RuntimeError("Failed to index resource.") from e
 
     def _load_vectors_to_vector_store(self, vector_documents: PineconeDocuments) -> None:
         """Load vectors to vector store."""
