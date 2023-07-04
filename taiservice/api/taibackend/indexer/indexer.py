@@ -1,53 +1,31 @@
 """Define the indexer module."""
 from enum import Enum
-from pydantic import BaseModel, Field
+from typing import Any, Optional
+from pydantic import BaseModel, Field, validator
 from langchain.embeddings import OpenAIEmbeddings
 from langchain.schema import Document
+
 try:
+    from taiservice.api.taibackend.indexer.data_ingestors import (
+        InputDataIngestStrategy,
+        InputDocument,
+        Ingestor,
+        S3ObjectIngestor,
+        URLIngestor,
+    )
     from taiservice.api.taibackend.databases.pinecone_db import PineconeDBConfig, PineconeDB
     from taiservice.api.taibackend.databases.document_db import DocumentDBConfig, DocumentDB
-    from taiservice.api.taibackend.databases.document_db_schemas import (
-        BaseClassResourceDocument,
-    )
 except ImportError:
+    from taibackend.indexer.data_ingestors import (
+        InputDataIngestStrategy,
+        InputDocument,
+        Ingestor,
+        S3ObjectIngestor,
+        URLIngestor,
+    )
     from taibackend.databases.pinecone_db import PineconeDBConfig, PineconeDB
     from taibackend.databases.document_db import DocumentDBConfig, DocumentDB
-    from taibackend.databases.document_db_schemas import BaseClassResourceDocument
 
-
-class SupportedInputFormat(str, Enum):
-    """Define the supported input formats."""
-
-    PDF = "pdf"
-
-class LoadingStrategy(str, Enum):
-    """Define the loading strategies."""
-
-    PyMuPDF = "PyMuPDF"
-
-LOADING_STRATEGY_MAPPING = {
-    SupportedInputFormat.PDF: LoadingStrategy.PyMuPDF,
-}
-
-class InputDataIngestStrategy(str, Enum):
-    """Define the input types."""
-
-    S3 = "s3"
-    WEB_CRAWL = "web_crawl"
-    NOT_APPLICABLE = "not_applicable"
-
-
-class InputDocument(BaseClassResourceDocument, Document):
-    """Define the input document."""
-
-    page_content: str = Field(
-        default="",
-        description="The content of the document.",
-    )
-    input_location: InputDataIngestStrategy = Field(
-        ...,
-        description="The location of the input data.",
-    )
 
 class OpenAIConfig(BaseModel):
     """Define the OpenAI config."""
@@ -99,12 +77,6 @@ class Indexer:
 
     def _ingest_document(self, document: InputDocument) -> None:
         """Ingest a document."""
-        if document.input_location == InputDataIngestStrategy.S3:
-            raise NotImplementedError
-        elif document.input_location == InputDataIngestStrategy.WEB_CRAWL:
-            raise NotImplementedError
-        elif document.input_location == InputDataIngestStrategy.NOT_APPLICABLE:
-            raise NotImplementedError
-        else:
-            raise NotImplementedError
+        if document.input_data_ingest_strategy == InputDataIngestStrategy.S3_FILE_DOWNLOAD:
+            
 

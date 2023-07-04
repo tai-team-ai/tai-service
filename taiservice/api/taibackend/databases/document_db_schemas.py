@@ -1,6 +1,7 @@
 """Define the shared schemas used by the backend."""
 from datetime import datetime
 from enum import Enum
+from typing import Optional
 from uuid import UUID
 from pydantic import Field, root_validator, validator
 # first imports are for local development, second imports are for deployment
@@ -44,6 +45,22 @@ class BaseClassResourceDocument(BasePydanticModel):
     metadata: Metadata = Field(
         ...,
         description="The metadata of the class resource.",
+    )
+    child_resource_id: Optional[UUID] = Field(
+        default=None,
+        description=("The ID of the child resource. This is useful when the provided "
+            "resource is a webpage and the user wants to crawl the website for resources. "
+            "In this case, the child resource ID of all child resources that are scraped "
+            "from the webpage."
+        ),
+    )
+    parent_resource_id: Optional[UUID] = Field(
+        default=None,
+        description=("The ID of the parent resource. This field must be populated if the "
+            "resource is a child of another resource. For example, if the resource is a "
+            "webpage, then the parent resource ID is the ID of the webpage that contains "
+            "the parent resource."
+        ),
     )
     create_timestamp: datetime = Field(
         default_factory=datetime.utcnow,

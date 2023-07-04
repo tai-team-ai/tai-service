@@ -9,7 +9,15 @@
       "type": "devenv"
     },
     {
+      "name": "beautifulsoup4",
+      "type": "devenv"
+    },
+    {
       "name": "boto3-stubs[essential]",
+      "type": "devenv"
+    },
+    {
+      "name": "filetype",
       "type": "devenv"
     },
     {

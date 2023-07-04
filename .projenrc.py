@@ -43,6 +43,9 @@ project:Project = AwsCdkPythonApp(
         "langchain",
         "ipykernel",
         "pymongo",
+        "filetype",
+        "boto3-stubs[essential]",
+        "beautifulsoup4",
     ],
 )
 env_file: TextFile = TextFile(

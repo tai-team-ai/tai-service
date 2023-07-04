@@ -1,6 +1,9 @@
-loguru
+loguru<=0.7.0
 fastapi<=0.98.0
 mangum
 pydantic<=1.10.10
 pinecone-client[grpc]
 pymongo<=4.4
+filetype<=1.2.0
+boto3
+beautifulsoup4
