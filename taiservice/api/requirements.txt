@@ -5,7 +5,6 @@ pydantic<=1.10.10
 pinecone-client[grpc]
 pymongo<=4.4
 filetype<=1.2.0
-boto3
 beautifulsoup4
 openai
 tiktoken
