@@ -17,6 +17,10 @@
       "type": "devenv"
     },
     {
+      "name": "boto3-stubs[secretsmanager]",
+      "type": "devenv"
+    },
+    {
       "name": "filetype",
       "type": "devenv"
     },

@@ -4,6 +4,7 @@ from typing import Any, Callable, Optional
 from uuid import UUID
 from pydantic import BaseModel, Field, ValidationError
 from pymongo import MongoClient
+from pymongo.collection import Collection
 from loguru import logger
 # first imports are for local development, second imports are for deployment
 try:
@@ -41,9 +42,13 @@ class DocumentDBConfig(BaseModel):
         ...,
         description="The name of the document db.",
     )
-    collection_name: str = Field(
+    class_resource_collection_name: str = Field(
         ...,
-        description="The name of the collection in the document db.",
+        description="The name of the collection in the document db used for class resources.",
+    )
+    class_resource_chunk_collection_name: str = Field(
+        ...,
+        description="The name of the collection in the document db used for class resource chunks.",
     )
 
 
@@ -71,16 +76,23 @@ class DocumentDB:
             ClassResourceChunkDocument,
             ClassResourceDocument,
         ]
-        self._collection = self._client[config.database_name][config.collection_name]
+        db = self._client[config.database_name]
+        class_resource_collection = db[config.class_resource_collection_name]
+        chunk_collection = db[config.class_resource_chunk_collection_name]
+        self._document_type_to_collection = {
+            ClassResourceDocument.__name__: class_resource_collection,
+            ClassResourceChunkDocument.__name__: chunk_collection,
+        }
 
     @property
     def supported_doc_models(self) -> list[BaseClassResourceDocument]:
         """Return the supported document models."""
         return self._doc_models
 
-    def get_class_resources(self, ids: list[UUID]) -> list[BaseClassResourceDocument]:
+    def get_class_resources(self, ids: list[UUID], doc_class: BaseClassResourceDocument) -> list[BaseClassResourceDocument]:
         """Return the full class resources."""
-        documents = self._collection.find({"_id": {"$in": ids}})
+        collection = self._document_type_to_collection[doc_class.__name__]
+        documents = collection.find({"_id": {"$in": ids}})
         # cast to the most specific document type
         # iterate over the documents models: BaseClassResourceDocument, ClassResourceDocument, ClassResourceChunkDocument
         for doc_model in self.supported_doc_models:
@@ -109,9 +121,9 @@ class DocumentDB:
             self._execute_operation(upsert_document, document, failed_documents=failed_documents)
         return failed_documents
 
-    def update_document(self, document: BaseClassResourceDocument) -> None:
+    def update_document(self, document: BaseClassResourceDocument, collection: Collection) -> None:
         """Update the document."""
-        self._collection.update_one({"_id": document.id}, {"$set": document.dict()})
+        collection.update_one({"_id": document.id}, {"$set": document.dict()})
 
     def delete_class_resources(self, documents: list[BaseClassResourceDocument]) -> list[BaseClassResourceDocument]:
         """Delete the full class resources."""
@@ -126,7 +138,7 @@ class DocumentDB:
 
     def _execute_operation(
         self,
-        operation: Callable, 
+        operation: Callable,
         document: BaseClassResourceDocument,
         *args: Any,
         failed_documents: Optional[list[BaseClassResourceDocument]] = None,
@@ -140,14 +152,16 @@ class DocumentDB:
             traceback.format_exc()
             failed_documents.append(document)
 
-    def _delete_documents(self, ids: list[UUID]) -> None:
+    def _delete_documents(self, docs: list[BaseClassResourceDocument]) -> None:
         """Delete the chunks of the class resource."""
-        ids = [str(id) for id in ids]
-        self._collection.delete_many({"_id": {"$in": ids}})
+        # sort by instance type
+        for doc in docs:
+            self._delete_document(doc)
 
-    def _delete_document(self, id_: UUID) -> None:
+    def _delete_document(self, doc: BaseClassResourceDocument) -> None:
         """Delete the chunks of the class resource."""
-        self._collection.delete_one({"_id": str(id_)})
+        collection = self._document_type_to_collection[doc.__class__.__name__]
+        collection.delete_one({"_id": doc.id})
 
     def _upsert_documents(self, documents: list[BaseClassResourceDocument]) -> None:
         """Upsert the chunks of the class resource."""
@@ -156,7 +170,8 @@ class DocumentDB:
 
     def _upsert_document(self, document: BaseClassResourceDocument) -> None:
         """Upsert the chunks of the class resource."""
-        self._collection.update_one(
+        collection = self._document_type_to_collection[document.__class__.__name__]
+        collection.update_one(
             {"_id": document.id},
             {"$set": document.dict(serialize_dates=False)},
             upsert=True,

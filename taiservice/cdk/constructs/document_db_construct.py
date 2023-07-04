@@ -160,6 +160,16 @@ class DocumentDatabase(Construct):
         """Return the DocumentDB cluster."""
         return self._db_cluster
 
+    @property
+    def fully_qualified_domain_name(self) -> str:
+        """Return the fully qualified domain name for the DocumentDB cluster."""
+        return self._db_cluster.attr_cluster_endpoint
+
+    @property
+    def access_port(self) -> int:
+        """Return the port to use for accessing the DocumentDB cluster."""
+        return self._settings.cluster_port
+
     def _configure_security_groups(self) -> None:
         self._db_security_group = create_restricted_security_group(
             scope=self,
@@ -176,12 +186,12 @@ class DocumentDatabase(Construct):
         )
         self._db_security_group.add_ingress_rule(
             peer=self._security_group_for_connecting_to_cluster,
-            connection=ec2.Port.tcp(27017),
+            connection=ec2.Port.tcp(self._settings.cluster_port),
             description="Allow inbound connections from the security group for connecting to the DocumentDB cluster.",
         )
         self._security_group_for_connecting_to_cluster.add_egress_rule(
             peer=ec2.Peer.any_ipv4(),
-            connection=ec2.Port.tcp(27017),
+            connection=ec2.Port.tcp(self._settings.cluster_port),
             description="Allow outbound connections to the DocumentDB cluster.",
         )
 

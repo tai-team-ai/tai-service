@@ -50,9 +50,13 @@ class TaiApiSettings(BaseSettings):
         ...,
         description="The name of the document db.",
     )
-    doc_db_collection_name: str = Field(
+    doc_db_class_resource_collection_name: str = Field(
         ...,
-        description="The name of the collection in the document db.",
+        description="The name of the collection in the document db for class resources.",
+    )
+    doc_db_class_resource_chunk_collection_name: str = Field(
+        ...,
+        description="The name of the collection in the document db for class resource chunks.",
     )
     openAI_api_key_secret_name: str = Field(
         ...,

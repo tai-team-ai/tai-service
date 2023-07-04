@@ -3,6 +3,7 @@ aws-lambda-powertools
 aws-lambda-typing
 beautifulsoup4
 boto3-stubs[essential]
+boto3-stubs[secretsmanager]
 filetype
 ipykernel
 langchain
