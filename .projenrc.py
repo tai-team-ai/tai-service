@@ -43,6 +43,13 @@ project:Project = AwsCdkPythonApp(
         "langchain",
         "ipykernel",
         "pymongo",
+        "filetype",
+        "boto3-stubs[essential]",
+        "beautifulsoup4",
+        "openai",
+        "tiktoken",
+        "pinecone-text",
+        "pinecone-text[splade]",
     ],
 )
 env_file: TextFile = TextFile(

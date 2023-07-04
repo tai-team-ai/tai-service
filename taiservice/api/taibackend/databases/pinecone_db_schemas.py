@@ -14,6 +14,19 @@ except ImportError:
         BasePydanticModel,
     )
 
+class SparseVector(BasePydanticModel):
+    """Define the sparse vector model of the class resource."""
+
+    indices: list[int] = Field(
+        ...,
+        description="The indices of the sparse vector of the class resource.",
+    )
+    values: list[float] = Field(
+        ...,
+        description="The values of the sparse vector of the class resource.",
+    )
+
+
 # This conforms to the pinecone document schema for a vector
 # https://docs.pinecone.io/docs/python-client#indexupsert
 class PineconeDocument(BasePydanticModel):
@@ -27,7 +40,7 @@ class PineconeDocument(BasePydanticModel):
         ...,
         description="The dense vector of the class resource.",
     )
-    sparse_vector: Optional[dict[int, float]] = Field(
+    sparse_vector: Optional[SparseVector] = Field(
         description="The sparse vector of the class resource.",
     )
     metadata: ChunkMetadata = Field(
@@ -55,6 +68,7 @@ class PineconeDocuments(BasePydanticModel):
         """Define the config for the pinecone documents model."""
 
         allow_population_by_field_name = True
+        validate_assignment = True
         extra = Extra.ignore
 
     @root_validator(pre=True)

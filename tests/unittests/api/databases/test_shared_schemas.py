@@ -19,7 +19,7 @@ EXAMPLE_METADATA = {
     "title": "Example Title",
     "description": "Example Description",
     "tags": ["tag1", "tag2"],
-    "resource_type": "pdf",
+    "resource_type": "textbook",
     "total_page_count": 10
 }
 

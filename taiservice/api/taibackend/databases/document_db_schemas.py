@@ -1,6 +1,7 @@
 """Define the shared schemas used by the backend."""
 from datetime import datetime
 from enum import Enum
+from typing import Optional
 from uuid import UUID
 from pydantic import Field, root_validator, validator
 # first imports are for local development, second imports are for deployment
@@ -19,7 +20,6 @@ except ImportError:
 
 class ClassResourceProcessingStatus(str, Enum):
     """Define the document status."""
-
     PENDING = "pending"
     PROCESSING = "processing"
     FAILED = "failed"
@@ -28,7 +28,6 @@ class ClassResourceProcessingStatus(str, Enum):
 
 class BaseClassResourceDocument(BasePydanticModel):
     """Define the base model of the class resource."""
-
     id: UUID = Field(
         ...,
         description="The ID of the class resource.",
@@ -62,10 +61,25 @@ class BaseClassResourceDocument(BasePydanticModel):
 
 class ClassResourceDocument(BaseClassResourceDocument):
     """Define the document model of the class resource."""
-
     status: ClassResourceProcessingStatus = Field(
         ...,
         description=f"The processing status of the class resource. Valid values are: {', '.join([status.value for status in ClassResourceProcessingStatus])}",
+    )
+    child_resource_ids: Optional[list[UUID]] = Field(
+        default=None,
+        description=("The IDs of the child resource. This is useful when the provided "
+            "resource is a webpage and the user wants to crawl the website for resources. "
+            "In this case, the child resource ID of all child resources that are scraped "
+            "from the webpage."
+        ),
+    )
+    parent_resource_ids: Optional[list[UUID]] = Field(
+        default=None,
+        description=("The IDs of the parent resource. This field must be populated if the "
+            "resource is a child of another resource. For example, if the resource is a "
+            "webpage, then the parent resource ID is the ID of the webpage that contains "
+            "the parent resource."
+        ),
     )
     class_resource_chunk_ids: list[UUID] = Field(
         default_factory=list,
@@ -77,15 +91,14 @@ class ClassResourceDocument(BaseClassResourceDocument):
         """Validate the class resource chunk ids."""
         completed_status = ClassResourceProcessingStatus.COMPLETED
         if values.get("status") == completed_status and not ids:
-            raise ValueError(f"Both the class resource chunk ids and chunk vector "\
-                f"ids must not be empty if the status is {completed_status}. Values you provided: {values}"
+            raise ValueError("The class resource chunk ids must NOT " \
+                f"be empty if the status is {completed_status}. Values you provided: {values}"
             )
         return ids
 
 
 class ClassResourceChunkDocument(BaseClassResourceDocument):
     """Define the snippet model of the class resource."""
-
     chunk: str = Field(
         ...,
         description="The text chunk of the class resource.",

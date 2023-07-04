@@ -98,7 +98,7 @@ class DocumentDB:
         """Upsert the full class resources."""
         failed_documents = []
         def upsert_document(document: BaseClassResourceDocument) -> None:
-            # self._upsert_document(document)
+            self._upsert_document(document)
             if isinstance(document, ClassResourceDocument):
                 try:
                     chunks = [chunk_mapping[id] for id in document.class_resource_chunk_ids]
@@ -109,6 +109,10 @@ class DocumentDB:
         for document in documents:
             self._execute_operation(upsert_document, document, failed_documents=failed_documents)
         return failed_documents
+
+    def update_document(self, document: BaseClassResourceDocument) -> None:
+        """Update the document."""
+        self._collection.update_one({"_id": document.id}, {"$set": document.dict()})
 
     def delete_class_resources(self, documents: list[BaseClassResourceDocument]) -> list[BaseClassResourceDocument]:
         """Delete the full class resources."""

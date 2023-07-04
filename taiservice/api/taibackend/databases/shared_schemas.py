@@ -2,18 +2,14 @@
 from datetime import datetime
 from uuid import UUID
 from enum import Enum
-from typing import Any, Dict, Optional
+from typing import Any, Optional
 from pydantic import BaseModel, Field, Extra
 
 
 class ClassResourceType(str, Enum):
-    """Define the built-in MongoDB roles."""
-
-    # VIDEO = "video"
-    # TEXT = "text"
-    # IMAGE = "image"
-    # AUDIO = "audio"
-    PDF = "pdf"
+    """Define the class resource types to use as a filter."""
+    TEXTBOOK = "textbook"
+    WEBSITE = "website"
 
 class BasePydanticModel(BaseModel):
     """
@@ -67,7 +63,7 @@ class Metadata(BasePydanticModel):
         default_factory=list,
         description="The tags of the class resource.",
     )
-    resource_type: str = Field(
+    resource_type: ClassResourceType = Field(
         ...,
         description="The type of the class resource.",
     )
@@ -75,6 +71,11 @@ class Metadata(BasePydanticModel):
         default=None,
         description="The page count of the class resource.",
     )
+
+    class Config:
+        """Define the configuration for the model."""
+
+        extra = Extra.allow
 
 class ChunkMetadata(Metadata):
     """Define the metadata of the class resource chunk."""
@@ -87,12 +88,8 @@ class ChunkMetadata(Metadata):
         default=None,
         description="The page number of the class resource.",
     )
-    timestamp: datetime = Field(
-        default_factory=datetime.utcnow,
-        description="The time stamp of the class resource.",
-    )
 
     class Config:
-        """Define the configuration for the Pydantic model."""
+        """Define the configuration for the model."""
 
         extra = Extra.allow

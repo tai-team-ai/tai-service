@@ -16,8 +16,8 @@ class Environment(str, Enum):
     US_EAST_1_AWS = "us-east-1-aws"
 
 
-class PineconeDB(BaseModel):
-    """Define the pinecone database."""
+class PineconeDBConfig(BaseModel):
+    """Define the pinecone database config."""
 
     api_key_secret_name: str = Field(
         ...,
@@ -32,10 +32,14 @@ class PineconeDB(BaseModel):
         description="The name of the pinecone index.",
     )
 
-    def __init__(self) -> None:
+
+class PineconeDB:
+    """Define the pinecone database."""
+
+    def __init__(self, config: PineconeDBConfig) -> None:
         """Initialize pinecone db."""
-        pinecone.init(api_key=self.api_key_secret_name, environment=self.environment)
-        self._index_name = self.index_name
+        pinecone.init(api_key=config.api_key_secret_name, environment=config.environment)
+        self._index_name = config.index_name
         self._number_threads = 50
         self._max_vectors_per_operation = 100
 

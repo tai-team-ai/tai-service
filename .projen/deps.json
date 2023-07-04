@@ -9,7 +9,15 @@
       "type": "devenv"
     },
     {
+      "name": "beautifulsoup4",
+      "type": "devenv"
+    },
+    {
       "name": "boto3-stubs[essential]",
+      "type": "devenv"
+    },
+    {
+      "name": "filetype",
       "type": "devenv"
     },
     {
@@ -21,7 +29,19 @@
       "type": "devenv"
     },
     {
+      "name": "openai",
+      "type": "devenv"
+    },
+    {
       "name": "pinecone-client[grpc]",
+      "type": "devenv"
+    },
+    {
+      "name": "pinecone-text",
+      "type": "devenv"
+    },
+    {
+      "name": "pinecone-text[splade]",
       "type": "devenv"
     },
     {
@@ -39,6 +59,10 @@
     },
     {
       "name": "pytest-cov",
+      "type": "devenv"
+    },
+    {
+      "name": "tiktoken",
       "type": "devenv"
     },
     {
