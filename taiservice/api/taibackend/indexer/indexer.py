@@ -22,7 +22,7 @@ try:
         S3ObjectIngestor,
         URLIngestor,
         IngestedDocument,
-        SupportedInputFormat,
+        InputFormat,
         get_splitter_text_splitter,
         get_page_number,
         get_total_page_count,
@@ -47,7 +47,7 @@ except ImportError:
         S3ObjectIngestor,
         URLIngestor,
         IngestedDocument,
-        SupportedInputFormat,
+        InputFormat,
         get_splitter_text_splitter,
         get_page_number,
         get_total_page_count,
@@ -191,7 +191,7 @@ class Indexer:
 
     def _get_page_number(self, documents: Document, ingested_document: IngestedDocument) -> Optional[int]:
         """Get page number for document."""
-        if ingested_document.input_format == SupportedInputFormat.PDF:
+        if ingested_document.input_format == InputFormat.PDF:
             return get_page_number(documents)
 
     def _embed_documents(self, documents: list[ClassResourceChunkDocument], class_id: UUID) -> PineconeDocuments:

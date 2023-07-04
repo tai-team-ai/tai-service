@@ -1,6 +1,5 @@
 """Define data ingestors used by the indexer."""
 from abc import ABC
-from functools import partial
 from enum import Enum
 from pathlib import Path
 import traceback
@@ -26,9 +25,8 @@ except ImportError:
     )
 
 
-class SupportedInputFormat(str, Enum):
+class InputFormat(str, Enum):
     """Define the supported input formats."""
-
     PDF = "pdf"
     GENERIC_TEXT = "generic_text"
     LATEX = "latex"
@@ -38,7 +36,6 @@ class SupportedInputFormat(str, Enum):
 
 class MarkdownExtension(str, Enum):
     """Define the markdown extensions."""
-
     MARKDOWN = ".markdown"
     MD = ".md"
     MKD = ".mkd"
@@ -48,46 +45,53 @@ class MarkdownExtension(str, Enum):
     MDTEXT = ".mdtext"
     TXT = ".text"
 
+
 class LatexExtension(str, Enum):
     """Define the latex extensions."""
-
     TEX = ".tex"
     LATEX = ".latex"
 
 
 class LoadingStrategy(str, Enum):
     """Define the loading strategies."""
-
     PyMuPDFLoader = "PyMuPDFLoader"
     UnstructuredMarkdownLoader = "UnstructuredMarkdownLoader"
     UnstructuredHTMLLoader = "UnstructuredHTMLLoader"
 
 class SplitterStrategy(str, Enum):
     """Define the splitter strategies."""
-
     RecursiveCharacterTextSplitter = "RecursiveCharacterTextSplitter"
     LatexTextSplitter = "LatexTextSplitter"
     MarkdownTextSplitter = "MarkdownTextSplitter"
 
+
+class InputDataIngestStrategy(str, Enum):
+    """Define the input types."""
+    S3_FILE_DOWNLOAD = "s3_file_download"
+    URL_DOWNLOAD = "url_download"
+    # WEB_CRAWL = "web_crawl"
+
+
 LOADING_STRATEGY_MAPPING = {
-    SupportedInputFormat.PDF: LoadingStrategy.PyMuPDFLoader,
-    SupportedInputFormat.GENERIC_TEXT: LoadingStrategy.UnstructuredMarkdownLoader,
-    SupportedInputFormat.LATEX: LoadingStrategy.UnstructuredMarkdownLoader,
-    SupportedInputFormat.MARKDOWN: LoadingStrategy.UnstructuredMarkdownLoader,
-    SupportedInputFormat.HTML: LoadingStrategy.UnstructuredHTMLLoader,
+    InputFormat.PDF: LoadingStrategy.PyMuPDFLoader,
+    InputFormat.GENERIC_TEXT: LoadingStrategy.UnstructuredMarkdownLoader,
+    InputFormat.LATEX: LoadingStrategy.UnstructuredMarkdownLoader,
+    InputFormat.MARKDOWN: LoadingStrategy.UnstructuredMarkdownLoader,
+    InputFormat.HTML: LoadingStrategy.UnstructuredHTMLLoader,
 }
 
 SPLITTER_STRATEGY_MAPPING = {
-    SupportedInputFormat.PDF: SplitterStrategy.RecursiveCharacterTextSplitter,
-    SupportedInputFormat.GENERIC_TEXT: SplitterStrategy.RecursiveCharacterTextSplitter,
-    SupportedInputFormat.LATEX: Language.LATEX,
-    SupportedInputFormat.MARKDOWN: Language.MARKDOWN,
-    SupportedInputFormat.HTML: Language.HTML,
+    InputFormat.PDF: SplitterStrategy.RecursiveCharacterTextSplitter,
+    InputFormat.GENERIC_TEXT: SplitterStrategy.RecursiveCharacterTextSplitter,
+    InputFormat.LATEX: Language.LATEX,
+    InputFormat.MARKDOWN: Language.MARKDOWN,
+    InputFormat.HTML: Language.HTML,
 }
 TOTAL_PAGE_COUNT_STRINGS = ["total_pages", "total_page_count", "total_page_counts", "page_count"]
 PAGE_NUMBER_STRINGS = ["page_number", "page_numbers", "page_num", "page_nums", "page"]
 
-def get_splitter_text_splitter(input_format: SupportedInputFormat) -> TextSplitter:
+
+def get_splitter_text_splitter(input_format: InputFormat) -> TextSplitter:
     """Get the splitter strategy."""
     strategy_instructions = SPLITTER_STRATEGY_MAPPING.get(input_format)
     if strategy_instructions is None:
@@ -96,6 +100,7 @@ def get_splitter_text_splitter(input_format: SupportedInputFormat) -> TextSplitt
         return RecursiveCharacterTextSplitter()
     return getattr(text_splitter, strategy_instructions)()
 
+
 def get_total_page_count(docs: list[Document]) -> Optional[int]:
     """Get the page count and total page count."""
     for doc in docs:
@@ -103,31 +108,24 @@ def get_total_page_count(docs: list[Document]) -> Optional[int]:
             if key in doc.metadata:
                 return doc.metadata[key]
 
+
 def get_page_number(doc: Document) -> Optional[int]:
     """Get the page number."""
     for key in PAGE_NUMBER_STRINGS:
         if key in doc.metadata:
             return doc.metadata[key]
 
-class InputDataIngestStrategy(str, Enum):
-    """Define the input types."""
-
-    S3_FILE_DOWNLOAD = "s3_file_download"
-    URL_DOWNLOAD = "url_download"
-    # WEB_CRAWL = "web_crawl"
-
 
 class InputDocument(BaseClassResourceDocument):
     """Define the input document."""
-
     input_data_ingest_strategy: InputDataIngestStrategy = Field(
         ...,
         description="The strategy for ingesting the input data.",
     )
 
+
 class IngestedDocument(BaseClassResourceDocument):
     """Define the ingested document."""
-
     data_pointer: Any = Field(
         ...,
         description=("This field should 'point' to the data. This will mean different things "
@@ -136,7 +134,7 @@ class IngestedDocument(BaseClassResourceDocument):
             "example, if the loading strategy is copy and paste, then this field will be a string."
         ),
     )
-    input_format: SupportedInputFormat = Field(
+    input_format: InputFormat = Field(
         ...,
         description="The format of the input document.",
     )
@@ -155,7 +153,6 @@ class IngestedDocument(BaseClassResourceDocument):
 
 class Ingestor(ABC):
     """Define the ingestor class."""
-
     def ingest_data(self, input_data: InputDocument) -> IngestedDocument:
         """Ingest the data."""
         raise NotImplementedError
@@ -165,21 +162,19 @@ class Ingestor(ABC):
         def check_file_type(path: Path, extension_enum: Enum) -> bool:
             """Check if the file type matches given extensions."""
             return path.suffix in [extension.value for extension in extension_enum]
-
-        def get_text_file_type(path: Path, file_contents: str) -> SupportedInputFormat:
+        def get_text_file_type(path: Path, file_contents: str) -> InputFormat:
             """Get the text file type."""
             if check_file_type(path, LatexExtension):
-                return SupportedInputFormat.LATEX
+                return InputFormat.LATEX
             elif check_file_type(path, MarkdownExtension):
-                return SupportedInputFormat.MARKDOWN
+                return InputFormat.MARKDOWN
             elif bool(BeautifulSoup(file_contents, "html.parser").find()):
-                return SupportedInputFormat.HTML
-            return SupportedInputFormat.GENERIC_TEXT
-
+                return InputFormat.HTML
+            return InputFormat.GENERIC_TEXT
         try:
             kind = filetype.guess(path)
             if kind:
-                return SupportedInputFormat(kind.extension)
+                return InputFormat(kind.extension)
             else:
                 with open(path, "r", encoding="utf-8") as f:
                     return get_text_file_type(path, f.read())
@@ -195,7 +190,6 @@ class S3ObjectIngestor(Ingestor):
 
     This class is used for ingesting data from S3.
     """
-
     def ingest_data(self, input_data: InputDocument) -> IngestedDocument:
         """Ingest the data from S3."""
         remote_file_url = input_data.full_resource_url
@@ -220,7 +214,6 @@ class URLIngestor(Ingestor):
 
     This class is used for ingesting data from a URL.
     """
-
     def ingest_data(self, input_data: InputDocument) -> IngestedDocument:
         """Ingest the data from a URL."""
         remote_file_url = input_data.full_resource_url

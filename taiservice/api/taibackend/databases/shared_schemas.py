@@ -8,12 +8,8 @@ from pydantic import BaseModel, Field, Extra
 
 class ClassResourceType(str, Enum):
     """Define the class resource types to use as a filter."""
-
-    # VIDEO = "video"
-    # TEXT = "text"
-    # IMAGE = "image"
-    # AUDIO = "audio"
-    PDF = "pdf"
+    TEXTBOOK = "textbook"
+    WEBSITE = "website"
 
 class BasePydanticModel(BaseModel):
     """
