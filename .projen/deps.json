@@ -41,6 +41,10 @@
       "type": "devenv"
     },
     {
+      "name": "pinecone-text[splade]",
+      "type": "devenv"
+    },
+    {
       "name": "projen",
       "version": "0.71.72",
       "type": "devenv"

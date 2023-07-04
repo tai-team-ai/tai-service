@@ -98,7 +98,7 @@ class DocumentDB:
         """Upsert the full class resources."""
         failed_documents = []
         def upsert_document(document: BaseClassResourceDocument) -> None:
-            # self._upsert_document(document)
+            self._upsert_document(document)
             if isinstance(document, ClassResourceDocument):
                 try:
                     chunks = [chunk_mapping[id] for id in document.class_resource_chunk_ids]

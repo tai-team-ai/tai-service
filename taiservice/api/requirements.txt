@@ -10,3 +10,4 @@ beautifulsoup4
 openai
 tiktoken
 pinecone-text
+pinecone-text[splade]

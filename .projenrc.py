@@ -49,6 +49,7 @@ project:Project = AwsCdkPythonApp(
         "openai",
         "tiktoken",
         "pinecone-text",
+        "pinecone-text[splade]",
     ],
 )
 env_file: TextFile = TextFile(

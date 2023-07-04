@@ -1,7 +1,8 @@
 """Define the indexer module."""
 from concurrent.futures import ThreadPoolExecutor
+import copy
 from typing import Optional
-from uuid import uuid4
+from uuid import UUID, uuid4
 import traceback
 from loguru import logger
 from pydantic import BaseModel, Field
@@ -28,9 +29,17 @@ try:
     )
     from taiservice.api.taibackend.databases.shared_schemas import ChunkMetadata
     from taiservice.api.taibackend.databases.pinecone_db import PineconeDBConfig, PineconeDB
-    from taiservice.api.taibackend.databases.pinecone_db_schemas import PineconeDocuments, PineconeDocument
+    from taiservice.api.taibackend.databases.pinecone_db_schemas import (
+        PineconeDocuments,
+        PineconeDocument,
+        SparseVector,
+    )
     from taiservice.api.taibackend.databases.document_db import DocumentDBConfig, DocumentDB
-    from taiservice.api.taibackend.databases.document_db_schemas import ClassResourceChunkDocument
+    from taiservice.api.taibackend.databases.document_db_schemas import (
+        ClassResourceChunkDocument,
+        ClassResourceDocument,
+        ClassResourceProcessingStatus,
+    )
 except ImportError:
     from taibackend.indexer.data_ingestors import (
         InputDataIngestStrategy,
@@ -44,10 +53,18 @@ except ImportError:
         get_total_page_count,
     )
     from taibackend.databases.shared_schemas import ChunkMetadata
-    from taibackend.databases.pinecone_db_schemas import PineconeDocuments, PineconeDocument
+    from taibackend.databases.pinecone_db_schemas import (
+        PineconeDocuments,
+        PineconeDocument,
+        SparseVector,
+    )
     from taibackend.databases.pinecone_db import PineconeDBConfig, PineconeDB
     from taibackend.databases.document_db import DocumentDBConfig, DocumentDB
-    from taibackend.databases.document_db_schemas import ClassResourceChunkDocument
+    from taibackend.databases.document_db_schemas import (
+        ClassResourceChunkDocument,
+        ClassResourceDocument,
+        ClassResourceProcessingStatus,
+    )
 
 
 class OpenAIConfig(BaseModel):
@@ -104,9 +121,44 @@ class Indexer:
     def index_resource(self, document: InputDocument) -> None:
         """Index a document."""
         ingested_document = self._ingest_document(document)
-        documents = self._load_and_split_document(ingested_document)
+        chunk_documents = self._load_and_split_document(ingested_document)
+        vector_documents = self._embed_documents(chunk_documents, document.class_id)
+        class_resource_document = ClassResourceDocument(
+            status=ClassResourceProcessingStatus.PROCESSING,
+            class_resource_chunk_ids=[doc.id for doc in chunk_documents],
+            **ingested_document.dict(),
+        )
+        self._load_class_resources_to_db(class_resource_document, chunk_documents)
+        self._load_vectors_to_vector_store(vector_documents)
 
-    def _load_and_split_document(self, document: IngestedDocument) -> list[Document]:
+    def _load_vectors_to_vector_store(self, vector_documents: PineconeDocuments) -> None:
+        """Load vectors to vector store."""
+        try:
+            self._pinecone_db.upsert_vectors(
+                documents=vector_documents,
+            )
+        except Exception as e:
+            logger.critical(traceback.format_exc())
+            raise RuntimeError("Failed to load vectors to vector store.") from e
+
+    def _load_class_resources_to_db(self, document: ClassResourceDocument, chunk_documents: list[ClassResourceChunkDocument]) -> None:
+        """Load the document to the db."""
+        chunk_mapping = {
+            chunk_doc.id: chunk_doc
+            for chunk_doc in chunk_documents
+        }
+        try:
+            failed_docs = self._document_db.upsert_class_resources(
+                documents=[document],
+                chunk_mapping=chunk_mapping
+            )
+        except Exception as e:
+            logger.critical(traceback.format_exc())
+            raise RuntimeError("Failed to load document to db.") from e
+        if failed_docs:
+            raise RuntimeError(f"{len(failed_docs)} documents failed to load to db: {failed_docs}")
+
+    def _load_and_split_document(self, document: IngestedDocument) -> list[ClassResourceChunkDocument]:
         """Split and load a document."""
         split_docs: list[Document] = []
         try:
@@ -135,29 +187,56 @@ class Indexer:
                 **document.dict(),
             )
             chunk_documents.append(chunk_doc)
-        vector_documents = self._embed_documents(chunk_documents)
+        return chunk_documents
 
     def _get_page_number(self, documents: Document, ingested_document: IngestedDocument) -> Optional[int]:
         """Get page number for document."""
         if ingested_document.input_format == SupportedInputFormat.PDF:
             return get_page_number(documents)
 
-    def _embed_documents(self, documents: list[ClassResourceChunkDocument]) -> PineconeDocuments:
+    def _embed_documents(self, documents: list[ClassResourceChunkDocument], class_id: UUID) -> PineconeDocuments:
         """Embed documents."""
-        texts = [document.page_content for document in documents]
-        batches = [texts[i : i + self._batch_size] for i in range(0, len(texts), self._batch_size)]
+        def _embed_batch(batch: list[ClassResourceChunkDocument]) -> list[PineconeDocument]:
+            """Embed a batch of documents."""
+            texts = [document.chunk for document in batch]
+            dense_vectors = self._embedding_strategy.embed_documents(texts)
+            vector_docs =  self._vector_document_from_dense_vectors(dense_vectors, batch)
+            sparse_vectors = self._get_sparse_vectors(texts)
+            for vector_doc, sparse_vector in zip(vector_docs, sparse_vectors):
+                vector_doc.sparse_vector = sparse_vector
+            return vector_docs
+        batches = [documents[i : i + self._batch_size] for i in range(0, len(documents), self._batch_size)]
+        vector_docs = []
         with ThreadPoolExecutor(max_workers=len(batches)) as executor:
-            results = executor.map(self._embedding_strategy.em, batches)
-            embeddings = [embedding for result in results for embedding in result]
+            results = executor.map(_embed_batch, batches)
+            vector_docs = [vector_doc for result in results for vector_doc in result]
+        return PineconeDocuments(class_id=class_id, documents=vector_docs)
 
-    def _vector_document_from_dense_vector(self, dense_vectors: list[list[float]]) -> list[PineconeDocument]:
+    def _get_sparse_vectors(self, texts: list[str]) -> list[SparseVector]:
+        """Add sparse vectors to pinecone."""
+        splade = SpladeEncoder()
+        vectors = splade.encode_documents(texts)
+        sparse_vectors = []
+        for vec in vectors:
+            sparse_vector = SparseVector.parse_obj(vec)
+            sparse_vectors.append(sparse_vector)
+        return sparse_vectors
+
+    def _vector_document_from_dense_vectors(
+        self,
+        dense_vectors: list[list[float]],
+        documents: list[ClassResourceChunkDocument],
+    ) -> list[PineconeDocument]:
         """Get a vector document from a dense vector."""
         documents = []
-        for dense_vector in dense_vectors:
+        for dense_vector, document in zip(dense_vectors, documents):
             doc = PineconeDocument(
-                id=uuid4(),
-                
+                id=document.vector_id,
+                metadata=ChunkMetadata.parse_obj(document.metadata),
+                values=dense_vector,
             )
+            documents.append(doc)
+        return documents
 
     def _ingest_document(self, document: InputDocument) -> IngestedDocument:
         if document.input_data_ingest_strategy == InputDataIngestStrategy.S3_FILE_DOWNLOAD:
