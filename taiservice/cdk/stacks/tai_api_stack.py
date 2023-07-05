@@ -13,7 +13,7 @@ from ...api.runtime_settings import TaiApiSettings
 from .stack_config_models import StackConfigBaseModel
 from .stack_helpers  import add_tags
 from ..constructs.python_lambda_construct import (
-    PythonLambda,
+    DockerLambda,
     BaseLambdaConfigModel,
     LambdaURLConfigModel,
 )
@@ -58,7 +58,7 @@ class TaiApiStack(Stack):
         self._namer = lambda name: f"{config.stack_name}-{name}"
         self._settings = api_settings
         self._vpc = get_vpc(self, vpc)
-        self._python_lambda: PythonLambda = self._create_lambda_function(security_group_allowing_db_connections)
+        self._python_lambda: DockerLambda = self._create_lambda_function(security_group_allowing_db_connections)
         add_tags(self, config.tags)
 
     @property
@@ -66,10 +66,10 @@ class TaiApiStack(Stack):
         """Return the lambda function."""
         return self._python_lambda.lambda_function
 
-    def _create_lambda_function(self, security_group_allowing_db_connections: ec2.SecurityGroup) -> PythonLambda:
+    def _create_lambda_function(self, security_group_allowing_db_connections: ec2.SecurityGroup) -> DockerLambda:
         config = self._get_lambda_config(security_group_allowing_db_connections)
         name = config.function_name
-        python_lambda: PythonLambda = PythonLambda(
+        python_lambda: DockerLambda = DockerLambda(
             self,
             construct_id=f"{name}-lambda",
             config=config,

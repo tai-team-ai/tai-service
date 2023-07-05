@@ -189,6 +189,7 @@ class BaseLambda(Construct):
         self._function_props_dict = {
             "function_name": config.function_name,
             "description": config.description,
+            "environment": self._config.runtime_environment.dict(by_alias=True, exclude_none=True, for_environment=True),
         }
         self._build_context_folder = Path(f".build-{self._config.code_path.name}-{self._config.function_name}")
         self._initialize_build_folder()
@@ -205,10 +206,6 @@ class BaseLambda(Construct):
     @abstractmethod
     def _create_layer_with_zip_asset(self) -> None:
         """Create the layer with the zip asset."""
-
-    @abstractmethod
-    def _copy_files_into_handler_dir(self) -> None:
-        """Copy files into the handler directory."""
 
     @abstractmethod
     def _create_layer_with_requirements_file(self) -> None:
@@ -278,6 +275,19 @@ class BaseLambda(Construct):
         self._function_props_dict["memory_size"] = config.memory_size
         self._function_props_dict["ephemeral_storage_size"] = config.ephemeral_storage_size
 
+    def _copy_files_into_handler_dir(self) -> None:
+        with tempfile.TemporaryDirectory(prefix=TEMP_BUILD_DIR) as build_context:
+            chmod(build_context, 0o0755)
+            for path in self._config.files_to_copy_into_handler_dir:
+                destination = Path(build_context) / path.name
+                if path.is_file():
+                    shutil.copy2(path, destination)
+                elif path.is_dir():
+                    shutil.copytree(path, destination)
+                else:
+                    logger.warning(f"Unable to copy {path} into handler directory. Not a file or directory.")
+            shutil.copytree(build_context, self._build_context_folder, dirs_exist_ok=True)
+
     def _add_vpc_and_subnets(self) -> None:
         config = self._config
         self._function_props_dict["vpc"] = config.vpc
@@ -323,14 +333,13 @@ class PythonLambda(BaseLambda):
         self._function_props_dict.update({
             "handler": f"{self._config.handler_module_name}.{self._config.handler_name}",
             "runtime": _lambda.Runtime(runtime_name),
-            "environment": self._config.runtime_environment.dict(by_alias=True, exclude_none=True, for_environment=True),
             "layers": [],
         })
-        build_context_path = str(self._build_context_folder.resolve())
-        self._function_props_dict["code"] = _lambda.Code.from_asset(build_context_path)
 
     def _create_lambda_function(self) -> _lambda.Function:
-        lambda_function: _lambda.Function = _lambda.Function(self._scope, **self.lambda_props)
+        build_context_path = str(self._build_context_folder.resolve())
+        self._function_props_dict["code"] = _lambda.Code.from_asset(build_context_path)
+        lambda_function: _lambda.Function = _lambda.Function(self._scope, self._config.function_name, **self.lambda_props)
         return lambda_function
 
     def _create_layer_with_zip_asset(self) -> None:
@@ -343,19 +352,6 @@ class PythonLambda(BaseLambda):
             code=_lambda.Code.from_asset(layer_zip_file_path),
         )
         self._add_layer(layer)
-
-    def _copy_files_into_handler_dir(self) -> None:
-        with tempfile.TemporaryDirectory(prefix=TEMP_BUILD_DIR) as build_context:
-            chmod(build_context, 0o0755)
-            for path in self._config.files_to_copy_into_handler_dir:
-                destination = Path(build_context) / path.name
-                if path.is_file():
-                    shutil.copy2(path, destination)
-                elif path.is_dir():
-                    shutil.copytree(path, destination)
-                else:
-                    logger.warning(f"Unable to copy {path} into handler directory. Not a file or directory.")
-            shutil.copytree(build_context, self._build_context_folder, dirs_exist_ok=True)
 
     def _create_layer_with_requirements_file(self) -> None:
         config = self._config
@@ -397,80 +393,53 @@ class DockerLambda(BaseLambda):
         """Initialize the builder."""
         super().__init__(scope, construct_id, config, **kwargs)
         self._config = config
-        self.dockerfile_content = []
 
     def _initialize_function_props(self) -> None:
-        build_context_path = str(self._config.code_path.resolve())
-        self._create_docker_file()
-        self._function_props_dict.update({
-            "code": _lambda.DockerImageCode.from_image_asset(build_context_path),
-            "function_name": self._config.function_name,
-            "description": self._config.description,
-            "environment": self._config.runtime_environment.dict(by_alias=True, exclude_none=True, for_environment=True)
-        })
+        stage_name = "build"
+        self.dockerfile_content = [f"FROM public.ecr.aws/lambda/{self._config.runtime.value} AS {stage_name}"]
+        self._previous_stage_name = stage_name
 
     def _create_docker_file(self) -> str:
+        self._copy_build_context_to_container()
+        self._add_handler_cmd()
         docker_file_path = Path(self._build_context_folder) / "Dockerfile"
-        with open(docker_file_path, "w") as f:
+        with open(docker_file_path, "w", encoding="utf-8") as f:
             f.write("\n".join(self.dockerfile_content))
         return docker_file_path
 
+    def _copy_build_context_to_container(self) -> None:
+        stage_name = "add-build-context"
+        self.dockerfile_content.append(f"FROM {self._previous_stage_name} AS {stage_name}")
+        self._previous_stage_name = stage_name
+        self.dockerfile_content.append(f"COPY . /var/task")
+
+    def _add_handler_cmd(self) -> None:
+        fully_qualified_handler_name = f"{self._config.handler_module_name}.{self._config.handler_name}"
+        self.dockerfile_content.append(f"CMD [ \"{fully_qualified_handler_name}\" ]")
+
     def _create_layer_with_zip_asset(self) -> None:
         config = self._config
-        layer_name = f"{config.function_name}-{config.zip_file_path.stem}"
         layer_zip_file_path = str(config.zip_file_path.resolve())
         self.dockerfile_content.append(f"COPY --from=0 {layer_zip_file_path} /")
 
-        layer_command = [
-            "aws", "lambda", "publish-layer-version",
-            "--layer-name", layer_name,
-            "--compatible-runtimes", config.runtime.value,
-            "--zip-file", f"fileb://{config.zip_file_path.name}"
-        ]
-        self.dockerfile_content.append(f"RUN {' '.join(layer_command)}")
-
-    def _copy_files_into_handler_dir(self) -> None:
-        for path in self._config.files_to_copy_into_handler_dir:
-            if path.is_file():
-                self.dockerfile_content.append(f"COPY {path} ./")
-            elif path.is_dir():
-                self.dockerfile_content.append(f"COPY {path}/ ./")
-            else:
-                logger.warning(f"Unable to copy {path} into handler directory. Not a file or directory.")
-
     def _create_layer_with_requirements_file(self) -> None:
         config = self._config
-        layer_name = f"{config.function_name}-{config.requirements_file_path.stem}"
-        install_cmd = f"pip install -r {config.requirements_file_path.name} -t /asset-output/python"
-
-        self.dockerfile_content.append("FROM lambci/lambda:build-python3.8 AS build")
-        self.dockerfile_content.append("WORKDIR /build")
-        self.dockerfile_content.append(f"COPY {config.requirements_file_path} ./")
+        shutil.copy(config.requirements_file_path, self._build_context_folder)
+        asset_output_folder_name = "/asset-output/python"
+        install_cmd = f"pip install -r {config.requirements_file_path.name} -t {asset_output_folder_name}"
+        self.dockerfile_content.append(f"WORKDIR /{asset_output_folder_name}")
+        self.dockerfile_content.append(f"COPY {config.requirements_file_path.name} .")
         self.dockerfile_content.append(f"RUN {install_cmd} && find . -name '*.pyc' -delete")
 
-        self.dockerfile_content.append(f"FROM {config.runtime.value} AS final")
-        self.dockerfile_content.append(f"WORKDIR /asset-output/python")
-        self.dockerfile_content.append("COPY --from=build /build/python/. .")
-        self.dockerfile_content.append("RUN find . -type d -exec chmod 755 {{}} +")
-
-        layer_command = [
-            "aws", "lambda", "publish-layer-version",
-            "--layer-name", layer_name,
-            "--compatible-runtimes", config.runtime.value,
-            "--zip-file", f"fileb:///asset-output/python.zip"
-        ]
-        self.dockerfile_content.append(f"RUN {' '.join(layer_command)}")
-
-    def _initialize_build_folder(self) -> None:
-        if self._build_context_folder.exists():
-            shutil.rmtree(self._build_context_folder)
-        self.dockerfile_content.append(f"FROM {self._config.runtime.value} AS base")
-        shutil.copytree(self._config.code_path, self._build_context_folder)
-
     def _create_lambda_function(self) -> _lambda.DockerImageFunction:
+        build_context_path = str(self._build_context_folder.resolve())
+        self._create_docker_file()
+        self._function_props_dict.update({
+            "code": _lambda.DockerImageCode.from_image_asset(build_context_path),
+        })
         lambda_function: _lambda.DockerImageFunction = _lambda.DockerImageFunction(
             self._scope,
             self._config.function_name,
-            **self.lambda_props
+            **self._function_props_dict,
         )
         return lambda_function

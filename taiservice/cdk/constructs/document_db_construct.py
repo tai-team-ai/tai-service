@@ -239,7 +239,7 @@ class DocumentDatabase(Construct):
         assert len(azs) == num_subnets, "The subnets must be in different AZs."
         return selected_subnets
 
-    def _create_custom_resource(self) -> cr.Provider:
+    def _create_custom_resource(self) -> CustomResource:
         config = self._get_lambda_config()
         name = config.function_name
         lambda_construct: PythonLambda = PythonLambda(
