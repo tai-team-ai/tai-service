@@ -72,10 +72,6 @@ class DocumentDB:
             tls=True,
             retryWrites=False,
         )
-        self._doc_models = [
-            ClassResourceChunkDocument,
-            ClassResourceDocument,
-        ]
         db = self._client[config.database_name]
         class_resource_collection = db[config.class_resource_collection_name]
         chunk_collection = db[config.class_resource_chunk_collection_name]
@@ -83,11 +79,6 @@ class DocumentDB:
             ClassResourceDocument.__name__: class_resource_collection,
             ClassResourceChunkDocument.__name__: chunk_collection,
         }
-
-    @property
-    def supported_doc_models(self) -> list[BaseClassResourceDocument]:
-        """Return the supported document models."""
-        return self._doc_models
 
     def get_class_resources(self, ids: list[UUID], doc_class: BaseClassResourceDocument) -> list[BaseClassResourceDocument]:
         """Return the full class resources."""

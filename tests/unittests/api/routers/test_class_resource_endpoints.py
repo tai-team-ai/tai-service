@@ -1,12 +1,15 @@
 """Define tests for the TAI endpoints."""
+from uuid import uuid4
 import pytest
 from pydantic import ValidationError
+from fastapi import Request
 from taiservice.api.taibackend.databases import shared_schemas as backend_shared_schemas
 from taiservice.api.taibackend.databases import document_db_schemas as backend_db_schemas
 from taiservice.api.routers.class_resources import (
     ClassResources,
     get_class_resources,
     create_class_resource,
+    ClassIds,
 )
 from taiservice.api.routers import class_resources as class_resources_router
 
@@ -22,7 +25,7 @@ def test_class_resource_example_schemas():
 def test_get_class_resources_endpoint():
     """Test that the search endpoint works."""
     try:
-        get_class_resources()
+        get_class_resources(ids=ClassIds(class_ids=[uuid4() for _ in range(5)]), request=Request)
     except ValidationError as e:
         pytest.fail(f"Endpoint {get_class_resources} failed. Error: {str(e)}")
 
