@@ -14,7 +14,7 @@ from .stack_config_models import StackConfigBaseModel
 from .stack_helpers  import add_tags
 from ..constructs.python_lambda_construct import (
     PythonLambda,
-    PythonLambdaConfigModel,
+    BaseLambdaConfigModel,
     LambdaURLConfigModel,
 )
 from ..constructs.construct_helpers import (
@@ -83,7 +83,7 @@ class TaiApiStack(Stack):
         python_lambda.allow_public_invoke_of_function()
         return python_lambda
 
-    def _get_lambda_config(self, security_group_allowing_db_connections: ec2.SecurityGroup) -> PythonLambdaConfigModel:
+    def _get_lambda_config(self, security_group_allowing_db_connections: ec2.SecurityGroup) -> BaseLambdaConfigModel:
         function_name = self._namer("tai-api-service")
         security_group_secrets = create_restricted_security_group(
             scope=self,
@@ -99,7 +99,7 @@ class TaiApiStack(Stack):
         subnet_type = ec2.SubnetType.PUBLIC
         assert vpc_interface_exists(ec2.InterfaceVpcEndpointAwsService.SECRETS_MANAGER, self._vpc),\
             "The VPC must have an interface endpoint for Secrets Manager."
-        lambda_config = PythonLambdaConfigModel(
+        lambda_config = BaseLambdaConfigModel(
             function_name=function_name,
             description="The lambda for the TAI API service.",
             code_path=API_DIR,

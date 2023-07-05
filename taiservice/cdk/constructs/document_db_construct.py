@@ -24,7 +24,7 @@ from .construct_helpers import (
 )
 from .python_lambda_construct import (
     PythonLambda,
-    PythonLambdaConfigModel,
+    BaseLambdaConfigModel,
 )
 from .customresources.document_db.settings import DocumentDBSettings, RuntimeDocumentDBSettings
 # This schema is defined by aws documentation for AWS Elastic DocumentDB
@@ -267,7 +267,7 @@ class DocumentDatabase(Construct):
         )
         return custom_resource
 
-    def _get_lambda_config(self) -> PythonLambdaConfigModel:
+    def _get_lambda_config(self) -> BaseLambdaConfigModel:
         runtime_settings = RuntimeDocumentDBSettings(
             cluster_host_name=self.db_cluster.attr_cluster_endpoint,
             **self._settings.dict(),
@@ -285,7 +285,7 @@ class DocumentDatabase(Construct):
         )
         assert vpc_interface_exists(ec2.InterfaceVpcEndpointAwsService.SECRETS_MANAGER, self._config.vpc),\
             "The VPC must have an interface endpoint for Secrets Manager."
-        lambda_config = PythonLambdaConfigModel(
+        lambda_config = BaseLambdaConfigModel(
             function_name="document-db-custom-resource",
             description="Custom resource for performing CRUD operations on the document database",
             code_path=DOCUMENT_DB_CUSTOM_RESOURCE_DIR,

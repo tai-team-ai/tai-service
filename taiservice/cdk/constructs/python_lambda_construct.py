@@ -77,6 +77,22 @@ class BaseLambdaConfigModel(BaseModel):
         ...,
         description="The description of the Lambda function. This should describe the purpose of the Lambda function.",
     )
+    code_path: Path = Field(
+        ...,
+        description="The path to the Lambda code where the handler is located.",
+    )
+    handler_module_name: str = Field(
+        ...,
+        description="The name of the handler module. This is the name of the file where the handler function is located.",
+    )
+    handler_name: str = Field(
+        ...,
+        description="The name of the handler function. This is the entry point to the Lambda code.",
+    )
+    runtime_environment: BaseDeploymentSettings = Field(
+        ...,
+        description="The runtime environment for the Lambda function.",
+    )
     requirements_file_path: Path = Field(
         default=None,
         description="The path to the requirements file for the Lambda function.",
@@ -153,25 +169,6 @@ class BaseLambdaConfigModel(BaseModel):
                 raise ValueError(f"Requirements file '{requirements_file_path}' is empty. Please provide a valid requirements file " \
                     "with at least package to install.")
         return requirements_file_path
-
-class PythonLambdaConfigModel(BaseLambdaConfigModel):
-    """Define the configuration for the Python Lambda properties builder."""
-    code_path: Path = Field(
-        ...,
-        description="The path to the Lambda code where the handler is located.",
-    )
-    handler_module_name: str = Field(
-        ...,
-        description="The name of the handler module. This is the name of the file where the handler function is located.",
-    )
-    handler_name: str = Field(
-        ...,
-        description="The name of the handler function. This is the entry point to the Lambda code.",
-    )
-    runtime_environment: BaseDeploymentSettings = Field(
-        ...,
-        description="The runtime environment for the Lambda function.",
-    )
 
 
 class BaseLambda(Construct):
@@ -311,7 +308,7 @@ class PythonLambda(BaseLambda):
         self,
         scope: Construct,
         construct_id: str,
-        config: PythonLambdaConfigModel,
+        config: BaseLambdaConfigModel,
         **kwargs,
     ) -> None:
         """Initialize the builder."""
@@ -389,3 +386,7 @@ class PythonLambda(BaseLambda):
     def _add_layer(self, layer: _lambda.ILayerVersion) -> None:
         layers: list = self._function_props_dict["layers"]
         layers.append(layer)
+
+
+class DockerLambda(BaseLambda):
+    pass
