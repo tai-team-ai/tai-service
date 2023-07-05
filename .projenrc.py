@@ -114,6 +114,6 @@ vscode_settings.add_setting("python.testing.pytestEnabled", True)
 vscode_settings.add_setting("python.testing.pytestArgs", ["tests"])
 vscode_settings.add_setting("editor.formatOnSave", True)
 
-project.add_git_ignore("/.build*")
+project.add_git_ignore("./.build*")
 
 project.synth()

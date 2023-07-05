@@ -9,4 +9,7 @@ beautifulsoup4
 openai
 tiktoken
 pinecone-text
-pinecone-text[splade]
+# pinecone-text[splade] # This installs torch with CUDA, which is a massive package
+# this manually installs the optional splade dependencies without cuda:
+torch -f https://download.pytorch.org/whl/cpu
+transformers
