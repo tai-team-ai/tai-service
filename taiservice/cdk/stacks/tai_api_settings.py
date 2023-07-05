@@ -1,9 +1,14 @@
 """Define settings for instantiating the TAI API."""
 import os
 from ...api.runtime_settings import TaiApiSettings
+from ..constructs.construct_config import BaseDeploymentSettings
 from .search_databases_settings import DOCUMENT_DB_SETTINGS, PINECONE_DB_SETTINGS
 
-TAI_API_SETTINGS = TaiApiSettings(
+class DeploymentTaiApiSettings(BaseDeploymentSettings, TaiApiSettings):
+    """Define the settings for instantiating the TAI API."""
+
+
+TAI_API_SETTINGS = DeploymentTaiApiSettings(
     doc_db_credentials_secret_name=os.environ.get("DOC_DB_READ_WRITE_USER_PASSWORD_SECRET_NAME"),
     doc_db_username_secret_key="username",
     doc_db_password_secret_key="password",
