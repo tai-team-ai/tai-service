@@ -8,12 +8,12 @@ from pydantic import Field, HttpUrl
 # first imports are for local development, second imports are for deployment
 try:
     from ..routers.base_schema import BasePydanticModel
-    from ..taibackend.class_resources import ClassResourcesBackend
-    from ..runtime_settings import SETTINGS_STATE_ATTRIBUTE_NAME
+    # from ..taibackend.class_resources import ClassResourcesBackend
+    # from ..runtime_settings import SETTINGS_STATE_ATTRIBUTE_NAME
 except ImportError:
     from routers.base_schema import BasePydanticModel
-    from taibackend.class_resources import ClassResourcesBackend
-    from runtime_settings import SETTINGS_STATE_ATTRIBUTE_NAME
+    # from taibackend.class_resources import ClassResourcesBackend
+    # from runtime_settings import SETTINGS_STATE_ATTRIBUTE_NAME
 
 
 ROUTER = APIRouter()
@@ -145,9 +145,9 @@ class ClassIds(BasePydanticModel):
 @ROUTER.get("/class_resources", response_model=ClassResources)
 def get_class_resources(ids: ClassIds, request: Request):
     """Get all class resources."""
-    settings = getattr(request.state, SETTINGS_STATE_ATTRIBUTE_NAME)
-    backend = ClassResourcesBackend(settings)
-    backend.get_class_resources(ids.class_ids)
+    # settings = getattr(request.state, SETTINGS_STATE_ATTRIBUTE_NAME)
+    # backend = ClassResourcesBackend(settings)
+    # backend.get_class_resources(ids.class_ids)
     dummy_class_resources = ClassResources(class_resources=[EXAMPLE_CLASS_RESOURCE])
     return dummy_class_resources
 

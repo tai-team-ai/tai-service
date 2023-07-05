@@ -425,9 +425,7 @@ class DockerLambda(BaseLambda):
     def _create_layer_with_requirements_file(self) -> None:
         config = self._config
         shutil.copy(config.requirements_file_path, self._build_context_folder)
-        asset_output_folder_name = "/asset-output/python"
-        install_cmd = f"pip install -r {config.requirements_file_path.name} -t {asset_output_folder_name}"
-        self.dockerfile_content.append(f"WORKDIR /{asset_output_folder_name}")
+        install_cmd = f"pip install --no-cache-dir pip && pip install -r {config.requirements_file_path.name}"
         self.dockerfile_content.append(f"COPY {config.requirements_file_path.name} .")
         self.dockerfile_content.append(f"RUN {install_cmd} && find . -name '*.pyc' -delete")
 

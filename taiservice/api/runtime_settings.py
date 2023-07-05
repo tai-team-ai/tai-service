@@ -1,10 +1,10 @@
 from pydantic import Field, BaseSettings
 
 # first imports are for local development, second imports are for deployment
-try:
-    from .taibackend.databases.pinecone_db import Environment as PineconeEnvironment
-except ImportError:
-    from taibackend.databases.pinecone_db import Environment as PineconeEnvironment
+# try:
+#     from .taibackend.databases.pinecone_db import Environment as PineconeEnvironment
+# except ImportError:
+#     from taibackend.databases.pinecone_db import Environment as PineconeEnvironment
 
 SETTINGS_STATE_ATTRIBUTE_NAME = "runtime_settings"
 
@@ -16,7 +16,7 @@ class TaiApiSettings(BaseSettings):
         ...,
         description="The name of the secret containing the Pinecone API key.",
     )
-    pinecone_db_environment: PineconeEnvironment = Field(
+    pinecone_db_environment: str = Field(
         ...,
         description="The environment of the pinecone db.",
     )
