@@ -11,7 +11,7 @@ from aws_cdk import (
 from .customresources.pinecone_db.pinecone_db_custom_resource import PineconeDBSettings
 from .construct_helpers import get_hash_for_all_files_in_dir, get_secret_arn_from_name
 from .python_lambda_construct import (
-    PythonLambdaConfigModel,
+    BaseLambdaConfigModel,
     PythonLambda,
 )
 
@@ -37,12 +37,12 @@ class PineconeDatabase(Construct):
     def _create_custom_resource(self) -> cr.Provider:
         config = self._get_lambda_config()
         name = config.function_name
-        lambda_function = PythonLambda.get_lambda_function(
+        python_lambda = PythonLambda.get_lambda_function(
             self,
             construct_id=f"custom-resource-lambda-{name}",
             config=config,
         )
-        lambda_function.add_to_role_policy(
+        python_lambda.add_to_role_policy(
             statement=iam.PolicyStatement(
                 actions=["secretsmanager:GetSecretValue"],
                 effect=iam.Effect.ALLOW,
@@ -52,7 +52,7 @@ class PineconeDatabase(Construct):
         provider: cr.Provider = cr.Provider(
             self,
             id="custom-resource-provider",
-            on_event_handler=lambda_function,
+            on_event_handler=python_lambda.lambda_function,
             provider_function_name=name + "-PROVIDER",
         )
         custom_resource = CustomResource(
@@ -63,8 +63,8 @@ class PineconeDatabase(Construct):
         )
         return custom_resource
 
-    def _get_lambda_config(self) -> PythonLambdaConfigModel:
-        lambda_config = PythonLambdaConfigModel(
+    def _get_lambda_config(self) -> BaseLambdaConfigModel:
+        lambda_config = BaseLambdaConfigModel(
             function_name="pinecone-db-custom-resource",
             description="Custom resource for performing CRUD operations on the pinecone database",
             code_path=PINECONE_CUSTOM_RESOURCE_DIR,

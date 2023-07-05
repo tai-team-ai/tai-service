@@ -24,7 +24,7 @@ from .construct_helpers import (
 )
 from .python_lambda_construct import (
     PythonLambda,
-    PythonLambdaConfigModel,
+    BaseLambdaConfigModel,
 )
 from .customresources.document_db.settings import DocumentDBSettings, RuntimeDocumentDBSettings
 # This schema is defined by aws documentation for AWS Elastic DocumentDB
@@ -160,6 +160,16 @@ class DocumentDatabase(Construct):
         """Return the DocumentDB cluster."""
         return self._db_cluster
 
+    @property
+    def fully_qualified_domain_name(self) -> str:
+        """Return the fully qualified domain name for the DocumentDB cluster."""
+        return self._db_cluster.attr_cluster_endpoint
+
+    @property
+    def access_port(self) -> int:
+        """Return the port to use for accessing the DocumentDB cluster."""
+        return self._settings.cluster_port
+
     def _configure_security_groups(self) -> None:
         self._db_security_group = create_restricted_security_group(
             scope=self,
@@ -176,12 +186,12 @@ class DocumentDatabase(Construct):
         )
         self._db_security_group.add_ingress_rule(
             peer=self._security_group_for_connecting_to_cluster,
-            connection=ec2.Port.tcp(27017),
+            connection=ec2.Port.tcp(self._settings.cluster_port),
             description="Allow inbound connections from the security group for connecting to the DocumentDB cluster.",
         )
         self._security_group_for_connecting_to_cluster.add_egress_rule(
             peer=ec2.Peer.any_ipv4(),
-            connection=ec2.Port.tcp(27017),
+            connection=ec2.Port.tcp(self._settings.cluster_port),
             description="Allow outbound connections to the DocumentDB cluster.",
         )
 
@@ -229,7 +239,7 @@ class DocumentDatabase(Construct):
         assert len(azs) == num_subnets, "The subnets must be in different AZs."
         return selected_subnets
 
-    def _create_custom_resource(self) -> cr.Provider:
+    def _create_custom_resource(self) -> CustomResource:
         config = self._get_lambda_config()
         name = config.function_name
         lambda_construct: PythonLambda = PythonLambda(
@@ -257,7 +267,7 @@ class DocumentDatabase(Construct):
         )
         return custom_resource
 
-    def _get_lambda_config(self) -> PythonLambdaConfigModel:
+    def _get_lambda_config(self) -> BaseLambdaConfigModel:
         runtime_settings = RuntimeDocumentDBSettings(
             cluster_host_name=self.db_cluster.attr_cluster_endpoint,
             **self._settings.dict(),
@@ -275,7 +285,7 @@ class DocumentDatabase(Construct):
         )
         assert vpc_interface_exists(ec2.InterfaceVpcEndpointAwsService.SECRETS_MANAGER, self._config.vpc),\
             "The VPC must have an interface endpoint for Secrets Manager."
-        lambda_config = PythonLambdaConfigModel(
+        lambda_config = BaseLambdaConfigModel(
             function_name="document-db-custom-resource",
             description="Custom resource for performing CRUD operations on the document database",
             code_path=DOCUMENT_DB_CUSTOM_RESOURCE_DIR,

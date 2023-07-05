@@ -13,8 +13,8 @@ from ...api.runtime_settings import TaiApiSettings
 from .stack_config_models import StackConfigBaseModel
 from .stack_helpers  import add_tags
 from ..constructs.python_lambda_construct import (
-    PythonLambda,
-    PythonLambdaConfigModel,
+    DockerLambda,
+    BaseLambdaConfigModel,
     LambdaURLConfigModel,
 )
 from ..constructs.construct_helpers import (
@@ -58,7 +58,7 @@ class TaiApiStack(Stack):
         self._namer = lambda name: f"{config.stack_name}-{name}"
         self._settings = api_settings
         self._vpc = get_vpc(self, vpc)
-        self._python_lambda: PythonLambda = self._create_lambda_function(security_group_allowing_db_connections)
+        self._python_lambda: DockerLambda = self._create_lambda_function(security_group_allowing_db_connections)
         add_tags(self, config.tags)
 
     @property
@@ -66,19 +66,24 @@ class TaiApiStack(Stack):
         """Return the lambda function."""
         return self._python_lambda.lambda_function
 
-    def _create_lambda_function(self, security_group_allowing_db_connections: ec2.SecurityGroup) -> PythonLambda:
+    def _create_lambda_function(self, security_group_allowing_db_connections: ec2.SecurityGroup) -> DockerLambda:
         config = self._get_lambda_config(security_group_allowing_db_connections)
         name = config.function_name
-        python_lambda: PythonLambda = PythonLambda(
+        python_lambda: DockerLambda = DockerLambda(
             self,
             construct_id=f"{name}-lambda",
             config=config,
         )
-        python_lambda.add_read_only_secrets_manager_access([get_secret_arn_from_name(self._settings.secret_name)])
+        secrets = [
+            self._settings.doc_db_credentials_secret_name,
+            self._settings.pinecone_db_api_key_secret_name,
+            self._settings.openAI_api_key_secret_name,
+        ]
+        python_lambda.add_read_only_secrets_manager_access(arns=[get_secret_arn_from_name(secret) for secret in secrets])
         python_lambda.allow_public_invoke_of_function()
         return python_lambda
 
-    def _get_lambda_config(self, security_group_allowing_db_connections: ec2.SecurityGroup) -> PythonLambdaConfigModel:
+    def _get_lambda_config(self, security_group_allowing_db_connections: ec2.SecurityGroup) -> BaseLambdaConfigModel:
         function_name = self._namer("tai-api-service")
         security_group_secrets = create_restricted_security_group(
             scope=self,
@@ -94,7 +99,7 @@ class TaiApiStack(Stack):
         subnet_type = ec2.SubnetType.PUBLIC
         assert vpc_interface_exists(ec2.InterfaceVpcEndpointAwsService.SECRETS_MANAGER, self._vpc),\
             "The VPC must have an interface endpoint for Secrets Manager."
-        lambda_config = PythonLambdaConfigModel(
+        lambda_config = BaseLambdaConfigModel(
             function_name=function_name,
             description="The lambda for the TAI API service.",
             code_path=API_DIR,

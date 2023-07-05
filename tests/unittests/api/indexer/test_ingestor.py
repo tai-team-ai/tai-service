@@ -10,8 +10,6 @@ from taiservice.api.taibackend.databases.shared_schemas import (
 )
 from taiservice.api.taibackend.indexer.data_ingestors import(
     IngestedDocument,
-    InputDataIngestStrategy,
-    InputDocument,
     LoadingStrategy,
     InputFormat,
 )

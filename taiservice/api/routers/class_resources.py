@@ -3,31 +3,37 @@ from enum import Enum
 from textwrap import dedent
 from typing import Optional
 from uuid import UUID, uuid4
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
 from pydantic import Field, HttpUrl
 # first imports are for local development, second imports are for deployment
 try:
     from ..routers.base_schema import BasePydanticModel
-    from ..taibackend.databases.document_db_schemas import ClassResourceProcessingStatus
+    # from ..taibackend.class_resources import ClassResourcesBackend
+    # from ..runtime_settings import SETTINGS_STATE_ATTRIBUTE_NAME
 except ImportError:
-    from routers.base_schema import BasePydanticModel   
-    from taibackend.databases.document_db_schemas import ClassResourceProcessingStatus
+    from routers.base_schema import BasePydanticModel
+    # from taibackend.class_resources import ClassResourcesBackend
+    # from runtime_settings import SETTINGS_STATE_ATTRIBUTE_NAME
 
 
 ROUTER = APIRouter()
 
-class ClassResourceType(str, Enum):
-    """Define the built-in MongoDB roles."""
+class ClassResourceProcessingStatus(str, Enum):
+    """Define the processing status of the class resource."""
+    PENDING = "pending"
+    PROCESSING = "processing"
+    FAILED = "failed"
+    COMPLETED = "completed"
 
-    # VIDEO = "video"
-    # TEXT = "text"
-    # IMAGE = "image"
-    # AUDIO = "audio"
-    PDF = "pdf"
+
+class ClassResourceType(str, Enum):
+    """Define the type of the class resource."""
+    TEXTBOOK = "textbook"
+    WEBSITE = "website"
+
 
 class Metadata(BasePydanticModel):
     """Define the metadata of the class resource."""
-
     title: str = Field(
         ...,
         description="The title of the class resource. This can be the file name or url if no title is provided.",
@@ -45,9 +51,9 @@ class Metadata(BasePydanticModel):
         description=f"The type of the class resource. Valid values are: {', '.join([role.value for role in ClassResourceType])}",
     )
 
+
 class BaseClassResource(BasePydanticModel):
     """Define the base model of the class resource."""
-
     id: UUID = Field(
         ...,
         description="The ID of the class resource.",
@@ -75,6 +81,7 @@ class BaseClassResource(BasePydanticModel):
         description="The metadata of the class resource.",
     )
 
+
 EXAMPLE_CLASS_RESOURCE = {
     # example pdf resource
     "id": uuid4(),
@@ -86,13 +93,12 @@ EXAMPLE_CLASS_RESOURCE = {
         "title": "dummy.pdf",
         "description": "This is a dummy pdf file.",
         "tags": ["dummy", "pdf"],
-        "resourceType": ClassResourceType.PDF,
+        "resourceType": ClassResourceType.TEXTBOOK,
     },
 }
 
 class ClassResource(BaseClassResource):
     """Define the complete model of the class resource."""
-
     status: ClassResourceProcessingStatus = Field(
         ...,
         description=f"The status of the class resource. Valid values are: {', '.join([status.value for status in ClassResourceProcessingStatus])}",
@@ -100,16 +106,13 @@ class ClassResource(BaseClassResource):
 
     class Config:
         """Configure the Pydantic model."""
-
         schema_extra = {
             "example": EXAMPLE_CLASS_RESOURCE,
         }
 
 
-
 class ClassResources(BasePydanticModel):
     """Define the base model of the class resources."""
-
     class_resources: list[ClassResource] = Field(
         default_factory=list,
         description="The list of class resources.",
@@ -117,18 +120,37 @@ class ClassResources(BasePydanticModel):
 
     class Config:
         """Configure the Pydantic model."""
-
         schema_extra = {
             "example": {
                 "class_resources": [EXAMPLE_CLASS_RESOURCE],
             },
         }
 
+class ClassIds(BasePydanticModel):
+    """Define the base model of the class ids."""
+    class_ids: list[UUID] = Field(
+        default_factory=list,
+        description="The list of class ids.",
+    )
+
+    class Config:
+        """Configure the Pydantic model."""
+        schema_extra = {
+            "example": {
+                "class_ids": [uuid4() for _ in range(5)],
+            },
+        }
+
+
 @ROUTER.get("/class_resources", response_model=ClassResources)
-def get_class_resources():
+def get_class_resources(ids: ClassIds, request: Request):
     """Get all class resources."""
+    # settings = getattr(request.state, SETTINGS_STATE_ATTRIBUTE_NAME)
+    # backend = ClassResourcesBackend(settings)
+    # backend.get_class_resources(ids.class_ids)
     dummy_class_resources = ClassResources(class_resources=[EXAMPLE_CLASS_RESOURCE])
     return dummy_class_resources
+
 
 @ROUTER.post("/class_resources")
 def create_class_resource(class_resource: ClassResource):

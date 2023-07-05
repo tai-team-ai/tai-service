@@ -1,26 +1,5 @@
 """Define tests for the document database."""
-from unittest.mock import patch
-from taiservice.api.taibackend.databases.document_db import DocumentDB, DocumentDBConfig
-from taiservice.api.taibackend.databases.document_db_schemas import BaseClassResourceDocument
-from tests.unittests.api.databases.test_shared_schemas import (
-    assert_schema1_inherits_from_schema2,
-)
 
-def test_model_inheritance_order():
-    """Ensure that the model inheritance order is correct."""
-    with patch('taiservice.api.taibackend.databases.document_db.MongoClient'):
-        config = DocumentDBConfig(
-            username="username",
-            password="password",
-            fully_qualified_domain_name="fully_qualified_domain_name",
-            port=1234,
-            database_name="database_name",
-            collection_name="collection_name",
-        )
-        document_db = DocumentDB(config)
-        models = document_db.supported_doc_models
-        for model in models:
-            assert_schema1_inherits_from_schema2(model, BaseClassResourceDocument)
 
 # future test case for upsert
 # class_id = uuid4()

@@ -1,4 +1,0 @@
-pymongo
-pydantic
-loguru
-urllib3<2

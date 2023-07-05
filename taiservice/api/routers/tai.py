@@ -120,7 +120,7 @@ EXAMPLE_CHAT_SESSION_REQUEST = {
     "chats": [
         {
             "message": "I'm stuck on this problem.",
-            "role": "student",
+            "role": ChatRole.STUDENT,
             "requestedTaiTutor": TaiTutorName.ALEX,
             "requestedTechnicalLevel": ResponseTechnicalLevel.EXPLAIN_LIKE_IM_IN_HIGH_SCHOOL,
             "renderChat": True,
@@ -147,7 +147,7 @@ EXAMPLE_CHAT_SESSION_RESPONSE["chats"].append(
                     "title": "Molecules",
                     "description": "Molecules are made up of atoms.",
                     "tags": ["molecules", "atoms"],
-                    "resourceType": "pdf",
+                    "resourceType": ClassResourceType.TEXTBOOK
                 },
             },
         ],
@@ -223,7 +223,7 @@ def chat(chat_session: ChatSessionRequest):
                         title="Molecules",
                         description="Chemistry textbook snippet.",
                         tags=["molecules", "atoms"],
-                        resource_type=ClassResourceType.PDF,
+                        resource_type=ClassResourceType.TEXTBOOK,
                     )
                 ),
             ],
@@ -256,7 +256,7 @@ EXAMPLE_SEARCH_ANSWER["chats"].append(
                     "title": "Molecules",
                     "description": "Molecules are made up of atoms.",
                     "tags": ["molecules", "atoms"],
-                    "resourceType": "pdf",
+                    "resourceType": ClassResourceType.TEXTBOOK
                 },
             },
         ],
@@ -338,7 +338,7 @@ def search(search_query: ResourceSearchQuery):
                         title="Molecules",
                         description="Chemistry textbook snippet.",
                         tags=["molecules", "atoms"],
-                        resource_type=ClassResourceType.PDF,
+                        resource_type=ClassResourceType.TEXTBOOK,
                     ),
                 ),
             ],

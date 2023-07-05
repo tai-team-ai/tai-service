@@ -19,9 +19,9 @@ class Environment(str, Enum):
 class PineconeDBConfig(BaseModel):
     """Define the pinecone database config."""
 
-    api_key_secret_name: str = Field(
+    api_key: str = Field(
         ...,
-        description="The name of the secret that stores the pinecone api key.",
+        description="The api key of the pinecone db.",
     )
     environment: Environment = Field(
         ...,
@@ -38,7 +38,7 @@ class PineconeDB:
 
     def __init__(self, config: PineconeDBConfig) -> None:
         """Initialize pinecone db."""
-        pinecone.init(api_key=config.api_key_secret_name, environment=config.environment)
+        pinecone.init(api_key=config.api_key, environment=config.environment)
         self._index_name = config.index_name
         self._number_threads = 50
         self._max_vectors_per_operation = 100

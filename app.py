@@ -46,6 +46,7 @@ tai_api_config = StackConfigBaseModel(
     termination_protection=False,
     tags=TAGS,
 )
+TAI_API_SETTINGS.doc_db_fully_qualified_domain_name = search_service_databases.document_db.fully_qualified_domain_name
 tai_api = TaiApiStack(
     scope=app,
     config=tai_api_config,

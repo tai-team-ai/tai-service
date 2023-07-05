@@ -1,24 +1,72 @@
-from pydantic import Field
+from pydantic import Field, BaseSettings
 
 # first imports are for local development, second imports are for deployment
-try:
-    from taiservice.cdk.constructs.customresources.document_db.settings import (
-        BaseDocumentDBSettings,
-        BuiltInMongoDBRoles,
-        MongoDBUser,
-    )
-except ImportError:
-    # this module must be copied to the root of the lambda for deployment
-    from settings import BaseDocumentDBSettings, BuiltInMongoDBRoles, MongoDBUser
-
+# try:
+#     from .taibackend.databases.pinecone_db import Environment as PineconeEnvironment
+# except ImportError:
+#     from taibackend.databases.pinecone_db import Environment as PineconeEnvironment
 
 SETTINGS_STATE_ATTRIBUTE_NAME = "runtime_settings"
 
-class TaiApiSettings(BaseDocumentDBSettings, MongoDBUser):
+
+class TaiApiSettings(BaseSettings):
     """Define the configuration model for the TAI API service."""
 
-    role: BuiltInMongoDBRoles = Field(
-        default=BuiltInMongoDBRoles.READ_WRITE,
+    pinecone_db_api_key_secret_name: str = Field(
+        ...,
+        description="The name of the secret containing the Pinecone API key.",
+    )
+    pinecone_db_environment: str = Field(
+        ...,
+        description="The environment of the pinecone db.",
+    )
+    pinecone_db_index_name: str = Field(
+        ...,
+        description="The name of the pinecone index.",
+    )
+    doc_db_credentials_secret_name: str = Field(
+        ...,
+        description="The name of the secret containing the document database credentials.",
+    )
+    doc_db_username_secret_key: str = Field(
+        default="username",
         const=True,
-        description="The role for the TAI API service when connecting to the DocumentDB.",
+        description="The name of the secret key containing the document database username.",
+    )
+    doc_db_password_secret_key: str = Field(
+        default="password",
+        const=True,
+        description="The name of the secret key containing the document database password.",
+    )
+    doc_db_fully_qualified_domain_name: str = Field(
+        ...,
+        description="The fully qualified domain name of the TAI API service.",
+    )
+    doc_db_port: int = Field(
+        ...,
+        description="The port of the TAI API service.",
+    )
+    doc_db_database_name: str = Field(
+        ...,
+        description="The name of the document db.",
+    )
+    doc_db_class_resource_collection_name: str = Field(
+        ...,
+        description="The name of the collection in the document db for class resources.",
+    )
+    doc_db_class_resource_chunk_collection_name: str = Field(
+        ...,
+        description="The name of the collection in the document db for class resource chunks.",
+    )
+    openAI_api_key_secret_name: str = Field(
+        ...,
+        description="The name of the secret containing the OpenAI API key.",
+    )
+    openAI_request_timeout: int = Field(
+        default=20,
+        description="The timeout for OpenAI requests.",
+    )
+    openAI_batch_size: int = Field(
+        default=50,
+        description="The batch size for OpenAI requests.",
     )

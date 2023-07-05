@@ -16,7 +16,7 @@ from langchain.schema import Document
 import requests
 # first imports are for local development, second imports are for deployment
 try:
-    from taiservice.api.taibackend.databases.document_db_schemas import (
+    from ..databases.document_db_schemas import (
         BaseClassResourceDocument
     )
 except ImportError:
