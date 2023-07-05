@@ -1,4 +1,0 @@
-pinecone-client[grpc]
-pydantic
-loguru
-urllib3<2
