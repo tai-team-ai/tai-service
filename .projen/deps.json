@@ -45,10 +45,6 @@
       "type": "devenv"
     },
     {
-      "name": "pinecone-text[splade]",
-      "type": "devenv"
-    },
-    {
       "name": "projen",
       "version": "0.71.72",
       "type": "devenv"
@@ -67,6 +63,14 @@
     },
     {
       "name": "tiktoken",
+      "type": "devenv"
+    },
+    {
+      "name": "torch -f https://download.pytorch.org/whl/cpu",
+      "type": "devenv"
+    },
+    {
+      "name": "transformers",
       "type": "devenv"
     },
     {

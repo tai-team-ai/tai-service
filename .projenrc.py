@@ -49,6 +49,7 @@ project:Project = AwsCdkPythonApp(
         "beautifulsoup4",
         "openai",
         "tiktoken",
+        "aws-lambda-powertools",
         "pinecone-text",
         # "pinecone-text[splade]", # this installs cuda too, which we don't want
         "torch -f https://download.pytorch.org/whl/cpu",
@@ -128,6 +129,6 @@ vscode_settings.add_setting("python.testing.pytestEnabled", True)
 vscode_settings.add_setting("python.testing.pytestArgs", ["tests"])
 vscode_settings.add_setting("editor.formatOnSave", True)
 
-project.add_git_ignore("./.build*")
+project.add_git_ignore(".build*")
 
 project.synth()

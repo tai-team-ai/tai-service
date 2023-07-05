@@ -1,5 +1,8 @@
 """Define Lambda properties builder."""
+from abc import ABC, abstractmethod
+import builtins
 import copy
+from enum import Enum
 from os import chmod
 from pathlib import Path
 import shutil
@@ -56,9 +59,16 @@ class LambdaURLConfigModel(BaseModel):
         return v
 
 
-class PythonLambdaConfigModel(BaseModel):
-    """Define the configuration for the Python Lambda properties builder."""
+class LambdaRuntime(Enum):
+    """Define the Lambda runtime options."""
 
+    PYTHON_3_8 = "python:3.8"
+    PYTHON_3_9 = "python:3.9"
+    PYTHON_3_10 = "python:3.10"
+
+
+class BaseLambdaConfigModel(BaseModel):
+    """Define the configuration for the base Lambda properties builder."""
     function_name: str = Field(
         ...,
         description="The name of the Lambda function.",
@@ -66,22 +76,6 @@ class PythonLambdaConfigModel(BaseModel):
     description: str = Field(
         ...,
         description="The description of the Lambda function. This should describe the purpose of the Lambda function.",
-    )
-    code_path: Path = Field(
-        ...,
-        description="The path to the Lambda code where the handler is located.",
-    )
-    handler_module_name: str = Field(
-        ...,
-        description="The name of the handler module. This is the name of the file where the handler function is located.",
-    )
-    handler_name: str = Field(
-        ...,
-        description="The name of the handler function. This is the entry point to the Lambda code.",
-    )
-    runtime_environment: BaseDeploymentSettings = Field(
-        ...,
-        description="The runtime environment for the Lambda function.",
     )
     requirements_file_path: Path = Field(
         default=None,
@@ -96,7 +90,7 @@ class PythonLambdaConfigModel(BaseModel):
         description="The subnet selection for the Lambda function to run in.",
     )
     security_groups: Optional[list[ec2.SecurityGroup]] = Field(
-        default=[],
+        default=None,
         description="The security groups to apply to the Lambda function.",
     )
     files_to_copy_into_handler_dir: Optional[list[Path]] = Field(
@@ -123,12 +117,16 @@ class PythonLambdaConfigModel(BaseModel):
         default=None,
         description="The configuration for the Lambda URL. If provided, the Lambda will be accessible via a URL.",
     )
+    runtime: Optional[LambdaRuntime] = Field(
+        default=LambdaRuntime.PYTHON_3_10,
+        description="The runtime for the Lambda function.",
+    )
 
     class Config:
         """Define the Pydantic model configuration."""
-
         arbitrary_types_allowed = True
         validate_assignment = True
+        use_enum_values = True
 
     @root_validator
     def validate_vpc_is_provided_if_subnet_selection_is_provided(cls, values) -> dict:
@@ -156,43 +154,79 @@ class PythonLambdaConfigModel(BaseModel):
                     "with at least package to install.")
         return requirements_file_path
 
+class PythonLambdaConfigModel(BaseLambdaConfigModel):
+    """Define the configuration for the Python Lambda properties builder."""
+    code_path: Path = Field(
+        ...,
+        description="The path to the Lambda code where the handler is located.",
+    )
+    handler_module_name: str = Field(
+        ...,
+        description="The name of the handler module. This is the name of the file where the handler function is located.",
+    )
+    handler_name: str = Field(
+        ...,
+        description="The name of the handler function. This is the entry point to the Lambda code.",
+    )
+    runtime_environment: BaseDeploymentSettings = Field(
+        ...,
+        description="The runtime environment for the Lambda function.",
+    )
 
-class PythonLambda(Construct):
-    """Define a builder for Python Lambda properties."""
+
+class BaseLambda(Construct):
+    """Define the base lambda construct."""
 
     def __init__(
         self,
         scope: Construct,
         construct_id: str,
-        config: PythonLambdaConfigModel,
+        config: BaseLambdaConfigModel,
         **kwargs,
     ) -> None:
-        """Initialize the builder."""
         super().__init__(scope, construct_id, **kwargs)
         self._scope = scope
         config.vpc = get_vpc(scope, config.vpc)
         self.security_groups = config.security_groups
         self._config = config
-        self._build_context_folder = Path(f".build-{config.code_path.name}-{config.function_name}")
-        self._initialize_build_folder()
         self._function_props_dict = {
             "function_name": config.function_name,
             "description": config.description,
-            "handler": f"{config.handler_module_name}.{config.handler_name}",
-            "runtime": _lambda.Runtime.PYTHON_3_10,
-            "environment": config.runtime_environment.dict(by_alias=True, exclude_none=True, for_environment=True),
-            "layers": [],
         }
+        self._initialize_function_props()
         self._create_optional_props()
-        build_context_path = str(self._build_context_folder.resolve())
-        self._function_props_dict["code"] = _lambda.Code.from_asset(build_context_path)
-        self._lambda_function: _lambda.Function = _lambda.Function(scope, config.function_name, **self.lambda_props)
+        self._lambda_function = self._create_lambda_function()
         self._create_instantiated_props()
 
     @property
     def lambda_function(self) -> _lambda.Function:
-        """Return the Lambda function."""
+        """Get the Lambda function."""
         return self._lambda_function
+
+    @abstractmethod
+    def _create_layer_with_zip_asset(self) -> None:
+        """Create the layer with the zip asset."""
+        pass
+
+    @abstractmethod
+    def _copy_files_into_handler_dir(self) -> None:
+        """Copy files into the handler directory."""
+        pass
+
+    @abstractmethod
+    def _create_layer_with_requirements_file(self) -> None:
+        """Create the layer with the requirements file."""
+        pass
+
+    @abstractmethod
+    def _initialize_function_props(self) -> None:
+        """Initialize the function props."""
+        pass
+
+    @abstractmethod
+    def _create_lambda_function(self) -> _lambda.Function:
+        """Create the Lambda function."""
+        pass
 
     @property
     def lambda_props(self) -> dict:
@@ -202,10 +236,10 @@ class PythonLambda(Construct):
         return self._function_props_dict
 
     @staticmethod
-    def get_lambda_function(scope: Construct, construct_id: str, config: PythonLambdaConfigModel) -> _lambda.Function:
+    def get_lambda_function(scope: Construct, construct_id: str, config: BaseLambdaConfigModel) -> 'BaseLambda':
         """Return the Lambda function."""
-        builder: PythonLambda = PythonLambda(scope, construct_id + "python-lambda", config)
-        return builder.lambda_function
+        lambda_func: BaseLambda = PythonLambda(scope, construct_id + "-lambda", config)
+        return lambda_func
 
     def add_read_only_secrets_manager_access(self, arns: list[str]) -> None:
         """Add a read only Secrets Manager policy to the Lambda function."""
@@ -225,10 +259,9 @@ class PythonLambda(Construct):
             )
         )
 
-    def _initialize_build_folder(self) -> None:
-        if self._build_context_folder.exists():
-            shutil.rmtree(self._build_context_folder)
-        shutil.copytree(self._config.code_path, self._build_context_folder)
+    def add_to_role_policy(self, statement: iam.PolicyStatement) -> None:
+        """Add a statement to the role policy."""
+        self._lambda_function.add_to_role_policy(statement)
 
     def _create_optional_props(self) -> None:
         config = self._config
@@ -240,19 +273,10 @@ class PythonLambda(Construct):
             self._create_layer_with_requirements_file()
         if config.vpc:
             self._add_vpc_and_subnets()
-        if config.security_groups:
-            self._function_props_dict["security_groups"] = config.security_groups
-        if config.timeout:
-            self._function_props_dict["timeout"] = config.timeout
-        if config.memory_size:
-            self._function_props_dict["memory_size"] = config.memory_size
-        if config.ephemeral_storage_size:
-            self._function_props_dict["ephemeral_storage_size"] = config.ephemeral_storage_size
-
-    def _create_instantiated_props(self) -> None:
-        config = self._config
-        if config.function_url_config:
-            self._add_function_url(config.function_url_config)
+        self._function_props_dict["security_groups"] = config.security_groups
+        self._function_props_dict["timeout"] = config.timeout
+        self._function_props_dict["memory_size"] = config.memory_size
+        self._function_props_dict["ephemeral_storage_size"] = config.ephemeral_storage_size
 
     def _add_vpc_and_subnets(self) -> None:
         config = self._config
@@ -262,6 +286,59 @@ class PythonLambda(Construct):
         if config.subnet_selection.subnet_type == ec2.SubnetType.PUBLIC:
             logger.warning("Lambda is being deployed to a public subnet.")
             self._function_props_dict["allow_public_subnet"] = True
+
+    def _create_instantiated_props(self) -> None:
+        config = self._config
+        if config.function_url_config:
+            self._add_function_url(config.function_url_config)
+
+    def _add_function_url(self, url_config: LambdaURLConfigModel) -> _lambda.FunctionUrl:
+        url = self._lambda_function.add_function_url(
+            auth_type=url_config.auth_type,
+            cors=_lambda.FunctionUrlCorsOptions(
+                allowed_headers=url_config.allowed_headers,
+                allowed_origins=url_config.allowed_origins,
+            ),
+            invoke_mode=url_config.invoke_mode,
+        )
+        return url
+
+
+class PythonLambda(BaseLambda):
+    """Define the Python Lambda construct."""
+
+    def __init__(
+        self,
+        scope: Construct,
+        construct_id: str,
+        config: PythonLambdaConfigModel,
+        **kwargs,
+    ) -> None:
+        """Initialize the builder."""
+        super().__init__(scope, construct_id, config, **kwargs)
+        self._config = config
+
+    def _initialize_function_props(self) -> None:
+        self._build_context_folder = Path(f".build-{self._config.code_path.name}-{self._config.function_name}")
+        self._initialize_build_folder()
+        runtime_name = self._config.runtime.value.replace(":", "")
+        self._function_props_dict.update({
+            "handler": f"{self._config.handler_module_name}.{self._config.handler_name}",
+            "runtime": _lambda.Runtime(runtime_name),
+            "environment": self._config.runtime_environment.dict(by_alias=True, exclude_none=True, for_environment=True),
+            "layers": [],
+        })
+        build_context_path = str(self._build_context_folder.resolve())
+        self._function_props_dict["code"] = _lambda.Code.from_asset(build_context_path)
+
+    def _create_lambda_function(self) -> _lambda.Function:
+        lambda_function: _lambda.Function = _lambda.Function(self._scope, self._config.function_name, **self.lambda_props)
+        return lambda_function
+
+    def _initialize_build_folder(self) -> None:
+        if self._build_context_folder.exists():
+            shutil.rmtree(self._build_context_folder)
+        shutil.copytree(self._config.code_path, self._build_context_folder)
 
     def _create_layer_with_zip_asset(self) -> None:
         config = self._config
@@ -292,7 +369,7 @@ class PythonLambda(Construct):
         with tempfile.TemporaryDirectory(prefix=TEMP_BUILD_DIR) as build_context:
             chmod(build_context, 0o0755)
             shutil.copy(config.requirements_file_path, build_context)
-            runtime: _lambda.Runtime = self._function_props_dict['runtime']
+            runtime: _lambda.Runtime = self._function_props_dict["runtime"]
             image_obj: DockerImage = runtime.bundling_image
             install_cmd = f"pip install -r {config.requirements_file_path.name} -t /asset-output/python"
             bundling_options = BundlingOptions(
@@ -310,16 +387,5 @@ class PythonLambda(Construct):
             self._add_layer(layer)
 
     def _add_layer(self, layer: _lambda.ILayerVersion) -> None:
-        layers = self._function_props_dict["layers"]
+        layers: list = self._function_props_dict["layers"]
         layers.append(layer)
-
-    def _add_function_url(self, url_config: LambdaURLConfigModel) -> _lambda.FunctionUrl:
-        url = self._lambda_function.add_function_url(
-            auth_type=url_config.auth_type,
-            cors=_lambda.FunctionUrlCorsOptions(
-                allowed_headers=url_config.allowed_headers,
-                allowed_origins=url_config.allowed_origins,
-            ),
-            invoke_mode=url_config.invoke_mode,
-        )
-        return url

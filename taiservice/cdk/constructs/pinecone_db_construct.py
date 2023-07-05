@@ -37,12 +37,12 @@ class PineconeDatabase(Construct):
     def _create_custom_resource(self) -> cr.Provider:
         config = self._get_lambda_config()
         name = config.function_name
-        lambda_function = PythonLambda.get_lambda_function(
+        python_lambda = PythonLambda.get_lambda_function(
             self,
             construct_id=f"custom-resource-lambda-{name}",
             config=config,
         )
-        lambda_function.add_to_role_policy(
+        python_lambda.add_to_role_policy(
             statement=iam.PolicyStatement(
                 actions=["secretsmanager:GetSecretValue"],
                 effect=iam.Effect.ALLOW,
@@ -52,7 +52,7 @@ class PineconeDatabase(Construct):
         provider: cr.Provider = cr.Provider(
             self,
             id="custom-resource-provider",
-            on_event_handler=lambda_function,
+            on_event_handler=python_lambda.lambda_function,
             provider_function_name=name + "-PROVIDER",
         )
         custom_resource = CustomResource(

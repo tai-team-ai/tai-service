@@ -74,7 +74,12 @@ class TaiApiStack(Stack):
             construct_id=f"{name}-lambda",
             config=config,
         )
-        python_lambda.add_read_only_secrets_manager_access([get_secret_arn_from_name(self._settings.secret_name)])
+        secrets = [
+            self._settings.doc_db_credentials_secret_name,
+            self._settings.pinecone_db_api_key_secret_name,
+            self._settings.openAI_api_key_secret_name,
+        ]
+        python_lambda.add_read_only_secrets_manager_access(arns=[get_secret_arn_from_name(secret) for secret in secrets])
         python_lambda.allow_public_invoke_of_function()
         return python_lambda
 
