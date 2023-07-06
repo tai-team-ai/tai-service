@@ -39,7 +39,7 @@ jobs:
       run: |
         source .venv/bin/activate && \
         export PATH=.venv/bin:$PATH && \
-        make test
+        make full-test
     - name: Deploy to AWS
       env:
         AWS_DEFAULT_REGION: ${{ vars.AWS_REGION }}
