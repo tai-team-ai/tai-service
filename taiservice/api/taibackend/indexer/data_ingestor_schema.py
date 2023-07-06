@@ -11,12 +11,12 @@ import requests
 try:
     from ..shared_schemas import (
         BaseClassResourceDocument,
-        HASH_FIELD_OBJECT,
+        StatefulClassResourceDocument
     )
 except ImportError:
     from taibackend.shared_schemas import (
         BaseClassResourceDocument,
-        HASH_FIELD_OBJECT
+        StatefulClassResourceDocument,
     )
 
 
@@ -108,7 +108,7 @@ class InputDocument(BaseClassResourceDocument):
         return values
 
 
-class IngestedDocument(BaseClassResourceDocument):
+class IngestedDocument(StatefulClassResourceDocument):
     """Define the ingested document."""
     data_pointer: Union[Path, str, HttpUrl] = Field(
         ...,
@@ -122,7 +122,7 @@ class IngestedDocument(BaseClassResourceDocument):
         ...,
         description="The format of the input document.",
     )
-    hashed_document_contents: str = HASH_FIELD_OBJECT
+
     loading_strategy: LoadingStrategy = Field(
         ...,
         description="The loading strategy for the input document.",

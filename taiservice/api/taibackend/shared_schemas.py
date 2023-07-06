@@ -3,7 +3,7 @@ from datetime import datetime
 from uuid import UUID
 from enum import Enum
 from typing import Any, Optional
-from pydantic import BaseModel, Field, Extra, HttpUrl, validator
+from pydantic import BaseModel, Field, Extra, HttpUrl, validator, constr
 
 
 HASH_FIELD_OBJECT = Field(
@@ -145,3 +145,15 @@ class BaseClassResourceDocument(BasePydanticModel):
     def str_id(self) -> str:
         """Return the string representation of the id."""
         return str(self.id)
+
+
+class StatefulClassResourceDocument(BaseClassResourceDocument):
+    """Define the stateful class resource document."""
+    hashed_document_contents: constr(min_length=40, max_length=40) = Field(
+        ...,
+        description=("This field serves as a version/revision number for the document. "
+            "It is used to determine if the document has changed since the last time "
+            "it was processed. The value of this field is the SHA1 hash of the document "
+            "contents."
+        )
+    )

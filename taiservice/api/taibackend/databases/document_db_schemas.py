@@ -9,7 +9,7 @@ try:
         ChunkMetadata,
         Metadata,
         BaseClassResourceDocument,
-        HASH_FIELD_OBJECT,
+        StatefulClassResourceDocument,
     )
     from ..indexer.data_ingestor_schema import IngestedDocument
 except ImportError:
@@ -17,7 +17,7 @@ except ImportError:
         ChunkMetadata,
         Metadata,
         BaseClassResourceDocument,
-        HASH_FIELD_OBJECT,
+        StatefulClassResourceDocument,
     )
     from taibackend.indexer.data_ingestor_schema import IngestedDocument
 
@@ -31,7 +31,7 @@ class ClassResourceProcessingStatus(str, Enum):
     COMPLETED = "completed"
 
 
-class ClassResourceDocument(BaseClassResourceDocument):
+class ClassResourceDocument(StatefulClassResourceDocument):
     """Define the document model of the class resource."""
     status: ClassResourceProcessingStatus = Field(
         ...,
@@ -45,7 +45,6 @@ class ClassResourceDocument(BaseClassResourceDocument):
             "from the webpage."
         ),
     )
-    hashed_document_contents: str = HASH_FIELD_OBJECT
     parent_resource_ids: Optional[list[UUID]] = Field(
         default=None,
         description=("The IDs of the parent resource. This field must be populated if the "

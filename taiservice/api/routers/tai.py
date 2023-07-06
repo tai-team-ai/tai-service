@@ -11,7 +11,7 @@ try:
     from ..routers.base_schema import BasePydanticModel
     from ..routers.class_resources_schema import BaseClassResource, ClassResourceType, Metadata
 except ImportError:
-    from tai_schemas import TaiTutorName
+    from routers.tai_schemas import TaiTutorName
     from routers.base_schema import BasePydanticModel
     from routers.class_resources_schema import BaseClassResource, ClassResourceType, Metadata
 

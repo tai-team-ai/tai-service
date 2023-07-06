@@ -1,6 +1,5 @@
 """Define tests for testing the indexer."""
-import uuid
-import datetime
+from hashlib import sha1
 import pytest
 from pydantic import ValidationError
 from tests.unit.api.databases.test_shared_schemas import (
@@ -64,6 +63,7 @@ CLASS_RESOURCE_DOCUMENT = {
     "modified_timestamp": "2021-01-01 00:00:00",
     "child_resource_ids": ["123e4567-e89b-12d3-a456-426614174000"],
     "parent_resource_ids": ["123e4567-e89b-12d3-a456-426614174000"],
+    "hashed_document_contents": sha1(b"test").hexdigest(),
     **EXAMPLE_BASE_CLASS_RESOURCE_DOCUMENT
 }
 def test_class_resource_document_model():
