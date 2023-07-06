@@ -64,14 +64,12 @@ class DocumentDB:
     """
     def __init__(self, config: DocumentDBConfig) -> None:
         """Initialize document db."""
-        self._client = MongoClient(
-            host=config.fully_qualified_domain_name,
-            port=config.port,
-            username=config.username,
-            password=config.password,
-            tls=True,
-            retryWrites=False,
-        )
+        uri = f"mongodb://{config.username}:{config.password}@{config.fully_qualified_domain_name}:{config.port}/?tls=true&retryWrites=False"
+        self._client = MongoClient(uri)
+        self._doc_models = [
+            ClassResourceChunkDocument,
+            ClassResourceDocument,
+        ]
         db = self._client[config.database_name]
         class_resource_collection = db[config.class_resource_collection_name]
         chunk_collection = db[config.class_resource_chunk_collection_name]
@@ -80,10 +78,15 @@ class DocumentDB:
             ClassResourceChunkDocument.__name__: chunk_collection,
         }
 
+    @property
+    def supported_doc_models(self) -> list[BaseClassResourceDocument]:
+        """Return the supported document models."""
+        return self._doc_models
+
     def get_class_resources(self, ids: list[UUID], doc_class: BaseClassResourceDocument) -> list[BaseClassResourceDocument]:
         """Return the full class resources."""
         collection = self._document_type_to_collection[doc_class.__name__]
-        documents = collection.find({"_id": {"$in": ids}})
+        documents = list(collection.find({"_id": {"$in": ids}}))
         # cast to the most specific document type
         # iterate over the documents models: BaseClassResourceDocument, ClassResourceDocument, ClassResourceChunkDocument
         for doc_model in self.supported_doc_models:

@@ -65,7 +65,7 @@ class ClassResourcesBackend:
 
     def get_class_resources(self, ids: list[UUID]) -> list[ClassResourceDocument]:
         """Get the class resources."""
-        return self._doc_db.get_class_resources(ids)
+        return self._doc_db.get_class_resources(ids, ClassResourceDocument)
 
     def delete_class_resources(self, ids: list[UUID]) -> None:
         """Delete the class resources."""
