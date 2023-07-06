@@ -30,6 +30,8 @@ def test_imports():
         try:
             # Install the requirements
             subprocess.run([str(temp_dir / 'bin' / 'python'), '-m', 'pip', 'install', '-r', str(temp_api_dir / 'requirements.txt')], check=True)
+            # need to install boto3 separately because it is not in the requirements.txt as it's included in the base image
+            subprocess.run([str(temp_dir / 'bin' / 'python'), '-m', 'pip', 'install', 'boto3'], check=True)
         except subprocess.CalledProcessError:
             pytest.fail("Failed to install requirements in temporary venv.")
         try:

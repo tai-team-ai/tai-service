@@ -13,3 +13,5 @@ pinecone-text
 # this manually installs the optional splade dependencies without cuda:
 torch -f https://download.pytorch.org/whl/cpu
 transformers
+langchain
+pymupdf
