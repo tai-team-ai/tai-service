@@ -48,7 +48,8 @@ class ClassResourcesBackend:
             fully_qualified_domain_name=runtime_settings.doc_db_fully_qualified_domain_name,
             port=runtime_settings.doc_db_port,
             database_name=runtime_settings.doc_db_database_name,
-            collection_name=runtime_settings.doc_db_collection_name,
+            class_resource_collection_name=runtime_settings.doc_db_class_resource_collection_name,
+            class_resource_chunk_collection_name=runtime_settings.doc_db_class_resource_chunk_collection_name,
         )
         self._doc_db = DocumentDB(self._doc_db_config)
         openAI_config = OpenAIConfig(
@@ -59,7 +60,7 @@ class ClassResourcesBackend:
         self._indexer_config = IndexerConfig(
             pinecone_db_config=self._pinecone_db_config,
             document_db_config=self._doc_db_config,
-            openAI_config=openAI_config,
+            openai_config=openAI_config,
         )
 
     def get_class_resources(self, ids: list[UUID]) -> list[ClassResourceDocument]:

@@ -1,19 +1,20 @@
 """Define CRUD endpoints for class resources."""
+from typing import Annotated
 from enum import Enum
 from textwrap import dedent
 from typing import Optional
 from uuid import UUID, uuid4
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Request, Query
 from pydantic import Field, HttpUrl
 # first imports are for local development, second imports are for deployment
 try:
     from ..routers.base_schema import BasePydanticModel
-    # from ..taibackend.class_resources import ClassResourcesBackend
-    # from ..runtime_settings import SETTINGS_STATE_ATTRIBUTE_NAME
+    from ..taibackend.class_resources import ClassResourcesBackend
+    from ..runtime_settings import SETTINGS_STATE_ATTRIBUTE_NAME
 except ImportError:
     from routers.base_schema import BasePydanticModel
-    # from taibackend.class_resources import ClassResourcesBackend
-    # from runtime_settings import SETTINGS_STATE_ATTRIBUTE_NAME
+    from taibackend.class_resources import ClassResourcesBackend
+    from runtime_settings import SETTINGS_STATE_ATTRIBUTE_NAME
 
 
 ROUTER = APIRouter()
@@ -126,28 +127,14 @@ class ClassResources(BasePydanticModel):
             },
         }
 
-class ClassIds(BasePydanticModel):
-    """Define the base model of the class ids."""
-    class_ids: list[UUID] = Field(
-        default_factory=list,
-        description="The list of class ids.",
-    )
-
-    class Config:
-        """Configure the Pydantic model."""
-        schema_extra = {
-            "example": {
-                "class_ids": [uuid4() for _ in range(5)],
-            },
-        }
 
 
 @ROUTER.get("/class_resources", response_model=ClassResources)
-def get_class_resources(ids: ClassIds, request: Request):
+def get_class_resources(ids: Annotated[list[UUID] | None, Query()], request: Request):
     """Get all class resources."""
-    # settings = getattr(request.state, SETTINGS_STATE_ATTRIBUTE_NAME)
-    # backend = ClassResourcesBackend(settings)
-    # backend.get_class_resources(ids.class_ids)
+    settings = getattr(request.app.state, SETTINGS_STATE_ATTRIBUTE_NAME)
+    backend = ClassResourcesBackend(settings)
+    backend.get_class_resources(ids)
     dummy_class_resources = ClassResources(class_resources=[EXAMPLE_CLASS_RESOURCE])
     return dummy_class_resources
 
