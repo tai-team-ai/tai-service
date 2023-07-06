@@ -4,11 +4,11 @@ from typing import Annotated
 from fastapi import APIRouter, Request, Query
 # first imports are for local development, second imports are for deployment
 try:
-    from .class_resources_schema import ClassResource, ClassResources
+    from .class_resources_schema import ClassResource, ClassResources, ClassResourceIds
     from ..taibackend.class_resources_backend import ClassResourcesBackend
     from ..runtime_settings import BACKEND_ATTRIBUTE_NAME
 except ImportError:
-    from routers.class_resources_schema import ClassResource, ClassResources
+    from routers.class_resources_schema import ClassResource, ClassResources, ClassResourceIds
     from taibackend.class_resources_backend import ClassResourcesBackend
     from runtime_settings import BACKEND_ATTRIBUTE_NAME
 
@@ -17,7 +17,7 @@ ROUTER = APIRouter()
 
 
 @ROUTER.get("/class_resources", response_model=ClassResources)
-def get_class_resources(ids: Annotated[list[UUID] | None, Query()], request: Request):
+def get_class_resources(ids: ClassResourceIds, request: Request):
     """Get all class resources."""
     backend: ClassResourcesBackend = getattr(request.app.state, BACKEND_ATTRIBUTE_NAME)
     class_resource_docs = backend.get_class_resources(ids)

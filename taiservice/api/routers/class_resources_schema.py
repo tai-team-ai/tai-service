@@ -1,15 +1,18 @@
 """Define the schema for the class resource endpoints."""
 from enum import Enum
 from textwrap import dedent
-from typing import Optional
+from typing import Optional, Annotated
 from uuid import UUID, uuid4
 from pydantic import Field, HttpUrl
+from fastapi import Query
 # first imports are for local development, second imports are for deployment
 try:
     from ..routers.base_schema import BasePydanticModel
 except ImportError:
     from routers.base_schema import BasePydanticModel
 
+
+ClassResourceIds = Annotated[list[UUID] | None, Query()]
 
 class ClassResourceProcessingStatus(str, Enum):
     """Define the processing status of the class resource."""

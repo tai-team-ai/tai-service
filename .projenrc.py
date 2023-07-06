@@ -82,14 +82,24 @@ make_file.add_rule(
     ],
 )
 make_file.add_rule(
-    targets=["test"],
+    targets=["unit-test"],
     recipe=[
-        "python3 -m pytest -vv tests --cov=taiservice --cov-report=term-missing --cov-report=xml:test-reports/coverage.xml --cov-report=html:test-reports/coverage",
+        "python3 -m pytest -vv tests/unit --cov=taiservice --cov-report=term-missing --cov-report=xml:test-reports/coverage.xml --cov-report=html:test-reports/coverage",
     ]
 )
 make_file.add_rule(
+    targets=["functional-test"],
+    recipe=[
+        "python3 -m pytest -vv tests/functional --cov=taiservice --cov-report=term-missing --cov-report=xml:test-reports/coverage.xml --cov-report=html:test-reports/coverage",
+    ]
+)
+make_file.add_rule(
+    targets=["full-test"],
+    prerequisites=["unit-test", "functional-test"],
+)
+make_file.add_rule(
     targets=["test-deploy-all"],
-    prerequisites=["test", "deploy-all"],
+    prerequisites=["full-test", "deploy-all"],
 )
 make_file.add_rule(
     targets=["start-docker"],

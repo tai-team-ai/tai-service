@@ -51,7 +51,7 @@ def test_pinecone_document_model():
 
 
 EXAMPLE_PINECONE_DOCUMENTS = {
-    "documents": [EXAMPLE_PINECONE_DOCUMENT],
+    "documents": [PineconeDocument.parse_obj(EXAMPLE_PINECONE_DOCUMENT)],
 }
 def test_pinecone_documents_model():
     """Define test for PineconeDocuments model."""
@@ -63,10 +63,14 @@ EXAMPLE_METADATA_2 = copy.deepcopy(EXAMPLE_METADATA)
 EXAMPLE_METADATA_2["class_id"] = uuid.uuid4()
 EXAMPLE_PINECONE_DOCUMENT_2 = copy.deepcopy(EXAMPLE_PINECONE_DOCUMENT)
 EXAMPLE_PINECONE_DOCUMENT_2["metadata"] = EXAMPLE_METADATA_2
-EXAMPLE_PINECONE_DOCUMENTS_WITH_DUPLICATEs = {
-    "documents": [EXAMPLE_PINECONE_DOCUMENT, EXAMPLE_PINECONE_DOCUMENT_2],
+EXAMPLE_PINECONE_DOCUMENTS_WITH_DUPLICATES = {
+    # "documents": [EXAMPLE_PINECONE_DOCUMENT, EXAMPLE_PINECONE_DOCUMENT_2],
+    "documents": [
+        PineconeDocument(**EXAMPLE_PINECONE_DOCUMENT),
+        PineconeDocument(**EXAMPLE_PINECONE_DOCUMENT_2),
+    ],
 }
 def test_different_class_ids_throws():
     """Ensure that different class ids throw an error."""
     with pytest.raises(ValidationError):
-        PineconeDocuments(**EXAMPLE_PINECONE_DOCUMENTS_WITH_DUPLICATEs)
+        PineconeDocuments(**EXAMPLE_PINECONE_DOCUMENTS_WITH_DUPLICATES)

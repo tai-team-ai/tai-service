@@ -2,14 +2,14 @@ loguru<=0.7.0
 fastapi<=0.98.0
 mangum
 pydantic<=1.10.10
-# pinecone-client[grpc]
-# pymongo<=4.4
-# filetype<=1.2.0
-# beautifulsoup4
-# openai
-# tiktoken
-# pinecone-text
-# # pinecone-text[splade] # This installs torch with CUDA, which is a massive package
-# # this manually installs the optional splade dependencies without cuda:
-# torch -f https://download.pytorch.org/whl/cpu
-# transformers
+pinecone-client[grpc]
+pymongo<=4.4
+filetype<=1.2.0
+beautifulsoup4
+openai
+tiktoken
+pinecone-text
+# pinecone-text[splade] # This installs torch with CUDA, which is a massive package
+# this manually installs the optional splade dependencies without cuda:
+torch -f https://download.pytorch.org/whl/cpu
+transformers

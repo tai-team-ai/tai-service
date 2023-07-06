@@ -2,7 +2,7 @@
 from unittest.mock import patch
 from taiservice.api.taibackend.databases.document_db import DocumentDB, DocumentDBConfig
 from taiservice.api.taibackend.databases.document_db_schemas import BaseClassResourceDocument
-from tests.unittests.api.databases.test_shared_schemas import (
+from tests.unit.api.databases.test_shared_schemas import (
     assert_schema1_inherits_from_schema2,
 )
 
@@ -15,7 +15,8 @@ def test_model_inheritance_order():
             fully_qualified_domain_name="fully_qualified_domain_name",
             port=1234,
             database_name="database_name",
-            collection_name="collection_name",
+            class_resource_chunk_collection_name="class_resource_chunk_collection_name",
+            class_resource_collection_name="class_resource_collection_name",
         )
         document_db = DocumentDB(config)
         models = document_db.supported_doc_models

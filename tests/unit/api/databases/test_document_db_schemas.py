@@ -3,7 +3,7 @@ import uuid
 import datetime
 import pytest
 from pydantic import ValidationError
-from tests.unittests.api.databases.test_shared_schemas import (
+from tests.unit.api.databases.test_shared_schemas import (
     assert_schema1_inherits_from_schema2,
     EXAMPLE_METADATA,
 )
@@ -28,6 +28,7 @@ EXAMPLE_BASE_CLASS_RESOURCE_DOCUMENT = {
     "id": "123e4567-e89b-12d3-a456-426614174000",
     "class_id": "123e4567-e89b-12d3-a456-426614174000",
     "full_resource_url": "https://example.com/resource",
+    "preview_image_url": "https://example.com/resource",
     "metadata": EXAMPLE_METADATA
 }
 def test_base_class_resource_document_model():
