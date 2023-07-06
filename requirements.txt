@@ -6,8 +6,8 @@ fastapi<=0.98.0
 loguru
 mangum
 pinecone-client[grpc]
-pydantic
-pydantic[dotenv]
+pydantic[dotenv]<=1.10.11
+pydantic<=1.10.11
 pygit2
 pymongo
 requests

@@ -1,4 +1,5 @@
 """Define the class resources backend."""
+import re
 from typing import Any, Union
 import json
 from uuid import UUID
@@ -7,7 +8,7 @@ import boto3
 from botocore.exceptions import ClientError
 try:
     from taiservice.api.runtime_settings import TaiApiSettings
-    from ..routers.class_resources_schema import ClassResource, ClassResources, Metadata
+    from ..routers.class_resources_schema import ClassResource, Metadata, ClassResourceProcessingStatus
     from .databases.document_db_schemas import ClassResourceDocument, ClassResourceChunkDocument
     from .databases.document_db import DocumentDB, DocumentDBConfig
     from .databases.pinecone_db import PineconeDB, PineconeDBConfig
@@ -20,7 +21,7 @@ try:
     )
 except ImportError:
     from runtime_settings import TaiApiSettings
-    from routers.class_resources_schema import ClassResource, ClassResources, Metadata
+    from routers.class_resources_schema import ClassResource, Metadata, ClassResourceProcessingStatus
     from taibackend.databases.document_db_schemas import ClassResourceDocument, ClassResourceChunkDocument
     from taibackend.databases.document_db import DocumentDB, DocumentDBConfig
     from taibackend.databases.pinecone_db import PineconeDB, PineconeDBConfig
@@ -65,9 +66,10 @@ class ClassResourcesBackend:
             openai_config=openAI_config,
         )
 
-    def get_class_resources(self, ids: list[UUID]) -> list[ClassResourceDocument]:
+    def get_class_resources(self, ids: list[UUID]) -> list[ClassResource]:
         """Get the class resources."""
-        return self._doc_db.get_class_resources(ids, ClassResourceDocument)
+        docs = self._doc_db.get_class_resources(ids, ClassResourceDocument)
+        return self.convert_database_documents_to_api_documents(docs)
 
     def delete_class_resources(self, ids: list[UUID]) -> None:
         """Delete the class resources."""
@@ -76,23 +78,43 @@ class ClassResourcesBackend:
             for doc in docs:
                 if isinstance(doc, ClassResourceDocument) or isinstance(doc, ClassResourceChunkDocument):
                     if isinstance(doc, ClassResourceDocument):
+                        self._coerce_status_to([doc], ClassResourceProcessingStatus.DELETING)
+                        self._doc_db.upsert_document(doc)
                         chunk_docs = self._chunks_from_class_resource(doc)
                     chunk_docs = [doc]
                     self._delete_vectors_from_chunks(chunk_docs)
-            self._doc_db.delete_class_resources(docs)
+            failed_docs = self._doc_db.delete_class_resources(docs)
+            for doc in failed_docs:
+                if isinstance(doc, ClassResourceDocument):
+                    self._coerce_status_to([doc], ClassResourceProcessingStatus.FAILED)
+                    self._doc_db.upsert_document(doc)
         except Exception as e:
             logger.critical(f"Failed to delete class resources: {e}")
             raise RuntimeError(f"Failed to delete class resources: {e}") from e
 
-    def _is_s3_url(self, url: str) -> bool:
-        """Return True if the url is an S3 url."""
-        return url.startswith('s3://')
+    def _coerce_to_s3_url(self, doc: ClassResource) -> None:
+        """Return True if the document url was able to be coerced to an s3 url."""
+        if doc.full_resource_url.startswith("s3://"):
+            _, bucket_domain_name, *path = doc.full_resource_url.split("/")
+            doc.full_resource_url = f"https://{bucket_domain_name}/{'/'.join(path)}"
+            return True
+        elif re.match(r"https://.*\.s3\.amazonaws\.com/.*", doc.full_resource_url):
+            return True
+        return False
 
-    def create_class_resources(self, class_resources: list[ClassResourceDocument]) -> None:
-        """Create the class resources."""
-        indexer = Indexer(self._indexer_config)
+    def _coerce_status_to(self, class_resources: list[ClassResourceDocument], status: ClassResourceProcessingStatus) -> None:
+        """Coerce the status of the class resources to the given status."""
         for class_resource in class_resources:
-            if self._is_s3_url(class_resource.full_resource_url):
+            class_resource.status = status
+
+    def create_class_resources(self, class_resources: list[ClassResource]) -> None:
+        """Create the class resources."""
+        class_resource_docs = self.convert_api_documents_to_database_documents(class_resources)
+        self._coerce_status_to(class_resource_docs, ClassResourceProcessingStatus.PENDING)
+        self._doc_db.upsert_documents(class_resource_docs)
+        indexer = Indexer(self._indexer_config)
+        for class_resource in class_resource_docs:
+            if self._coerce_to_s3_url(class_resource):
                 ingest_strategy = InputDataIngestStrategy.S3_FILE_DOWNLOAD
             else:
                 ingest_strategy = InputDataIngestStrategy.URL_DOWNLOAD
@@ -133,6 +155,27 @@ class ClassResourcesBackend:
         for doc in documents:
             metadata = doc.metadata
             output_doc = ClassResource(
+                id=doc.id,
+                class_id=doc.class_id,
+                full_resource_url=doc.full_resource_url,
+                preview_image_url=doc.preview_image_url,
+                status=doc.status,
+                metadata=Metadata(
+                    title=metadata.title,
+                    description=metadata.description,
+                    tags=metadata.tags,
+                    resource_type=metadata.resource_type,
+                )
+            )
+            output_documents.append(output_doc)
+        return output_documents
+
+    def convert_api_documents_to_database_documents(self, documents: list[ClassResource]) -> list[ClassResourceDocument]:
+        """Convert the API documents to database documents."""
+        output_documents = []
+        for doc in documents:
+            metadata = doc.metadata
+            output_doc = ClassResourceDocument(
                 id=doc.id,
                 class_id=doc.class_id,
                 full_resource_url=doc.full_resource_url,

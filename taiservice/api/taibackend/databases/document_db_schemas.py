@@ -3,7 +3,7 @@ from datetime import datetime
 from enum import Enum
 from typing import Optional
 from uuid import UUID
-from pydantic import Field, root_validator, validator
+from pydantic import Field, validator, HttpUrl
 # first imports are for local development, second imports are for deployment
 try:
     from ...taibackend.databases.shared_schemas import (
@@ -23,6 +23,7 @@ class ClassResourceProcessingStatus(str, Enum):
     PENDING = "pending"
     PROCESSING = "processing"
     FAILED = "failed"
+    DELETING = "deleting"
     COMPLETED = "completed"
 
 
@@ -36,7 +37,7 @@ class BaseClassResourceDocument(BasePydanticModel):
         ...,
         description="The ID of the class that the resource belongs to.",
     )
-    full_resource_url: str = Field(
+    full_resource_url: HttpUrl = Field(
         ...,
         description="The URL of the class resource.",
     )
