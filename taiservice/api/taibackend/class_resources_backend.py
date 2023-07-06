@@ -18,6 +18,7 @@ try:
         IndexerConfig,
         InputDataIngestStrategy,
         OpenAIConfig,
+        IngestedDocument,
     )
 except ImportError:
     from runtime_settings import TaiApiSettings
@@ -31,6 +32,7 @@ except ImportError:
         IndexerConfig,
         InputDataIngestStrategy,
         OpenAIConfig,
+        IngestedDocument,
     )
 
 class ClassResourcesBackend:
@@ -78,51 +80,52 @@ class ClassResourcesBackend:
             for doc in docs:
                 if isinstance(doc, ClassResourceDocument) or isinstance(doc, ClassResourceChunkDocument):
                     if isinstance(doc, ClassResourceDocument):
-                        self._coerce_status_to([doc], ClassResourceProcessingStatus.DELETING)
-                        self._doc_db.upsert_document(doc)
+                        self._coerce_and_update_status(doc, ClassResourceProcessingStatus.DELETING)
                         chunk_docs = self._chunks_from_class_resource(doc)
                     chunk_docs = [doc]
                     self._delete_vectors_from_chunks(chunk_docs)
             failed_docs = self._doc_db.delete_class_resources(docs)
             for doc in failed_docs:
                 if isinstance(doc, ClassResourceDocument):
-                    self._coerce_status_to([doc], ClassResourceProcessingStatus.FAILED)
-                    self._doc_db.upsert_document(doc)
+                    self._coerce_and_update_status(doc, ClassResourceProcessingStatus.FAILED)
         except Exception as e:
             logger.critical(f"Failed to delete class resources: {e}")
             raise RuntimeError(f"Failed to delete class resources: {e}") from e
-
-    def _coerce_to_s3_url(self, doc: ClassResource) -> None:
-        """Return True if the document url was able to be coerced to an s3 url."""
-        if doc.full_resource_url.startswith("s3://"):
-            _, bucket_domain_name, *path = doc.full_resource_url.split("/")
-            doc.full_resource_url = f"https://{bucket_domain_name}/{'/'.join(path)}"
-            return True
-        elif re.match(r"https://.*\.s3\.amazonaws\.com/.*", doc.full_resource_url):
-            return True
-        return False
 
     def _coerce_status_to(self, class_resources: list[ClassResourceDocument], status: ClassResourceProcessingStatus) -> None:
         """Coerce the status of the class resources to the given status."""
         for class_resource in class_resources:
             class_resource.status = status
 
+    def _coerce_and_update_status(
+        self,
+        class_resources: Union[list[ClassResourceDocument], ClassResourceDocument],
+        status: ClassResourceProcessingStatus
+    ) -> None:
+        """Coerce the status of the class resources to the given status and update the database."""
+        if isinstance(class_resources, ClassResourceDocument):
+            class_resources = [class_resources]
+        self._coerce_status_to(class_resources, status)
+        self._doc_db.upsert_documents(class_resources)
+
     def create_class_resources(self, class_resources: list[ClassResource]) -> None:
         """Create the class resources."""
-        class_resource_docs = self.convert_api_documents_to_database_documents(class_resources)
-        self._coerce_status_to(class_resource_docs, ClassResourceProcessingStatus.PENDING)
-        self._doc_db.upsert_documents(class_resource_docs)
+        input_docs = self.convert_api_documents_to_input_docs(class_resources)
+        doc_pairs: list[tuple[Indexer, ClassResourceDocument]] = []
+        for input_doc in input_docs:
+            ingested_doc = Indexer.ingest_document(input_doc)
+            doc = ClassResourceDocument.from_ingested_doc(ingested_doc)
+            self._coerce_and_update_status(doc, ClassResourceProcessingStatus.PENDING)
+            doc_pairs.append((ingested_doc, doc))
         indexer = Indexer(self._indexer_config)
-        for class_resource in class_resource_docs:
-            if self._coerce_to_s3_url(class_resource):
-                ingest_strategy = InputDataIngestStrategy.S3_FILE_DOWNLOAD
-            else:
-                ingest_strategy = InputDataIngestStrategy.URL_DOWNLOAD
-            input_doc = InputDocument(
-                input_data_ingest_strategy=ingest_strategy,
-                **class_resource.dict()
-            )
-            indexer.index_resource(input_doc)
+        for ingested_doc, class_resource in doc_pairs:
+            try:
+                self._coerce_and_update_status(class_resource, ClassResourceProcessingStatus.PROCESSING)
+                indexer.index_resource(ingested_doc)
+                self._coerce_and_update_status(class_resource, ClassResourceProcessingStatus.COMPLETED)
+            except Exception as e: # pylint: disable=broad-except
+                logger.critical(f"Failed to create class resources: {e}")
+                self._coerce_and_update_status(class_resource, ClassResourceProcessingStatus.FAILED)
 
     def _chunks_from_class_resource(self, class_resources: ClassResourceDocument) -> list[ClassResourceChunkDocument]:
         """Get the chunks from the class resources."""
@@ -170,17 +173,17 @@ class ClassResourcesBackend:
             output_documents.append(output_doc)
         return output_documents
 
-    def convert_api_documents_to_database_documents(self, documents: list[ClassResource]) -> list[ClassResourceDocument]:
+    def convert_api_documents_to_input_docs(self, resources: list[ClassResource]) -> list[InputDocument]:
         """Convert the API documents to database documents."""
-        output_documents = []
-        for doc in documents:
-            metadata = doc.metadata
-            output_doc = ClassResourceDocument(
-                id=doc.id,
-                class_id=doc.class_id,
-                full_resource_url=doc.full_resource_url,
-                preview_image_url=doc.preview_image_url,
-                status=doc.status,
+        input_documents = []
+        for resource in resources:
+            metadata = resource.metadata
+            input_doc = InputDocument(
+                id=resource.id,
+                class_id=resource.class_id,
+                full_resource_url=resource.full_resource_url,
+                preview_image_url=resource.preview_image_url,
+                status=resource.status,
                 metadata=Metadata(
                     title=metadata.title,
                     description=metadata.description,
@@ -188,5 +191,5 @@ class ClassResourcesBackend:
                     resource_type=metadata.resource_type,
                 )
             )
-            output_documents.append(output_doc)
-        return output_documents
+            input_documents.append(input_doc)
+        return input_documents

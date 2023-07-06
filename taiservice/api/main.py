@@ -10,7 +10,7 @@ try:
         class_resources,
         tai
     )
-except ImportError:
+except ImportError as e:
     from runtime_settings import TaiApiSettings, BACKEND_ATTRIBUTE_NAME
     from taibackend.class_resources_backend import ClassResourcesBackend
     from routers import (

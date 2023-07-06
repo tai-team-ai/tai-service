@@ -1,94 +1,45 @@
 """Define data ingestors used by the indexer."""
+from typing import List, Optional
 from abc import ABC
 from enum import Enum
 from pathlib import Path
 import traceback
-from typing import Any, Optional
 import filetype
 from bs4 import BeautifulSoup
-from loguru import logger
 import tiktoken
-from pydantic import Field, validator
-from langchain.text_splitter import Language
+from loguru import logger
+import requests
 from langchain.text_splitter import TextSplitter, RecursiveCharacterTextSplitter
 from langchain import text_splitter
 from langchain.schema import Document
-import requests
 # first imports are for local development, second imports are for deployment
 try:
-    from ..databases.document_db_schemas import (
-        BaseClassResourceDocument
+    from .data_ingestor_schema import (
+        IngestedDocument,
+        LatexExtension,
+        MarkdownExtension,
+        InputFormat,
+        SPLITTER_STRATEGY_MAPPING,
+        Language,
+        TOTAL_PAGE_COUNT_STRINGS,
+        PAGE_NUMBER_STRINGS,
+        LOADING_STRATEGY_MAPPING,
     )
+    from .data_ingestor_schema import InputDocument, InputFormat
 except ImportError:
-    from taibackend.databases.document_db_schemas import (
-        BaseClassResourceDocument
+    from taibackend.indexer.data_ingestor_schema import (
+        IngestedDocument,
+        LatexExtension,
+        MarkdownExtension,
+        InputFormat,
+        SPLITTER_STRATEGY_MAPPING,
+        Language,
+        TOTAL_PAGE_COUNT_STRINGS,
+        PAGE_NUMBER_STRINGS,
+        LOADING_STRATEGY_MAPPING,
     )
+    from taibackend.indexer.indexer import InputDocument, InputFormat
 
-
-class InputFormat(str, Enum):
-    """Define the supported input formats."""
-    PDF = "pdf"
-    GENERIC_TEXT = "generic_text"
-    LATEX = "latex"
-    MARKDOWN = "markdown"
-    HTML = "html"
-
-
-class MarkdownExtension(str, Enum):
-    """Define the markdown extensions."""
-    MARKDOWN = ".markdown"
-    MD = ".md"
-    MKD = ".mkd"
-    MDWN = ".mdwn"
-    MDOWN = ".mdown"
-    MDTXT = ".mdtxt"
-    MDTEXT = ".mdtext"
-    TXT = ".text"
-
-
-class LatexExtension(str, Enum):
-    """Define the latex extensions."""
-    TEX = ".tex"
-    LATEX = ".latex"
-
-
-class LoadingStrategy(str, Enum):
-    """Define the loading strategies."""
-    PyMuPDFLoader = "PyMuPDFLoader"
-    UnstructuredMarkdownLoader = "UnstructuredMarkdownLoader"
-    UnstructuredHTMLLoader = "UnstructuredHTMLLoader"
-
-class SplitterStrategy(str, Enum):
-    """Define the splitter strategies."""
-    RecursiveCharacterTextSplitter = "RecursiveCharacterTextSplitter"
-    LatexTextSplitter = "LatexTextSplitter"
-    MarkdownTextSplitter = "MarkdownTextSplitter"
-
-
-class InputDataIngestStrategy(str, Enum):
-    """Define the input types."""
-    S3_FILE_DOWNLOAD = "s3_file_download"
-    URL_DOWNLOAD = "url_download"
-    # WEB_CRAWL = "web_crawl"
-
-
-LOADING_STRATEGY_MAPPING = {
-    InputFormat.PDF: LoadingStrategy.PyMuPDFLoader,
-    InputFormat.GENERIC_TEXT: LoadingStrategy.UnstructuredMarkdownLoader,
-    InputFormat.LATEX: LoadingStrategy.UnstructuredMarkdownLoader,
-    InputFormat.MARKDOWN: LoadingStrategy.UnstructuredMarkdownLoader,
-    InputFormat.HTML: LoadingStrategy.UnstructuredHTMLLoader,
-}
-
-SPLITTER_STRATEGY_MAPPING = {
-    InputFormat.PDF: SplitterStrategy.RecursiveCharacterTextSplitter,
-    InputFormat.GENERIC_TEXT: SplitterStrategy.RecursiveCharacterTextSplitter,
-    InputFormat.LATEX: Language.LATEX,
-    InputFormat.MARKDOWN: Language.MARKDOWN,
-    InputFormat.HTML: Language.HTML,
-}
-TOTAL_PAGE_COUNT_STRINGS = ["total_pages", "total_page_count", "total_page_counts", "page_count"]
-PAGE_NUMBER_STRINGS = ["page_number", "page_numbers", "page_num", "page_nums", "page"]
 
 def number_tokens(text: str) -> int:
     """Get the number of tokens in the text."""
@@ -125,42 +76,6 @@ def get_page_number(doc: Document) -> Optional[int]:
     for key in PAGE_NUMBER_STRINGS:
         if key in doc.metadata:
             return doc.metadata[key]
-
-
-class InputDocument(BaseClassResourceDocument):
-    """Define the input document."""
-    input_data_ingest_strategy: InputDataIngestStrategy = Field(
-        ...,
-        description="The strategy for ingesting the input data.",
-    )
-
-
-class IngestedDocument(BaseClassResourceDocument):
-    """Define the ingested document."""
-    data_pointer: Any = Field(
-        ...,
-        description=("This field should 'point' to the data. This will mean different things "
-            "depending on the input format and loading strategy. For example, if the input format "
-            "is PDF and the loading strategy is PyMuPDF, then this field will be a path object, as another "
-            "example, if the loading strategy is copy and paste, then this field will be a string."
-        ),
-    )
-    input_format: InputFormat = Field(
-        ...,
-        description="The format of the input document.",
-    )
-    loading_strategy: LoadingStrategy = Field(
-        ...,
-        description="The loading strategy for the input document.",
-    )
-
-    @validator("loading_strategy")
-    def verify_loading_strategy(cls, loading_strategy: LoadingStrategy, values: dict) -> LoadingStrategy:
-        """Verify the loading strategy."""
-        if values.get("input_format") is not None:
-            assert loading_strategy == LOADING_STRATEGY_MAPPING[values.get("input_format")], "The loading strategy must match the input format."
-        return loading_strategy
-
 
 class Ingestor(ABC):
     """Define the ingestor class."""

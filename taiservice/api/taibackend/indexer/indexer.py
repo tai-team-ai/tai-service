@@ -14,17 +14,19 @@ from langchain.schema import Document
 from pinecone_text.sparse import SpladeEncoder
 try:
     from .data_ingestors import (
-        InputDataIngestStrategy,
-        InputDocument,
-        S3ObjectIngestor,
-        URLIngestor,
-        IngestedDocument,
-        InputFormat,
         get_splitter_text_splitter,
         get_page_number,
         get_total_page_count,
+        S3ObjectIngestor,
+        URLIngestor,
     )
-    from ..databases.shared_schemas import ChunkMetadata
+    from .data_ingestor_schema import (
+        IngestedDocument,
+        InputFormat,
+        InputDocument,
+        InputDataIngestStrategy,
+    )
+    from ..shared_schemas import ChunkMetadata
     from ..databases.pinecone_db import PineconeDBConfig, PineconeDB
     from ..databases.pinecone_db_schemas import (
         PineconeDocuments,
@@ -39,17 +41,19 @@ try:
     )
 except ImportError:
     from taibackend.indexer.data_ingestors import (
-        InputDataIngestStrategy,
-        InputDocument,
-        S3ObjectIngestor,
-        URLIngestor,
-        IngestedDocument,
-        InputFormat,
         get_splitter_text_splitter,
         get_page_number,
         get_total_page_count,
+        S3ObjectIngestor,
+        URLIngestor,
     )
-    from taibackend.databases.shared_schemas import ChunkMetadata
+    from taibackend.indexer.data_ingestor_schema import (
+        IngestedDocument,
+        InputFormat,
+        InputDocument,
+        InputDataIngestStrategy,
+    )
+    from taiservice.api.taibackend.shared_schemas import ChunkMetadata
     from taibackend.databases.pinecone_db_schemas import (
         PineconeDocuments,
         PineconeDocument,
@@ -114,18 +118,16 @@ class Indexer:
         )
         self._batch_size = indexer_config.openai_config.batch_size
 
-    def index_resource(self, document: InputDocument) -> None:
+    def index_resource(self, ingested_document: IngestedDocument) -> None:
         """Index a document."""
         try:
             class_resource_document = ClassResourceDocument(
                 status=ClassResourceProcessingStatus.PROCESSING,
-                **document.dict(),
+                **ingested_document.dict(),
             )
-            self._document_db.upsert_document(class_resource_document)
-            ingested_document = self._ingest_document(document)
             chunk_documents = self._load_and_split_document(ingested_document)
             class_resource_document.class_resource_chunk_ids = [chunk_doc.id for chunk_doc in chunk_documents]
-            vector_documents = self._embed_documents(chunk_documents, document.class_id)
+            vector_documents = self._embed_documents(chunk_documents, class_resource_document.class_id)
             self._load_class_resources_to_db(class_resource_document, chunk_documents)
             self._load_vectors_to_vector_store(vector_documents)
             class_resource_document.status = ClassResourceProcessingStatus.COMPLETED
@@ -246,7 +248,9 @@ class Indexer:
             vector_docs.append(doc)
         return vector_docs
 
-    def _ingest_document(self, document: InputDocument) -> IngestedDocument:
+    @staticmethod
+    def ingest_document(document: InputDocument) -> IngestedDocument:
+        """Ingest a document."""
         if document.input_data_ingest_strategy == InputDataIngestStrategy.S3_FILE_DOWNLOAD:
             ingestor = S3ObjectIngestor()
         elif document.input_data_ingest_strategy == InputDataIngestStrategy.URL_DOWNLOAD:

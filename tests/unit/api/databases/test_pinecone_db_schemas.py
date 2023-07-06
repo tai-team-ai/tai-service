@@ -10,7 +10,7 @@ from taiservice.api.taibackend.databases.pinecone_db_schemas import (
     PineconeDocuments,
     ChunkMetadata,
 )
-from taiservice.api.taibackend.databases.shared_schemas import Metadata
+from taiservice.api.taibackend.shared_schemas import Metadata
 from .test_shared_schemas import EXAMPLE_METADATA, assert_schema1_inherits_from_schema2
 
 def test_chunk_metadata_schema():
