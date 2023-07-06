@@ -84,7 +84,7 @@ class TaiApiStack(Stack):
         return python_lambda
 
     def _get_lambda_config(self, security_group_allowing_db_connections: ec2.SecurityGroup) -> BaseLambdaConfigModel:
-        function_name = self._namer("tai-api-service")
+        function_name = self._namer("handler")
         security_group_secrets = create_restricted_security_group(
             scope=self,
             name=function_name + "-sg",
