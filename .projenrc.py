@@ -54,6 +54,7 @@ project:Project = AwsCdkPythonApp(
         # "pinecone-text[splade]", # this installs cuda too, which we don't want
         "torch -f https://download.pytorch.org/whl/cpu",
         "transformers",
+        "pymupdf",
     ],
 )
 
@@ -81,14 +82,24 @@ make_file.add_rule(
     ],
 )
 make_file.add_rule(
-    targets=["test"],
+    targets=["unit-test"],
     recipe=[
-        "python3 -m pytest -vv tests --cov=taiservice --cov-report=term-missing --cov-report=xml:test-reports/coverage.xml --cov-report=html:test-reports/coverage",
+        "python3 -m pytest -vv tests/unit --cov=taiservice --cov-report=term-missing --cov-report=xml:test-reports/coverage.xml --cov-report=html:test-reports/coverage",
     ]
 )
 make_file.add_rule(
+    targets=["functional-test"],
+    recipe=[
+        "python3 -m pytest -vv tests/functional --cov=taiservice --cov-report=term-missing --cov-report=xml:test-reports/coverage.xml --cov-report=html:test-reports/coverage",
+    ]
+)
+make_file.add_rule(
+    targets=["full-test"],
+    prerequisites=["unit-test", "functional-test"],
+)
+make_file.add_rule(
     targets=["test-deploy-all"],
-    prerequisites=["test", "deploy-all"],
+    prerequisites=["full-test", "deploy-all"],
 )
 make_file.add_rule(
     targets=["start-docker"],
@@ -112,14 +123,15 @@ vscode_launch_config.add_configuration(
     env={
         "PINECONE_DB_API_KEY_SECRET_NAME": "dev/tai_service/pinecone_db/api_key",
         "PINECONE_DB_ENVIRONMENT": "us-east-1-aws",
-        "PINCEONE_DB_INDEX_NAME": "tai_service",
+        "PINECONE_DB_INDEX_NAME": "tai-index",
         "DOC_DB_CREDENTIALS_SECRET_NAME": "dev/tai_service/document_DB/read_write_user_password",
         "DOC_DB_USERNAME_SECRET_KEY": "username",
         "DOC_DB_PASSWORD_SECRET_KEY": "password",
         "DOC_DB_FULLY_QUALIFIED_DOMAIN_NAME": "tai-service-645860363137.us-east-1.docdb-elastic.amazonaws.com",
         "DOC_DB_PORT": "27017",
-        "DOC_DB_DATABASE_NAME": "tai_service",
-        "DOC_DB_COLLECTION_NAME": "tai_service",
+        "DOC_DB_DATABASE_NAME": "class_resources",
+        "DOC_DB_CLASS_RESOURCE_COLLECTION_NAME": "class_resource",
+        "DOC_DB_CLASS_RESOURCE_CHUNK_COLLECTION_NAME": "class_resource_chunk",
         "OPENAI_API_KEY_SECRET_NAME": "dev/tai_service/openai/api_key",
     },
 )

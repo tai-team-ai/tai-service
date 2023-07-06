@@ -1,5 +1,6 @@
 """Define the pinecone database."""
 from enum import Enum
+from multiprocessing.pool import ApplyResult
 from typing import List
 from uuid import UUID
 from pydantic import BaseModel, Field
@@ -66,8 +67,9 @@ class PineconeDB:
             operation = getattr(index, index_operation_name)
             for batch in batches:
                 async_results.append(operation(batch, async_req=True, namespace=str(documents.class_id)))
+            async_result: ApplyResult
             for async_result in async_results:
-                async_result.result()
+                async_result.get()
 
     def upsert_vectors(self, documents: PineconeDocuments) -> None:
         """Upsert vectors into pinecone db."""

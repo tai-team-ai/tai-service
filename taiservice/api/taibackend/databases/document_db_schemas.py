@@ -40,6 +40,10 @@ class BaseClassResourceDocument(BasePydanticModel):
         ...,
         description="The URL of the class resource.",
     )
+    preview_image_url: Optional[str] = Field(
+        default=None,
+        description="The URL of the image preview of the class resource.",
+    )
     metadata: Metadata = Field(
         ...,
         description="The metadata of the class resource.",
@@ -58,6 +62,10 @@ class BaseClassResourceDocument(BasePydanticModel):
         """Set the modified timestamp."""
         return datetime.utcnow()
 
+    @property
+    def str_id(self) -> str:
+        """Return the string representation of the id."""
+        return str(self.id)
 
 class ClassResourceDocument(BaseClassResourceDocument):
     """Define the document model of the class resource."""

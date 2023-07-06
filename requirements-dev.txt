@@ -12,6 +12,7 @@ pinecone-client[grpc]
 pinecone-text
 projen==0.71.72
 pymongo
+pymupdf
 pytest
 pytest-cov
 tiktoken

@@ -9,11 +9,11 @@ from pydantic import Field, validator
 try:
     from ..taibackend.shared_schemas import TaiTutorName
     from ..routers.base_schema import BasePydanticModel
-    from ..routers.class_resources import BaseClassResource, ClassResourceType, Metadata
+    from ..routers.class_resources_schema import BaseClassResource, ClassResourceType, Metadata
 except ImportError:
     from taibackend.shared_schemas import TaiTutorName
     from routers.base_schema import BasePydanticModel
-    from routers.class_resources import BaseClassResource, ClassResourceType, Metadata
+    from routers.class_resources_schema import BaseClassResource, ClassResourceType, Metadata
 
 ROUTER = APIRouter()
 

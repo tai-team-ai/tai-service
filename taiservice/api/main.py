@@ -4,13 +4,15 @@ from fastapi.middleware.cors import CORSMiddleware
 from loguru import logger
 # first imports are for local development, second imports are for deployment
 try:
-    from .runtime_settings import TaiApiSettings, SETTINGS_STATE_ATTRIBUTE_NAME
+    from .runtime_settings import TaiApiSettings, BACKEND_ATTRIBUTE_NAME
+    from .taibackend.class_resources_backend import ClassResourcesBackend
     from .routers import (
         class_resources,
         tai
     )
 except ImportError:
-    from runtime_settings import TaiApiSettings, SETTINGS_STATE_ATTRIBUTE_NAME
+    from runtime_settings import TaiApiSettings, BACKEND_ATTRIBUTE_NAME
+    from taibackend.class_resources_backend import ClassResourcesBackend
     from routers import (
         class_resources,
         tai
@@ -34,7 +36,8 @@ def create_app() -> FastAPI:
         title=TITLE,
         description=DESCRIPTION,
     )
-    setattr(app.state, SETTINGS_STATE_ATTRIBUTE_NAME, runtime_settings)
+    backend = ClassResourcesBackend(runtime_settings=runtime_settings)
+    setattr(app.state, BACKEND_ATTRIBUTE_NAME, backend)
     # add exception handlers
     # configure CORS
     app.add_middleware(
