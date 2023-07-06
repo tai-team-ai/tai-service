@@ -54,6 +54,7 @@ project:Project = AwsCdkPythonApp(
         # "pinecone-text[splade]", # this installs cuda too, which we don't want
         "torch -f https://download.pytorch.org/whl/cpu",
         "transformers",
+        "pymupdf",
     ],
 )
 

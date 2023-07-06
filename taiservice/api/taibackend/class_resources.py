@@ -82,14 +82,18 @@ class ClassResourcesBackend:
             logger.critical(f"Failed to delete class resources: {e}")
             raise RuntimeError(f"Failed to delete class resources: {e}") from e
 
-    def create_class_resources(
-        self,
-        class_resources: list[ClassResourceDocument],
-        ingest_strategy: InputDataIngestStrategy
-    ) -> None:
+    def _is_s3_url(self, url: str) -> bool:
+        """Return True if the url is an S3 url."""
+        return url.startswith('s3://')
+
+    def create_class_resources(self, class_resources: list[ClassResourceDocument]) -> None:
         """Create the class resources."""
         indexer = Indexer(self._indexer_config)
         for class_resource in class_resources:
+            if self._is_s3_url(class_resource.full_resource_url):
+                ingest_strategy = InputDataIngestStrategy.S3_FILE_DOWNLOAD
+            else:
+                ingest_strategy = InputDataIngestStrategy.URL_DOWNLOAD
             input_doc = InputDocument(
                 input_data_ingest_strategy=ingest_strategy,
                 **class_resource.dict()

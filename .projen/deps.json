@@ -54,6 +54,10 @@
       "type": "devenv"
     },
     {
+      "name": "pymupdf",
+      "type": "devenv"
+    },
+    {
       "name": "pytest",
       "type": "devenv"
     },

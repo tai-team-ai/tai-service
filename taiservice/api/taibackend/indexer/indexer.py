@@ -1,5 +1,6 @@
 """Define the indexer module."""
 from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
 from typing import Optional
 from uuid import UUID, uuid4
 import traceback
@@ -164,7 +165,12 @@ class Indexer:
         """Split and load a document."""
         split_docs: list[Document] = []
         try:
-            Loader: BaseLoader = getattr(document_loaders, document.input_format)
+            Loader: BaseLoader = getattr(document_loaders, document.loading_strategy)
+            try:
+                # try to treat the pointer as a Path object and resolve it and convert to str
+                document.data_pointer = str(Path(document.data_pointer).resolve())
+            except Exception: # pylint: disable=broad-except
+                logger.warning(f"Failed to resolve path: {document.data_pointer}")
             loader: BaseLoader = Loader(document.data_pointer)
             splitter: TextSplitter = get_splitter_text_splitter(document.input_format)
             split_docs = loader.load_and_split(splitter)
@@ -183,10 +189,9 @@ class Indexer:
                 metadata=ChunkMetadata(
                     class_id=document.class_id,
                     page_number=get_page_number(split_doc),
-                    total_page_count=total_page_count,
                     **ingested_doc_metadata.dict(),
                 ),
-                **document.dict(),
+                **document.dict(exclude={"id", "metadata"}),
             )
             chunk_documents.append(chunk_doc)
         return chunk_documents
