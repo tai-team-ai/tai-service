@@ -7,6 +7,7 @@ import boto3
 from botocore.exceptions import ClientError
 try:
     from taiservice.api.runtime_settings import TaiApiSettings
+    from ..routers.class_resources_schema import ClassResource, ClassResources, Metadata
     from .databases.document_db_schemas import ClassResourceDocument, ClassResourceChunkDocument
     from .databases.document_db import DocumentDB, DocumentDBConfig
     from .databases.pinecone_db import PineconeDB, PineconeDBConfig
@@ -19,6 +20,7 @@ try:
     )
 except ImportError:
     from runtime_settings import TaiApiSettings
+    from routers.class_resources_schema import ClassResource, ClassResources, Metadata
     from taibackend.databases.document_db_schemas import ClassResourceDocument, ClassResourceChunkDocument
     from taibackend.databases.document_db import DocumentDB, DocumentDBConfig
     from taibackend.databases.pinecone_db import PineconeDB, PineconeDBConfig
@@ -124,3 +126,24 @@ class ClassResourcesBackend:
             return json.loads(secret)
         except json.JSONDecodeError:
             return secret
+
+    def convert_database_documents_to_api_documents(self, documents: list[ClassResourceDocument]) -> list[ClassResource]:
+        """Convert the database documents to API documents."""
+        output_documents = []
+        for doc in documents:
+            metadata = doc.metadata
+            output_doc = ClassResource(
+                id=doc.id,
+                class_id=doc.class_id,
+                full_resource_url=doc.full_resource_url,
+                preview_image_url=doc.preview_image_url,
+                status=doc.status,
+                metadata=Metadata(
+                    title=metadata.title,
+                    description=metadata.description,
+                    tags=metadata.tags,
+                    resource_type=metadata.resource_type,
+                )
+            )
+            output_documents.append(output_doc)
+        return output_documents

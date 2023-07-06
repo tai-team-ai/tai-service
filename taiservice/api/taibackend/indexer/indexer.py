@@ -130,6 +130,7 @@ class Indexer:
             class_resource_document.status = ClassResourceProcessingStatus.COMPLETED
             self._document_db.update_document(class_resource_document)
         except Exception as e:
+            logger.error(traceback.format_exc())
             class_resource_document.status = ClassResourceProcessingStatus.FAILED
             self._document_db.update_document(class_resource_document)
             raise RuntimeError("Failed to index resource.") from e
@@ -210,7 +211,7 @@ class Indexer:
             vector_docs =  self._vector_document_from_dense_vectors(dense_vectors, batch)
             sparse_vectors = self._get_sparse_vectors(texts)
             for vector_doc, sparse_vector in zip(vector_docs, sparse_vectors):
-                vector_doc.sparse_vector = sparse_vector
+                vector_doc.sparse_values = sparse_vector
             return vector_docs
         batches = [documents[i : i + self._batch_size] for i in range(0, len(documents), self._batch_size)]
         vector_docs = []
@@ -234,16 +235,15 @@ class Indexer:
         dense_vectors: list[list[float]],
         documents: list[ClassResourceChunkDocument],
     ) -> list[PineconeDocument]:
-        """Get a vector document from a dense vector."""
-        documents = []
+        vector_docs = []
         for dense_vector, document in zip(dense_vectors, documents):
             doc = PineconeDocument(
                 id=document.vector_id,
                 metadata=ChunkMetadata.parse_obj(document.metadata),
                 values=dense_vector,
             )
-            documents.append(doc)
-        return documents
+            vector_docs.append(doc)
+        return vector_docs
 
     def _ingest_document(self, document: InputDocument) -> IngestedDocument:
         if document.input_data_ingest_strategy == InputDataIngestStrategy.S3_FILE_DOWNLOAD:

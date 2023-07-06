@@ -40,7 +40,7 @@ class PineconeDocument(BasePydanticModel):
         ...,
         description="The dense vector of the class resource.",
     )
-    sparse_vector: Optional[SparseVector] = Field(
+    sparse_values: Optional[SparseVector] = Field(
         description="The sparse vector of the class resource.",
     )
     metadata: ChunkMetadata = Field(
@@ -75,8 +75,9 @@ class PineconeDocuments(BasePydanticModel):
     def ensure_all_have_same_class_id_and_set_namespace(cls, values: Dict) -> Dict:
         """Ensure that all documents have the same class id."""
         class_id = set()
+        document: PineconeDocument
         for document in values["documents"]:
-            class_id.add(document["metadata"]["class_id"])
+            class_id.add(document.metadata.class_id)
         if len(class_id) != 1:
             raise ValueError("")
         values.update({"class_id": class_id.pop()})

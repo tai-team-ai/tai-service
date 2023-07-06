@@ -64,8 +64,14 @@ class DocumentDB:
     """
     def __init__(self, config: DocumentDBConfig) -> None:
         """Initialize document db."""
-        uri = f"mongodb://{config.username}:{config.password}@{config.fully_qualified_domain_name}:{config.port}/?tls=true&retryWrites=False"
-        self._client = MongoClient(uri)
+        self._client = MongoClient(
+            username=config.username,
+            password=config.password,
+            host=config.fully_qualified_domain_name,
+            port=config.port,
+            tls=True,
+            retryWrites=False,
+        )
         self._doc_models = [
             ClassResourceChunkDocument,
             ClassResourceDocument,
@@ -86,6 +92,7 @@ class DocumentDB:
     def get_class_resources(self, ids: list[UUID], doc_class: BaseClassResourceDocument) -> list[BaseClassResourceDocument]:
         """Return the full class resources."""
         collection = self._document_type_to_collection[doc_class.__name__]
+        ids = [str(id) for id in ids]
         documents = list(collection.find({"_id": {"$in": ids}}))
         # cast to the most specific document type
         # iterate over the documents models: BaseClassResourceDocument, ClassResourceDocument, ClassResourceChunkDocument
@@ -115,9 +122,10 @@ class DocumentDB:
             self._execute_operation(upsert_document, document, failed_documents=failed_documents)
         return failed_documents
 
-    def update_document(self, document: BaseClassResourceDocument, collection: Collection) -> None:
+    def update_document(self, document: BaseClassResourceDocument) -> None:
         """Update the document."""
-        collection.update_one({"_id": document.id}, {"$set": document.dict()})
+        collection = self._document_type_to_collection[ClassResourceDocument.__name__]
+        collection.update_one({"_id": document.str_id}, {"$set": document.dict()}, upsert=True)
 
     def delete_class_resources(self, documents: list[BaseClassResourceDocument]) -> list[BaseClassResourceDocument]:
         """Delete the full class resources."""
@@ -125,7 +133,7 @@ class DocumentDB:
         def delete_document(document: BaseClassResourceDocument) -> None:
             if isinstance(document, ClassResourceDocument):
                 self._delete_documents(document.class_resource_chunk_ids)
-            self._delete_document(document.id)
+            self._delete_document(document)
         for document in documents:
             self._execute_operation(delete_document, document, failed_documents=failed_documents)
         return failed_documents
@@ -155,7 +163,7 @@ class DocumentDB:
     def _delete_document(self, doc: BaseClassResourceDocument) -> None:
         """Delete the chunks of the class resource."""
         collection = self._document_type_to_collection[doc.__class__.__name__]
-        collection.delete_one({"_id": doc.id})
+        collection.delete_one({"_id": doc.str_id})
 
     def _upsert_documents(self, documents: list[BaseClassResourceDocument]) -> None:
         """Upsert the chunks of the class resource."""
@@ -166,7 +174,7 @@ class DocumentDB:
         """Upsert the chunks of the class resource."""
         collection = self._document_type_to_collection[document.__class__.__name__]
         collection.update_one(
-            {"_id": document.id},
+            {"_id": document.str_id},
             {"$set": document.dict(serialize_dates=False)},
             upsert=True,
         )

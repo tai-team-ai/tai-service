@@ -17,7 +17,7 @@ from taiservice.cdk.constructs.customresources.pinecone_db.pinecone_db_custom_re
 INDEXES = [
     PineconeIndexConfig(
         name="tai-index",
-        dimension=768,
+        dimension=1536,
         metric=DistanceMetric.DOT_PRODUCT,
         pod_instance_type=PodType.S1,
         pod_size=PodSize.X1,

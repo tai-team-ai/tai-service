@@ -3,6 +3,7 @@ from typing import Any
 from loguru import logger
 import pymongo
 from pymongo.database import Database
+from pymongo.errors import OperationFailure
 from settings import RuntimeDocumentDBSettings, MongoDBUser
 # first imports are for local development, second imports are for deployment
 try:
@@ -39,27 +40,19 @@ class DocumentDBCustomResource(CustomResourceInterface):
         return mongo_client
 
     def _create_database(self) -> None:
+        self._run_database_operation(self._create_user)
+
+    def _update_database(self) -> None:
+        self._run_database_operation(self._update_user)
+
+    def _run_database_operation(self, user_operation: callable) -> None:
         db = self._mongo_client[self._settings.db_name]
         for user in self._settings.user_config:
             secret = self.get_secret(user.secret_name)
             username = secret[user.username_secret_field_name]
             password = secret[user.password_secret_field_name]
-            self._run_operation_with_retry(self._create_user, db, user, username, password)
-        self._run_operation_with_retry(self._create_collections, db)
+            self._run_operation_with_retry(user_operation, db, user, username, password)
         self._run_operation_with_retry(self._create_shards, db, self._mongo_client)
-        self._run_operation_with_retry(self._create_indexes, db)
-
-
-    def _update_database(self) -> None:
-        db = self._mongo_client[self._settings.db_name]
-        for user in self._settings.user_config:
-            try:
-                secret = self.get_secret(user.secret_name)
-                username = secret[user.username_secret_field_name]
-                password = secret[user.password_secret_field_name]
-                self._run_operation_with_retry(self._create_user, db, user, username, password)
-            except Exception: # pylint: disable=broad-except
-                logger.info(f"User {username} with role {user.role} already exists. Skipping creation.")
         self._run_operation_with_retry(self._create_collections, db)
         self._run_operation_with_retry(self._create_indexes, db)
 
@@ -77,20 +70,34 @@ class DocumentDBCustomResource(CustomResourceInterface):
             ],
         })
 
+    def _update_user(self, db: Database, user: MongoDBUser, username: str, password: str) -> None:
+        logger.info(f"Updating user: {username}")
+        db.command({
+            "updateUser": username,
+            "pwd": password,
+            "roles": [
+                {"role": user.role, "db": db.name},
+            ],
+        })
+
     def _create_collections(self, db: Database) -> None:
         for config in self._settings.collection_config:
-            logger.info(f"Creating collection: {config.name}")
+            logger.info(f"Inserting dummy document into collection: {config.name}")
             db[config.name].insert_one({"_id": "dummy"})
             db[config.name].delete_one({"_id": "dummy"})
+            logger.info(f"Successfully inserted & deleted dummy document into collection: {config.name}")
 
     def _create_shards(self, db: Database, client: pymongo.MongoClient) -> None:
         client.admin.command('enableSharding', db.name)
         for config in self._settings.collection_config:
-            db.command({
-                "shardCollection": f"{db.name}.{config.name}",
-                "key": {"_id": "hashed"},
-            })
-            logger.info(f"Created shard for collection: {config.name}")
+            try:
+                db.command({
+                    "shardCollection": f"{db.name}.{config.name}",
+                    "key": {"_id": "hashed"},
+                })
+                logger.info(f"Created shard for collection: {config.name}")
+            except OperationFailure:
+                logger.info(f"Shard for collection: {config.name} already exists")
 
     def _create_indexes(self, db: Database) -> None:
         for config in self._settings.collection_config:
