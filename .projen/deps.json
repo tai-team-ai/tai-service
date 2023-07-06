@@ -112,11 +112,11 @@
       "type": "runtime"
     },
     {
-      "name": "pydantic",
+      "name": "pydantic[dotenv]<=1.10.11",
       "type": "runtime"
     },
     {
-      "name": "pydantic[dotenv]",
+      "name": "pydantic<=1.10.11",
       "type": "runtime"
     },
     {

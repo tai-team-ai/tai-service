@@ -110,22 +110,26 @@ class DocumentDB:
         """Upsert the full class resources."""
         failed_documents = []
         def upsert_document(document: BaseClassResourceDocument) -> None:
-            self._upsert_document(document)
+            self.upsert_document(document)
             if isinstance(document, ClassResourceDocument):
                 try:
                     chunks = [chunk_mapping[id] for id in document.class_resource_chunk_ids]
                 except KeyError as e:
                     logger.error(f"Failed to find chunk: {e} for document: {document}")
                     raise e
-                self._upsert_documents(chunks)
+                self.upsert_documents(chunks)
         for document in documents:
             self._execute_operation(upsert_document, document, failed_documents=failed_documents)
         return failed_documents
 
-    def update_document(self, document: BaseClassResourceDocument) -> None:
-        """Update the document."""
-        collection = self._document_type_to_collection[ClassResourceDocument.__name__]
-        collection.update_one({"_id": document.str_id}, {"$set": document.dict()}, upsert=True)
+    def upsert_many_class_resources(self, documents: list[BaseClassResourceDocument]) -> list[BaseClassResourceDocument]:
+        """Upsert the full class resources."""
+        failed_documents = []
+        def upsert_document(document: BaseClassResourceDocument) -> None:
+            self.upsert_document(document)
+        for document in documents:
+            self._execute_operation(upsert_document, document, failed_documents=failed_documents)
+        return failed_documents
 
     def delete_class_resources(self, documents: list[BaseClassResourceDocument]) -> list[BaseClassResourceDocument]:
         """Delete the full class resources."""
@@ -165,12 +169,12 @@ class DocumentDB:
         collection = self._document_type_to_collection[doc.__class__.__name__]
         collection.delete_one({"_id": doc.str_id})
 
-    def _upsert_documents(self, documents: list[BaseClassResourceDocument]) -> None:
+    def upsert_documents(self, documents: list[BaseClassResourceDocument]) -> None:
         """Upsert the chunks of the class resource."""
         for document in documents:
-            self._upsert_document(document)
+            self.upsert_document(document)
 
-    def _upsert_document(self, document: BaseClassResourceDocument) -> None:
+    def upsert_document(self, document: BaseClassResourceDocument) -> None:
         """Upsert the chunks of the class resource."""
         collection = self._document_type_to_collection[document.__class__.__name__]
         collection.update_one(

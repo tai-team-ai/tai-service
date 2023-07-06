@@ -21,8 +21,7 @@ def get_class_resources(ids: ClassResourceIds, request: Request):
     """Get all class resources."""
     backend: ClassResourcesBackend = getattr(request.app.state, BACKEND_ATTRIBUTE_NAME)
     class_resource_docs = backend.get_class_resources(ids)
-    class_resources = backend.convert_database_documents_to_api_documents(class_resource_docs)
-    return ClassResources(class_resources=class_resources)
+    return ClassResources(class_resources=class_resource_docs)
 
 
 @ROUTER.post("/class_resources")

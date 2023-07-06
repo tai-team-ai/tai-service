@@ -18,6 +18,7 @@ class ClassResourceProcessingStatus(str, Enum):
     """Define the processing status of the class resource."""
     PENDING = "pending"
     PROCESSING = "processing"
+    DELETING = "deleting"
     FAILED = "failed"
     COMPLETED = "completed"
 

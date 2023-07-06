@@ -6,8 +6,8 @@ import traceback
 from typing import Any, Optional
 import filetype
 from bs4 import BeautifulSoup
-import boto3
 from loguru import logger
+import tiktoken
 from pydantic import Field, validator
 from langchain.text_splitter import Language
 from langchain.text_splitter import TextSplitter, RecursiveCharacterTextSplitter
@@ -90,6 +90,12 @@ SPLITTER_STRATEGY_MAPPING = {
 TOTAL_PAGE_COUNT_STRINGS = ["total_pages", "total_page_count", "total_page_counts", "page_count"]
 PAGE_NUMBER_STRINGS = ["page_number", "page_numbers", "page_num", "page_nums", "page"]
 
+def number_tokens(text: str) -> int:
+    """Get the number of tokens in the text."""
+    # the cl100k_base is the encoding for chat models
+    encoding = tiktoken.get_encoding("cl100k_base")
+    num_tokens = len(encoding.encode(text))
+    return num_tokens
 
 def get_splitter_text_splitter(input_format: InputFormat) -> TextSplitter:
     """Get the splitter strategy."""
@@ -98,7 +104,12 @@ def get_splitter_text_splitter(input_format: InputFormat) -> TextSplitter:
         raise ValueError("The input format is not supported.")
     if strategy_instructions in Language:
         return RecursiveCharacterTextSplitter()
-    return getattr(text_splitter, strategy_instructions)()
+    splitter: TextSplitter = getattr(text_splitter, strategy_instructions)(
+        chunk_size=400,
+        chunk_overlap=150,
+        length_function=number_tokens,
+    )
+    return splitter
 
 
 def get_total_page_count(docs: list[Document]) -> Optional[int]:
@@ -192,13 +203,12 @@ class S3ObjectIngestor(Ingestor):
     """
     def ingest_data(self, input_data: InputDocument) -> IngestedDocument:
         """Ingest the data from S3."""
-        remote_file_url = input_data.full_resource_url
-        s3 = boto3.resource("s3")
-        bucket_name = remote_file_url.split("/")[2]
-        key = "/".join(remote_file_url.split("/")[3:])
-        bucket = s3.Bucket(bucket_name)
-        tmp_path = Path(f"/tmp/{key}")
-        bucket.download_file(key, str(tmp_path))
+        tmp_path = Path(f"/tmp/{input_data.id}")
+        # Download the file using the requests library
+        response = requests.get(input_data.full_resource_url, timeout=10)
+        response.raise_for_status() # Raise an error if the download fails
+        with open(tmp_path, "wb") as f:
+            f.write(response.content)
         document = IngestedDocument(
             data_pointer=tmp_path,
             input_format=self._get_file_type(tmp_path),
@@ -206,7 +216,6 @@ class S3ObjectIngestor(Ingestor):
             **input_data.dict(),
         )
         return document
-
 
 class URLIngestor(Ingestor):
     """
