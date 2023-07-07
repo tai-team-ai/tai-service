@@ -14,6 +14,7 @@ from .stack_config_models import StackConfigBaseModel
 from .stack_helpers  import add_tags
 from ..constructs.python_lambda_construct import (
     DockerLambda,
+    DockerLambdaConfigModel,
     BaseLambdaConfigModel,
     LambdaURLConfigModel,
     LambdaRuntime,
@@ -100,7 +101,7 @@ class TaiApiStack(Stack):
         subnet_type = ec2.SubnetType.PUBLIC
         assert vpc_interface_exists(ec2.InterfaceVpcEndpointAwsService.SECRETS_MANAGER, self._vpc),\
             "The VPC must have an interface endpoint for Secrets Manager."
-        lambda_config = BaseLambdaConfigModel(
+        lambda_config = DockerLambdaConfigModel(
             function_name=function_name,
             description="The lambda for the TAI API service.",
             code_path=API_DIR,
@@ -121,5 +122,6 @@ class TaiApiStack(Stack):
                 allowed_origins=["*"],
                 auth_type=_lambda.FunctionUrlAuthType.NONE,
             ),
+            run_as_webserver=True,
         )
         return lambda_config

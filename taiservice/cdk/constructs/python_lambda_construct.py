@@ -171,6 +171,15 @@ class BaseLambdaConfigModel(BaseModel):
         return requirements_file_path
 
 
+class DockerLambdaConfigModel(BaseLambdaConfigModel):
+    """Define the configuration for the Docker Lambda."""
+
+    run_as_webserver: bool = Field(
+        default=False,
+        description="Whether or not to run the Lambda as a webserver.",
+    )
+
+
 class BaseLambda(Construct):
     """Define the base lambda construct."""
 
@@ -387,7 +396,7 @@ class DockerLambda(BaseLambda):
         self,
         scope: Construct,
         construct_id: str,
-        config: BaseLambdaConfigModel,
+        config: DockerLambdaConfigModel,
         **kwargs,
     ) -> None:
         """Initialize the builder."""
@@ -397,7 +406,13 @@ class DockerLambda(BaseLambda):
 
     def _initialize_function_props(self) -> None:
         stage_name = "build"
-        self.dockerfile_content = [f"FROM public.ecr.aws/lambda/{self._config.runtime} AS {stage_name}"]
+        if self._config.run_as_webserver:
+            self.dockerfile_content = [
+                f"FROM public.ecr.aws/docker/library/{self._config.runtime}-slim-buster",
+                "COPY --from=public.ecr.aws/awsguru/aws-lambda-adapter:0.7.0 /lambda-adapter /opt/extensions/lambda-adapter",
+            ]
+        else:
+            self.dockerfile_content = [f"FROM public.ecr.aws/lambda/{self._config.runtime} AS {stage_name}"]
         self._previous_stage_name = stage_name
 
     def _create_docker_file(self) -> str:
