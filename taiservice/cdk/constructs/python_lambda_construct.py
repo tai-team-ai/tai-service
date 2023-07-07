@@ -397,7 +397,7 @@ class DockerLambda(BaseLambda):
 
     def _initialize_function_props(self) -> None:
         stage_name = "build"
-        self.dockerfile_content = [f"FROM public.ecr.aws/lambda/{self._config.runtime.value} AS {stage_name}"]
+        self.dockerfile_content = [f"FROM public.ecr.aws/lambda/{self._config.runtime} AS {stage_name}"]
         self._previous_stage_name = stage_name
 
     def _create_docker_file(self) -> str:
