@@ -391,6 +391,7 @@ class DockerLambda(BaseLambda):
         **kwargs,
     ) -> None:
         """Initialize the builder."""
+        self._handler_root_dir = "${LAMBDA_TASK_ROOT}" # this needs to be first to configure the handler root dir
         super().__init__(scope, construct_id, config, **kwargs)
         self._config = config
 
@@ -411,7 +412,7 @@ class DockerLambda(BaseLambda):
         stage_name = "add-build-context"
         self.dockerfile_content.append(f"FROM {self._previous_stage_name} AS {stage_name}")
         self._previous_stage_name = stage_name
-        self.dockerfile_content.append(f"COPY . /var/task")
+        self.dockerfile_content.append(f"COPY . {self._handler_root_dir}")
 
     def _add_handler_cmd(self) -> None:
         fully_qualified_handler_name = f"{self._config.handler_module_name}.{self._config.handler_name}"

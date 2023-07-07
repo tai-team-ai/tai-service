@@ -13,7 +13,7 @@ try:
     )
     from ..indexer.data_ingestor_schema import IngestedDocument
 except ImportError:
-    from taiservice.api.taibackend.shared_schemas import (
+    from taibackend.shared_schemas import (
         ChunkMetadata,
         Metadata,
         BaseClassResourceDocument,

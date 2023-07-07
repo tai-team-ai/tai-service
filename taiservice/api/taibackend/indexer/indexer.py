@@ -53,7 +53,7 @@ except ImportError:
         InputDocument,
         InputDataIngestStrategy,
     )
-    from taiservice.api.taibackend.shared_schemas import ChunkMetadata
+    from taibackend.shared_schemas import ChunkMetadata
     from taibackend.databases.pinecone_db_schemas import (
         PineconeDocuments,
         PineconeDocument,
