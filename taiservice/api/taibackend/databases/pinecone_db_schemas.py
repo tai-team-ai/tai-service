@@ -4,12 +4,12 @@ from uuid import UUID
 from pydantic import Field, root_validator, Extra
 # first imports are for local development, second imports are for deployment
 try:
-    from ...taibackend.databases.shared_schemas import (
+    from ..shared_schemas import (
         ChunkMetadata,
         BasePydanticModel,
     )
 except ImportError:
-    from taibackend.databases.shared_schemas import (
+    from taiservice.api.taibackend.shared_schemas import (
         ChunkMetadata,
         BasePydanticModel,
     )

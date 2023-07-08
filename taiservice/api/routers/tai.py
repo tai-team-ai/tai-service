@@ -7,11 +7,11 @@ from typing import Optional, Union
 from fastapi import APIRouter
 from pydantic import Field, validator
 try:
-    from ..taibackend.shared_schemas import TaiTutorName
+    from .tai_schemas import TaiTutorName
     from ..routers.base_schema import BasePydanticModel
     from ..routers.class_resources_schema import BaseClassResource, ClassResourceType, Metadata
 except ImportError:
-    from taibackend.shared_schemas import TaiTutorName
+    from routers.tai_schemas import TaiTutorName
     from routers.base_schema import BasePydanticModel
     from routers.class_resources_schema import BaseClassResource, ClassResourceType, Metadata
 

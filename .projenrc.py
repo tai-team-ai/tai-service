@@ -107,6 +107,20 @@ make_file.add_rule(
         "sudo systemctl start docker",
     ],
 )
+make_file.add_rule(
+    targets=["build-and-run-docker"],
+    recipe=[
+        "cd $(DIR) && \\",
+        "docker build -t test-container . && \\",
+        "docker run -p 9000:8080 test-container",
+    ],
+)
+make_file.add_rule(
+    targets=["test-docker-lambda"],
+    recipe=[
+        'curl -XPOST "http://localhost:9000/2015-03-31/functions/function/invocations" -d \'{"payload":"hello world!"}\'',
+    ],
+)
 
 vscode = VsCode(project)
 vscode_launch_config: VsCodeLaunchConfig = VsCodeLaunchConfig(vscode)

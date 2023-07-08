@@ -5,10 +5,10 @@ import pytest
 from taiservice.api.taibackend.databases.document_db_schemas import (
     Metadata,
 )
-from taiservice.api.taibackend.databases.shared_schemas import (
+from taiservice.api.taibackend.shared_schemas import (
     ClassResourceType,
 )
-from taiservice.api.taibackend.indexer.data_ingestors import(
+from taiservice.api.taibackend.indexer.data_ingestor_schema import(
     IngestedDocument,
     LoadingStrategy,
     InputFormat,

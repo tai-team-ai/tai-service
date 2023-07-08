@@ -1,22 +1,26 @@
 """Define the shared schemas used by the backend."""
-from datetime import datetime
 from enum import Enum
 from typing import Optional
 from uuid import UUID
-from pydantic import Field, validator, HttpUrl
+from pydantic import Field, validator
 # first imports are for local development, second imports are for deployment
 try:
-    from ...taibackend.databases.shared_schemas import (
+    from ..shared_schemas import (
         ChunkMetadata,
         Metadata,
-        BasePydanticModel,
+        BaseClassResourceDocument,
+        StatefulClassResourceDocument,
     )
+    from ..indexer.data_ingestor_schema import IngestedDocument
 except ImportError:
-    from taibackend.databases.shared_schemas import (
+    from taibackend.shared_schemas import (
         ChunkMetadata,
         Metadata,
-        BasePydanticModel,
+        BaseClassResourceDocument,
+        StatefulClassResourceDocument,
     )
+    from taibackend.indexer.data_ingestor_schema import IngestedDocument
+
 
 class ClassResourceProcessingStatus(str, Enum):
     """Define the document status."""
@@ -27,48 +31,7 @@ class ClassResourceProcessingStatus(str, Enum):
     COMPLETED = "completed"
 
 
-class BaseClassResourceDocument(BasePydanticModel):
-    """Define the base model of the class resource."""
-    id: UUID = Field(
-        ...,
-        description="The ID of the class resource.",
-    )
-    class_id: UUID = Field(
-        ...,
-        description="The ID of the class that the resource belongs to.",
-    )
-    full_resource_url: HttpUrl = Field(
-        ...,
-        description="The URL of the class resource.",
-    )
-    preview_image_url: Optional[str] = Field(
-        default=None,
-        description="The URL of the image preview of the class resource.",
-    )
-    metadata: Metadata = Field(
-        ...,
-        description="The metadata of the class resource.",
-    )
-    create_timestamp: datetime = Field(
-        default_factory=datetime.utcnow,
-        description="The timestamp when the class resource was created.",
-    )
-    modified_timestamp: datetime = Field(
-        default_factory=datetime.utcnow,
-        description="The timestamp when the class resource was last modified.",
-    )
-
-    @validator("modified_timestamp", pre=True)
-    def set_modified_timestamp(cls, _: datetime) -> datetime:
-        """Set the modified timestamp."""
-        return datetime.utcnow()
-
-    @property
-    def str_id(self) -> str:
-        """Return the string representation of the id."""
-        return str(self.id)
-
-class ClassResourceDocument(BaseClassResourceDocument):
+class ClassResourceDocument(StatefulClassResourceDocument):
     """Define the document model of the class resource."""
     status: ClassResourceProcessingStatus = Field(
         ...,
@@ -104,6 +67,26 @@ class ClassResourceDocument(BaseClassResourceDocument):
                 f"be empty if the status is {completed_status}. Values you provided: {values}"
             )
         return ids
+
+    @staticmethod
+    def from_ingested_doc(ingested_doc: IngestedDocument) -> 'ClassResourceDocument':
+        """Convert the ingested document to a database document."""
+        metadata = ingested_doc.metadata
+        doc = ClassResourceDocument(
+            id=ingested_doc.id,
+            class_id=ingested_doc.class_id,
+            full_resource_url=ingested_doc.full_resource_url,
+            preview_image_url=ingested_doc.preview_image_url,
+            status=ClassResourceProcessingStatus.PENDING,
+            hashed_document_contents=ingested_doc.hashed_document_contents,
+            metadata=Metadata(
+                title=metadata.title,
+                description=metadata.description,
+                tags=metadata.tags,
+                resource_type=metadata.resource_type,
+            )
+        )
+        return doc
 
 
 class ClassResourceChunkDocument(BaseClassResourceDocument):

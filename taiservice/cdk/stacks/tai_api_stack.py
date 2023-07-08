@@ -16,6 +16,7 @@ from ..constructs.python_lambda_construct import (
     DockerLambda,
     BaseLambdaConfigModel,
     LambdaURLConfigModel,
+    LambdaRuntime,
 )
 from ..constructs.construct_helpers import (
     get_secret_arn_from_name,
@@ -103,6 +104,7 @@ class TaiApiStack(Stack):
             function_name=function_name,
             description="The lambda for the TAI API service.",
             code_path=API_DIR,
+            runtime=LambdaRuntime.PYTHON_3_10,
             handler_module_name="index",
             handler_name="handler",
             runtime_environment=self._settings,
