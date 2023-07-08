@@ -70,3 +70,7 @@ class TaiApiSettings(BaseSettings):
         default=50,
         description="The batch size for OpenAI requests.",
     )
+    nltk_data: str = Field(
+        default="/var/task/nltk_data",
+        description="The path to the nltk data.",
+    )
