@@ -176,7 +176,10 @@ class DockerLambdaConfigModel(BaseLambdaConfigModel):
 
     run_as_webserver: bool = Field(
         default=False,
-        description="Whether or not to run the Lambda as a webserver.",
+        description=("Whether or not to run the Lambda as a webserver. "
+            "IMPORTANT, if running as a webserver, the handler should point to "
+            "a fastAPI factory function."
+        )
     )
 
 
@@ -303,7 +306,9 @@ class BaseLambda(Construct):
         if config.subnet_selection:
             self._function_props_dict["vpc_subnets"] = config.subnet_selection
         if config.subnet_selection.subnet_type == ec2.SubnetType.PUBLIC:
-            logger.warning("Lambda is being deployed to a public subnet.")
+            logger.warning("Lambda is being deployed to a public subnet. If you are trying to connect to the internet, " \
+                "you can't from a public subnet with lambda as they do not have public IP addresses. " \
+                "You must place the lambda in a private subnet and create a NAT Gateway if you want to connect to the internet.")
             self._function_props_dict["allow_public_subnet"] = True
 
     def _create_instantiated_props(self) -> None:
@@ -335,7 +340,6 @@ class PythonLambda(BaseLambda):
     ) -> None:
         """Initialize the builder."""
         super().__init__(scope, construct_id, config, **kwargs)
-        self._config = config
 
     def _initialize_function_props(self) -> None:
         runtime_name = self._config.runtime.value.replace(":", "")
@@ -400,20 +404,24 @@ class DockerLambda(BaseLambda):
         **kwargs,
     ) -> None:
         """Initialize the builder."""
-        self._handler_root_dir = "${LAMBDA_TASK_ROOT}" # this needs to be first to configure the handler root dir
-        super().__init__(scope, construct_id, config, **kwargs)
+        if config.run_as_webserver:
+            handler_root_dir = "/var/task"
+            self._port_env_var_name = "PORT"
+        else:
+            handler_root_dir = "${LAMBDA_TASK_ROOT}" # this needs to be first to configure the handler root dir
+        self._previous_stage_name = "build"
         self._config = config
+        self._working_dir_docker_cmd = f"WORKDIR {handler_root_dir}"
+        super().__init__(scope, construct_id, config, **kwargs)
 
     def _initialize_function_props(self) -> None:
-        stage_name = "build"
         if self._config.run_as_webserver:
             self.dockerfile_content = [
-                f"FROM public.ecr.aws/docker/library/{self._config.runtime}-slim-buster",
+                f"FROM public.ecr.aws/docker/library/{self._config.runtime}-slim-buster AS {self._previous_stage_name}",
                 "COPY --from=public.ecr.aws/awsguru/aws-lambda-adapter:0.7.0 /lambda-adapter /opt/extensions/lambda-adapter",
             ]
         else:
-            self.dockerfile_content = [f"FROM public.ecr.aws/lambda/{self._config.runtime} AS {stage_name}"]
-        self._previous_stage_name = stage_name
+            self.dockerfile_content = [f"FROM public.ecr.aws/lambda/{self._config.runtime} AS {self._previous_stage_name}"]
 
     def _create_docker_file(self) -> str:
         self._copy_build_context_to_container()
@@ -425,13 +433,23 @@ class DockerLambda(BaseLambda):
 
     def _copy_build_context_to_container(self) -> None:
         stage_name = "add-build-context"
-        self.dockerfile_content.append(f"FROM {self._previous_stage_name} AS {stage_name}")
+        contents = [
+            f"FROM {self._previous_stage_name} AS {stage_name}",
+            f"ENV {self._port_env_var_name}=8000", 
+            self._working_dir_docker_cmd,
+            "COPY . .",
+        ]
+        self.dockerfile_content.extend(contents)
         self._previous_stage_name = stage_name
-        self.dockerfile_content.append(f"COPY . {self._handler_root_dir}")
 
     def _add_handler_cmd(self) -> None:
-        fully_qualified_handler_name = f"{self._config.handler_module_name}.{self._config.handler_name}"
-        self.dockerfile_content.append(f"CMD [ \"{fully_qualified_handler_name}\" ]")
+        handler_separator = ":" if self._config.run_as_webserver else "."
+        fully_qualified_handler_name = f"{self._config.handler_module_name}{handler_separator}{self._config.handler_name}"
+        if self._config.run_as_webserver:
+            command = f"CMD exec uvicorn --port ${self._port_env_var_name} --factory {fully_qualified_handler_name}"
+        else:
+            command = f"CMD [ \"{fully_qualified_handler_name}\" ]"
+        self.dockerfile_content.append(command)
 
     def _create_layer_with_zip_asset(self) -> None:
         config = self._config
@@ -442,8 +460,14 @@ class DockerLambda(BaseLambda):
         config = self._config
         shutil.copy(config.requirements_file_path, self._build_context_folder)
         install_cmd = f"pip install --no-cache-dir pip && pip install -r {config.requirements_file_path.name}"
-        self.dockerfile_content.append(f"COPY {config.requirements_file_path.name} .")
-        self.dockerfile_content.append(f"RUN {install_cmd} && find . -name '*.pyc' -delete")
+        contents = [
+            self._working_dir_docker_cmd,
+            f"COPY {config.requirements_file_path.name} .",
+            f"RUN {install_cmd} && find . -name '*.pyc' -delete",
+        ]
+        self.dockerfile_content.extend(contents)
+        if config.run_as_webserver:
+            self.dockerfile_content.append("RUN pip install uvicorn")
 
     def _create_lambda_function(self) -> _lambda.DockerImageFunction:
         build_context_path = str(self._build_context_folder.resolve())
