@@ -96,11 +96,27 @@ class PineconeDB:
             sparse_vector=sparse,
             top_k=4,
         )
+        docs = PineconeDocuments(class_id=PineconeDocument.metadata.class_id, documents=[])
+        for result in results.to_dict()['matches']:
+            result.
+            docs.documents.append(
+                PineconeDocument(
+                    values=result.vector,
+                    sparse_values=result.sparse_vector,
+                    metadata=PineconeDocument.Metadata(
+                        class_id=result.metadata["class_id"],
+                        document_id=result.metadata["document_id"],
+                        document_name=result.metadata["document_name"],
+                        document_type=result.metadata["document_type"],
+                        document_url=result.metadata["document_url"],
+                    ),
+                )
+            )
         return PineconeDocuments.parse_obj(**results.to_dict())
 
     def delete_vectors(self, documents: PineconeDocuments) -> None:
         """Delete vectors from pinecone db."""
-        self._execute_casync_pinecone_operation("delete", documents)
+        self._execute_async_pinecone_operation("delete", documents)
 
     def delete_all_vectors(self, class_id: UUID) -> None:
         """Delete all vectors from pinecone db."""

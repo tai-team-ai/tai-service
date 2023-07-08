@@ -42,11 +42,17 @@ class PineconeDocument(BasePydanticModel):
     )
     sparse_values: Optional[SparseVector] = Field(
         description="The sparse vector of the class resource.",
+        alias="sparseValues",
     )
     metadata: ChunkMetadata = Field(
         ...,
         description="The metadata of the class resource.",
     )
+    score: Optional[float] = Field(
+        default=None,
+        description="The similarity score of the vector if returned in response to a query.",
+    )
+
 
 # this is modeled to match the query response from pinecone
 # https://docs.pinecone.io/docs/python-client#indexquery
