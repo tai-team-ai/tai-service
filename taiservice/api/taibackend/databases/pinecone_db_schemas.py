@@ -8,7 +8,7 @@ try:
         ChunkMetadata,
         BasePydanticModel,
     )
-except ImportError:
+except (KeyError, ImportError):
     from taiservice.api.taibackend.shared_schemas import (
         ChunkMetadata,
         BasePydanticModel,
@@ -52,6 +52,11 @@ class PineconeDocument(BasePydanticModel):
         default=None,
         description="The similarity score of the vector if returned in response to a query.",
     )
+
+    class Config:
+        """Define the config for the pinecone document model."""
+        allow_population_by_field_name = True
+        validate_assignment = True
 
 
 # this is modeled to match the query response from pinecone
