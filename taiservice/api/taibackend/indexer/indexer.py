@@ -127,7 +127,7 @@ class Indexer:
             )
             chunk_documents = self._load_and_split_document(ingested_document)
             class_resource_document.class_resource_chunk_ids = [chunk_doc.id for chunk_doc in chunk_documents]
-            vector_documents = self._embed_documents(chunk_documents, class_resource_document.class_id)
+            vector_documents = self.embed_documents(chunk_documents, class_resource_document.class_id)
             self._load_class_resources_to_db(class_resource_document, chunk_documents)
             self._load_vectors_to_vector_store(vector_documents)
             class_resource_document.status = ClassResourceProcessingStatus.COMPLETED
@@ -205,14 +205,14 @@ class Indexer:
         if ingested_document.input_format == InputFormat.PDF:
             return get_page_number(documents)
 
-    def _embed_documents(self, documents: list[ClassResourceChunkDocument], class_id: UUID) -> PineconeDocuments:
+    def embed_documents(self, documents: list[ClassResourceChunkDocument], class_id: UUID) -> PineconeDocuments:
         """Embed documents."""
         def _embed_batch(batch: list[ClassResourceChunkDocument]) -> list[PineconeDocument]:
             """Embed a batch of documents."""
             texts = [document.chunk for document in batch]
             dense_vectors = self._embedding_strategy.embed_documents(texts)
-            vector_docs =  self._vector_document_from_dense_vectors(dense_vectors, batch)
-            sparse_vectors = self._get_sparse_vectors(texts)
+            vector_docs =  self.vector_document_from_dense_vectors(dense_vectors, batch)
+            sparse_vectors = self.get_sparse_vectors(texts)
             for vector_doc, sparse_vector in zip(vector_docs, sparse_vectors):
                 vector_doc.sparse_values = sparse_vector
             return vector_docs
@@ -223,7 +223,8 @@ class Indexer:
             vector_docs = [vector_doc for result in results for vector_doc in result]
         return PineconeDocuments(class_id=class_id, documents=vector_docs)
 
-    def _get_sparse_vectors(self, texts: list[str]) -> list[SparseVector]:
+    @staticmethod
+    def get_sparse_vectors(texts: list[str]) -> list[SparseVector]:
         """Add sparse vectors to pinecone."""
         splade = SpladeEncoder()
         vectors = splade.encode_documents(texts)
@@ -233,8 +234,8 @@ class Indexer:
             sparse_vectors.append(sparse_vector)
         return sparse_vectors
 
-    def _vector_document_from_dense_vectors(
-        self,
+    @staticmethod
+    def vector_document_from_dense_vectors(
         dense_vectors: list[list[float]],
         documents: list[ClassResourceChunkDocument],
     ) -> list[PineconeDocument]:

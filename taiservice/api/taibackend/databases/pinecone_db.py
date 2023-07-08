@@ -82,7 +82,7 @@ class PineconeDB:
             include_values=True,
             include_metadata=True,
             vector=document.values,
-            sparse_vector=document.sparse_vector,
+            sparse_vector=document.sparse_values,
             top_k=4,
         )
         return PineconeDocuments.parse_obj(**results.to_dict())

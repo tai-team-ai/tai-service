@@ -1,15 +1,13 @@
 """Define CRUD endpoints for class resources."""
-from uuid import UUID
-from typing import Annotated
-from fastapi import APIRouter, Request, Query
+from fastapi import APIRouter, Request
 # first imports are for local development, second imports are for deployment
 try:
     from .class_resources_schema import ClassResource, ClassResources, ClassResourceIds
-    from ..taibackend.class_resources_backend import ClassResourcesBackend
+    from ..taibackend.backend import ClassResourcesBackend
     from ..runtime_settings import BACKEND_ATTRIBUTE_NAME
 except ImportError:
     from routers.class_resources_schema import ClassResource, ClassResources, ClassResourceIds
-    from taibackend.class_resources_backend import ClassResourcesBackend
+    from taibackend.backend import ClassResourcesBackend
     from runtime_settings import BACKEND_ATTRIBUTE_NAME
 
 

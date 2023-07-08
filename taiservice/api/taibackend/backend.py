@@ -1,14 +1,23 @@
 """Define the class resources backend."""
-from typing import Any, Union
-import json
 from uuid import UUID
+from uuid import uuid4
 from loguru import logger
-import boto3
-from botocore.exceptions import ClientError
 try:
     from taiservice.api.runtime_settings import TaiApiSettings
-    from ..routers.class_resources_schema import ClassResource, Metadata, ClassResourceProcessingStatus
-    from .databases.document_db_schemas import ClassResourceDocument, ClassResourceChunkDocument
+    from ..routers.class_resources_schema import (
+        ClassResource,
+        Metadata as APIResourceMetadata,
+        ClassResourceType as APIResourceType,
+        ClassResourceProcessingStatus,
+    )
+    from .databases.document_db_schemas import (
+        ClassResourceDocument,
+        ClassResourceChunkDocument,
+    )
+    from .shared_schemas import (
+        Metadata as DBResourceMetadata,
+        ClassResourceType as DBResourceType,
+    )
     from .databases.document_db import DocumentDB, DocumentDBConfig
     from .databases.pinecone_db import PineconeDB, PineconeDBConfig
     from .indexer.indexer import (
@@ -17,10 +26,22 @@ try:
         IndexerConfig,
         OpenAIConfig,
     )
-except ImportError:
+except (KeyError, ImportError):
     from runtime_settings import TaiApiSettings
-    from routers.class_resources_schema import ClassResource, Metadata, ClassResourceProcessingStatus
-    from taibackend.databases.document_db_schemas import ClassResourceDocument, ClassResourceChunkDocument
+    from routers.class_resources_schema import (
+        ClassResource,
+        Metadata as APIResourceMetadata,
+        ClassResourceType as APIResourceType,
+        ClassResourceProcessingStatus
+    )
+    from taibackend.databases.document_db_schemas import (
+        ClassResourceDocument,
+        ClassResourceChunkDocument,
+    )
+    from taibackend.shared_schemas import (
+        Metadata as DBResourceMetadata,
+        ClassResourceType as DBResourceType,
+    )
     from taibackend.databases.document_db import DocumentDB, DocumentDBConfig
     from taibackend.databases.pinecone_db import PineconeDB, PineconeDBConfig
     from taibackend.indexer.indexer import (
@@ -62,6 +83,29 @@ class ClassResourcesBackend:
             document_db_config=self._doc_db_config,
             openai_config=openAI_config,
         )
+
+    def get_relevant_class_resources(
+        self,
+        query: str,
+        class_id: UUID,
+    ) -> list[ClassResource]:
+        """Get the most relevant class resources."""
+        #convert query into a chunk document:
+        chunk_doc = ClassResourceChunkDocument(
+            class_id=class_id,
+            chunk=query,
+            full_resource_url="https://www.google.com", # this is a dummy link as it's not needed for the query
+            id=uuid4(),
+            metadata=DBResourceMetadata(
+                title="User Query",
+                description="User Query",
+                resource_type=DBResourceType.TEXTBOOK,
+            )
+        )
+        indexer = Indexer(self._indexer_config)
+        pinecone_docs = indexer.embed_documents(documents=[chunk_doc], class_id=class_id)
+        similar_docs = self._pinecone_db.get_similar_vectors(document=pinecone_docs[0], class_id=class_id)
+        
 
     def get_class_resources(self, ids: list[UUID]) -> list[ClassResource]:
         """Get the class resources."""
@@ -158,7 +202,7 @@ class ClassResourcesBackend:
                 full_resource_url=doc.full_resource_url,
                 preview_image_url=doc.preview_image_url,
                 status=doc.status,
-                metadata=Metadata(
+                metadata=APIResourceMetadata(
                     title=metadata.title,
                     description=metadata.description,
                     tags=metadata.tags,
@@ -179,7 +223,7 @@ class ClassResourcesBackend:
                 full_resource_url=resource.full_resource_url,
                 preview_image_url=resource.preview_image_url,
                 status=resource.status,
-                metadata=Metadata(
+                metadata=DBResourceMetadata(
                     title=metadata.title,
                     description=metadata.description,
                     tags=metadata.tags,

@@ -2,6 +2,7 @@
 from enum import Enum
 from typing import Optional
 from uuid import UUID
+from uuid import uuid4
 from pydantic import Field, validator
 # first imports are for local development, second imports are for deployment
 try:
@@ -96,7 +97,7 @@ class ClassResourceChunkDocument(BaseClassResourceDocument):
         description="The text chunk of the class resource.",
     )
     vector_id: UUID = Field(
-        default_factory=list,
+        default=uuid4(),
         description="The ID of the class resource chunk vector.",
     )
     metadata: ChunkMetadata = Field(
