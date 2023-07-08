@@ -11,7 +11,7 @@ from langchain import document_loaders
 from langchain.document_loaders.base import BaseLoader
 from langchain.text_splitter import TextSplitter
 from langchain.schema import Document
-# from pinecone_text.sparse import SpladeEncoder
+from pinecone_text.sparse import SpladeEncoder
 try:
     from .data_ingestors import (
         get_splitter_text_splitter,
