@@ -1,5 +1,4 @@
 """Define the class resources backend."""
-import re
 from typing import Any, Union
 import json
 from uuid import UUID
@@ -16,9 +15,7 @@ try:
         Indexer,
         InputDocument,
         IndexerConfig,
-        InputDataIngestStrategy,
         OpenAIConfig,
-        IngestedDocument,
     )
 except ImportError:
     from runtime_settings import TaiApiSettings
@@ -30,9 +27,7 @@ except ImportError:
         Indexer,
         InputDocument,
         IndexerConfig,
-        InputDataIngestStrategy,
         OpenAIConfig,
-        IngestedDocument,
     )
 
 class ClassResourcesBackend:

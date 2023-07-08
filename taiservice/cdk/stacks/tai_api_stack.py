@@ -14,6 +14,7 @@ from .stack_config_models import StackConfigBaseModel
 from .stack_helpers  import add_tags
 from ..constructs.python_lambda_construct import (
     DockerLambda,
+    DockerLambdaConfigModel,
     BaseLambdaConfigModel,
     LambdaURLConfigModel,
     LambdaRuntime,
@@ -97,22 +98,22 @@ class TaiApiStack(Stack):
             connection=ec2.Port.tcp(443),
             description="Allow outbound HTTPS traffic to Secrets Manager.",
         )
-        subnet_type = ec2.SubnetType.PUBLIC
+        subnet_type = ec2.SubnetType.PRIVATE_WITH_EGRESS
         assert vpc_interface_exists(ec2.InterfaceVpcEndpointAwsService.SECRETS_MANAGER, self._vpc),\
             "The VPC must have an interface endpoint for Secrets Manager."
-        lambda_config = BaseLambdaConfigModel(
+        lambda_config = DockerLambdaConfigModel(
             function_name=function_name,
             description="The lambda for the TAI API service.",
             code_path=API_DIR,
             runtime=LambdaRuntime.PYTHON_3_10,
-            handler_module_name="index",
-            handler_name="handler",
+            handler_module_name="main",
+            handler_name="create_app",
             runtime_environment=self._settings,
             requirements_file_path=API_DIR / "requirements.txt",
             files_to_copy_into_handler_dir=MODULES_TO_COPY_INTO_API_DIR,
             timeout=Duration.minutes(3),
-            memory_size=128,
-            ephemeral_storage_size=StorageSize.mebibytes(512),
+            memory_size=3000,
+            ephemeral_storage_size=StorageSize.gibibytes(3),
             vpc=self._vpc,
             subnet_selection=ec2.SubnetSelection(subnet_type=subnet_type),
             security_groups=[security_group_secrets, security_group_allowing_db_connections],
@@ -121,5 +122,10 @@ class TaiApiStack(Stack):
                 allowed_origins=["*"],
                 auth_type=_lambda.FunctionUrlAuthType.NONE,
             ),
+            run_as_webserver=True,
+            custom_docker_commands=[
+                "RUN mkdir -p /var/task/nltk_data",  # Create directory for model
+                f"RUN python -m nltk.downloader -d {self._settings.nltk_data} punkt stopwords",  # Download the model and save it to the directory
+            ]
         )
         return lambda_config

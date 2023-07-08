@@ -4,14 +4,15 @@ mangum
 pydantic<=1.10.10
 pinecone-client
 pymongo<=4.4
+boto3
 filetype<=1.2.0
 beautifulsoup4
 openai
 tiktoken
-pinecone-text
 langchain
+pymupdf
+pinecone-text
 # # pinecone-text[splade] # This installs torch with CUDA, which is a massive package
 # # this manually installs the optional splade dependencies without cuda:
 torch -f https://download.pytorch.org/whl/cpu
 transformers
-pymupdf

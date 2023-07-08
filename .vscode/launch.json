@@ -22,7 +22,8 @@
         "DOC_DB_DATABASE_NAME": "class_resources",
         "DOC_DB_CLASS_RESOURCE_COLLECTION_NAME": "class_resource",
         "DOC_DB_CLASS_RESOURCE_CHUNK_COLLECTION_NAME": "class_resource_chunk",
-        "OPENAI_API_KEY_SECRET_NAME": "dev/tai_service/openai/api_key"
+        "OPENAI_API_KEY_SECRET_NAME": "dev/tai_service/openai/api_key",
+        "AWS_DEFAULT_REGION": "us-east-1"
       },
       "program": "${workspaceFolder}/.venv/bin/uvicorn"
     }

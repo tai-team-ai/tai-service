@@ -39,7 +39,7 @@ class SearchServiceDatabases(Stack):
         self._doc_db_settings = doc_db_settings
         self._config = config
         self._namer = lambda name: f"{config.stack_name}-{name}"
-        self._subnet_type_for_doc_db = ec2.SubnetType.PRIVATE_ISOLATED
+        self._subnet_type_for_doc_db = ec2.SubnetType.PRIVATE_WITH_EGRESS
         self.vpc = self._create_vpc()
         self.document_db = self._get_document_db(doc_db_settings=doc_db_settings)
         self._security_group_for_connecting_to_doc_db = self.document_db.security_group_for_connecting_to_cluster
@@ -60,7 +60,7 @@ class SearchServiceDatabases(Stack):
         subnet_configurations.append(
             ec2.SubnetConfiguration(
                 name=self._namer("subnet-isolated"),
-                subnet_type=ec2.SubnetType.PRIVATE_ISOLATED,
+                subnet_type=ec2.SubnetType.PRIVATE_WITH_EGRESS,
             )
         )
         subnet_configurations.append(
@@ -74,7 +74,7 @@ class SearchServiceDatabases(Stack):
             id=self._namer("vpc"),
             vpc_name=self._namer("vpc"),
             max_azs=3,
-            nat_gateways=0,
+            nat_gateways=1,
             subnet_configuration=subnet_configurations,
         )
         subnets = ec2.SubnetSelection(one_per_az=True)

@@ -107,18 +107,36 @@ make_file.add_rule(
         "sudo systemctl start docker",
     ],
 )
+def convert_dict_env_vars_to_docker_env_vars(env_vars: dict):
+    return " ".join([f"-e {key}=\"{value}\"" for key, value in env_vars.items()])
+
+RUNTIME_ENV_VARS = {
+    "PINECONE_DB_API_KEY_SECRET_NAME": "dev/tai_service/pinecone_db/api_key",
+    "PINECONE_DB_ENVIRONMENT": "us-east-1-aws",
+    "PINECONE_DB_INDEX_NAME": "tai-index",
+    "DOC_DB_CREDENTIALS_SECRET_NAME": "dev/tai_service/document_DB/read_write_user_password",
+    "DOC_DB_USERNAME_SECRET_KEY": "username",
+    "DOC_DB_PASSWORD_SECRET_KEY": "password",
+    "DOC_DB_FULLY_QUALIFIED_DOMAIN_NAME": "tai-service-645860363137.us-east-1.docdb-elastic.amazonaws.com",
+    "DOC_DB_PORT": "27017",
+    "DOC_DB_DATABASE_NAME": "class_resources",
+    "DOC_DB_CLASS_RESOURCE_COLLECTION_NAME": "class_resource",
+    "DOC_DB_CLASS_RESOURCE_CHUNK_COLLECTION_NAME": "class_resource_chunk",
+    "OPENAI_API_KEY_SECRET_NAME": "dev/tai_service/openai/api_key",
+    "AWS_DEFAULT_REGION": "us-east-1",
+}
 make_file.add_rule(
     targets=["build-and-run-docker"],
     recipe=[
         "cd $(DIR) && \\",
         "docker build -t test-container . && \\",
-        "docker run -p 9000:8080 test-container",
+        f"docker run -p 8000:8000 {convert_dict_env_vars_to_docker_env_vars(RUNTIME_ENV_VARS)} test-container",
     ],
 )
 make_file.add_rule(
     targets=["test-docker-lambda"],
     recipe=[
-        'curl -XPOST "http://localhost:9000/2015-03-31/functions/function/invocations" -d \'{"payload":"hello world!"}\'',
+        'curl localhost:8000/',
     ],
 )
 
@@ -134,21 +152,9 @@ vscode_launch_config.add_configuration(
         "--reload",
         "--factory"
     ],
-    env={
-        "PINECONE_DB_API_KEY_SECRET_NAME": "dev/tai_service/pinecone_db/api_key",
-        "PINECONE_DB_ENVIRONMENT": "us-east-1-aws",
-        "PINECONE_DB_INDEX_NAME": "tai-index",
-        "DOC_DB_CREDENTIALS_SECRET_NAME": "dev/tai_service/document_DB/read_write_user_password",
-        "DOC_DB_USERNAME_SECRET_KEY": "username",
-        "DOC_DB_PASSWORD_SECRET_KEY": "password",
-        "DOC_DB_FULLY_QUALIFIED_DOMAIN_NAME": "tai-service-645860363137.us-east-1.docdb-elastic.amazonaws.com",
-        "DOC_DB_PORT": "27017",
-        "DOC_DB_DATABASE_NAME": "class_resources",
-        "DOC_DB_CLASS_RESOURCE_COLLECTION_NAME": "class_resource",
-        "DOC_DB_CLASS_RESOURCE_CHUNK_COLLECTION_NAME": "class_resource_chunk",
-        "OPENAI_API_KEY_SECRET_NAME": "dev/tai_service/openai/api_key",
-    },
+    env=RUNTIME_ENV_VARS,
 )
+
 vscode_settings: VsCodeSettings = VsCodeSettings(vscode)
 vscode_settings.add_setting("python.formatting.provider", "none")
 vscode_settings.add_setting("python.testing.pytestEnabled", True)
