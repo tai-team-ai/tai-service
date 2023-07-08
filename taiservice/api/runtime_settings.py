@@ -74,3 +74,7 @@ class TaiApiSettings(BaseSettings):
         default="/var/task/nltk_data",
         description="The path to the nltk data.",
     )
+    transformers_cache: str = Field(
+        default="/tmp/transformers_cache",
+        description="The path to the transformers cache.",
+    )
