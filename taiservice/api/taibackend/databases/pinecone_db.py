@@ -89,7 +89,7 @@ class PineconeDB:
 
     def delete_vectors(self, documents: PineconeDocuments) -> None:
         """Delete vectors from pinecone db."""
-        self._execute_async_pinecone_operation("delete", documents)
+        self._execute_casync_pinecone_operation("delete", documents)
 
     def delete_all_vectors(self, class_id: UUID) -> None:
         """Delete all vectors from pinecone db."""
