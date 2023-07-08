@@ -5,6 +5,7 @@ from typing import List
 from uuid import UUID
 from pydantic import BaseModel, Field
 import pinecone
+from pinecone_text.hybrid import hybrid_convex_scale
 # first imports are for local development, second imports are for deployment
 try:
     from .pinecone_db_schemas import PineconeDocuments, PineconeDocument
@@ -75,8 +76,17 @@ class PineconeDB:
         """Upsert vectors into pinecone db."""
         self._execute_async_pinecone_operation("upsert", documents)
 
-    def get_similar_vectors(self, document: PineconeDocument) -> PineconeDocuments:
-        """Get similar vectors from pinecone db."""
+    def get_similar_vectors(self, document: PineconeDocument, alpha=0.8) -> PineconeDocuments:
+        """
+        Get similar vectors from pinecone db.
+
+        Args:
+            document: The document to get similar vectors for.
+            alpha: The alpha value for the hybrid convex scale. Lower value
+                will favor semantic search, while a value closer to 1 will
+                favor keyword search.
+        """
+        assert 0 <= alpha <= 1, "alpha must be between 0 and 1"
         results = self.index.query(
             namespace=PineconeDocument.metadata.class_id,
             include_values=True,
