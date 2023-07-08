@@ -189,7 +189,6 @@ class Indexer:
             chunk_doc = ClassResourceChunkDocument(
                 id=uuid4(),
                 chunk=split_doc.page_content,
-                vector_id=uuid4(),
                 metadata=ChunkMetadata(
                     class_id=document.class_id,
                     page_number=get_page_number(split_doc),
@@ -242,7 +241,7 @@ class Indexer:
         vector_docs = []
         for dense_vector, document in zip(dense_vectors, documents):
             doc = PineconeDocument(
-                id=document.vector_id,
+                id=document.metadata.vector_id,
                 metadata=ChunkMetadata.parse_obj(document.metadata),
                 values=dense_vector,
             )

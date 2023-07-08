@@ -1,7 +1,11 @@
 """Define the class resources backend."""
+import json
 from uuid import UUID
+from typing import Union, Any
 from uuid import uuid4
 from loguru import logger
+import boto3
+from botocore.exceptions import ClientError
 try:
     from taiservice.api.runtime_settings import TaiApiSettings
     from ..routers.class_resources_schema import (
@@ -173,7 +177,7 @@ class ClassResourcesBackend:
 
     def _delete_vectors_from_chunks(self, chunks: list[ClassResourceChunkDocument]) -> None:
         """Delete the vectors from the chunks."""
-        vector_ids = [chunk.vector_id for chunk in chunks]
+        vector_ids = [chunk.metadata.vector_id for chunk in chunks]
         self._pinecone_db.delete_vectors(vector_ids)
 
     def _get_secret_value(self, secret_name: str) -> Union[dict[str, Any], str]:

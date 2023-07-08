@@ -76,7 +76,7 @@ class PineconeDB:
         """Upsert vectors into pinecone db."""
         self._execute_async_pinecone_operation("upsert", documents)
 
-    def get_similar_vectors(self, document: PineconeDocument, alpha=0.8) -> PineconeDocuments:
+    def get_similar_documents(self, document: PineconeDocument, alpha=0.8) -> PineconeDocuments:
         """
         Get similar vectors from pinecone db.
 
@@ -87,12 +87,13 @@ class PineconeDB:
                 favor keyword search.
         """
         assert 0 <= alpha <= 1, "alpha must be between 0 and 1"
+        dense, sparse = hybrid_convex_scale(document.values, document.sparse_values, alpha)
         results = self.index.query(
             namespace=PineconeDocument.metadata.class_id,
             include_values=True,
             include_metadata=True,
-            vector=document.values,
-            sparse_vector=document.sparse_values,
+            vector=dense,
+            sparse_vector=sparse,
             top_k=4,
         )
         return PineconeDocuments.parse_obj(**results.to_dict())

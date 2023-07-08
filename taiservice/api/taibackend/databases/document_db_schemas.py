@@ -96,20 +96,22 @@ class ClassResourceChunkDocument(BaseClassResourceDocument):
         ...,
         description="The text chunk of the class resource.",
     )
-    vector_id: UUID = Field(
-        default=uuid4(),
-        description="The ID of the class resource chunk vector.",
-    )
     metadata: ChunkMetadata = Field(
         ...,
         description="The metadata of the class resource chunk.",
     )
 
-    @validator("metadata")
-    def ensure_same_class_id(cls, metadata: ChunkMetadata, values: dict) -> ChunkMetadata:
+    @staticmethod
+    def _ensure_same_class_id(metadata_class_id: UUID, class_id: UUID) -> None:
         """Ensure the same class id."""
-        assert metadata.class_id == values.get("class_id"), \
+        assert metadata_class_id == class_id, \
             "The class id of the metadata must be the same as the class id " \
-            f"of the class resource. Id of the metadata: {metadata.class_id}, " \
-            f"id of the class resource: {values.get('class_id')}"
+            f"of the class resource. Id of the metadata: {metadata_class_id}, " \
+            f"id of the class resource: {class_id}"
+
+    @validator("metadata")
+    def validate_metadata(cls, metadata: ChunkMetadata, values: dict) -> ChunkMetadata:
+        """Ensure the same class id."""
+        cls._ensure_same_class_id(metadata.class_id, values.get("class_id"))
+        metadata.chunk_id = values.get("id")
         return metadata
