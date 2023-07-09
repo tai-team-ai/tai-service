@@ -51,7 +51,7 @@ class PineconeDB:
         return pinecone.Index(self._index_name)
 
     def _export_documents(self, documents: PineconeDocuments) -> List[dict]:
-        docs = [doc.dict() for doc in documents.documents]
+        docs = [doc.dict(exclude={'score'}) for doc in documents.documents]
         return docs
 
     def _get_exported_batches(self, documents: PineconeDocuments) -> List[PineconeDocuments]:

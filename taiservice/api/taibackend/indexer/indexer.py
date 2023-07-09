@@ -118,25 +118,22 @@ class Indexer:
         )
         self._batch_size = indexer_config.openai_config.batch_size
 
-    def index_resource(self, ingested_document: IngestedDocument) -> None:
+    def index_resource(
+        self,
+        ingested_document: IngestedDocument,
+        class_resource_document: ClassResourceDocument
+    ) -> ClassResourceDocument:
         """Index a document."""
         try:
-            class_resource_document = ClassResourceDocument(
-                status=ClassResourceProcessingStatus.PROCESSING,
-                **ingested_document.dict(),
-            )
             chunk_documents = self._load_and_split_document(ingested_document)
             class_resource_document.class_resource_chunk_ids = [chunk_doc.id for chunk_doc in chunk_documents]
             vector_documents = self.embed_documents(chunk_documents, class_resource_document.class_id)
             self._load_class_resources_to_db(class_resource_document, chunk_documents)
             self._load_vectors_to_vector_store(vector_documents)
-            class_resource_document.status = ClassResourceProcessingStatus.COMPLETED
-            self._document_db.upsert_document(class_resource_document)
         except Exception as e:
             logger.error(traceback.format_exc())
-            class_resource_document.status = ClassResourceProcessingStatus.FAILED
-            self._document_db.upsert_document(class_resource_document)
             raise RuntimeError("Failed to index resource.") from e
+        return class_resource_document
 
     def _load_vectors_to_vector_store(self, vector_documents: PineconeDocuments) -> None:
         """Load vectors to vector store."""

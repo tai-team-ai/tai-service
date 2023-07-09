@@ -58,6 +58,7 @@ class BasePydanticModel(BaseModel):
         """Define the configuration for the Pydantic model."""
 
         use_enum_values = True
+        allow_population_by_field_name = True
 
 
 class Metadata(BasePydanticModel):
@@ -119,6 +120,7 @@ class BaseClassResourceDocument(BasePydanticModel):
     id: UUID = Field(
         ...,
         description="The ID of the class resource.",
+        alias="_id",
     )
     class_id: UUID = Field(
         ...,

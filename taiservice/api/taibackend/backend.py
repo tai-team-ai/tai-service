@@ -165,7 +165,7 @@ class Backend:
         for ingested_doc, class_resource in doc_pairs:
             try:
                 self._coerce_and_update_status(class_resource, ClassResourceProcessingStatus.PROCESSING)
-                indexer.index_resource(ingested_doc)
+                class_resource = indexer.index_resource(ingested_doc, class_resource)
                 self._coerce_and_update_status(class_resource, ClassResourceProcessingStatus.COMPLETED)
             except Exception as e: # pylint: disable=broad-except
                 logger.critical(f"Failed to create class resources: {e}")
