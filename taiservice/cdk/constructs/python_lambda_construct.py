@@ -219,7 +219,7 @@ class BaseLambda(Construct):
     @property
     def function_url(self) -> Optional[str]:
         """Get the function URL."""
-        return self._function_url
+        return self._function_url.url
 
     @abstractmethod
     def _create_layer_with_zip_asset(self) -> None:
