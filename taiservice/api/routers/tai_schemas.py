@@ -137,7 +137,7 @@ EXAMPLE_CHAT_SESSION_RESPONSE = copy.deepcopy(EXAMPLE_CHAT_SESSION_REQUEST)
 EXAMPLE_CHAT_SESSION_RESPONSE["chats"].append(
     {
         "message": "I can help you with that!",
-        "role": "tai_tutor",
+        "role": ChatRole.TAI_TUTOR,
         "taiTutor": TaiTutorName.ALEX,
         "technicalLevel": ResponseTechnicalLevel.EXPLAIN_LIKE_IM_IN_HIGH_SCHOOL,
         "classResourceSnippets": [
