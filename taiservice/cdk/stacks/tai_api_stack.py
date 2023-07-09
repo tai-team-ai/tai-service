@@ -8,6 +8,7 @@ from aws_cdk import (
     aws_ec2 as ec2,
     Duration,
     Size as StorageSize,
+    CfnOutput,
 )
 from ...api.runtime_settings import TaiApiSettings
 from .stack_config_models import StackConfigBaseModel
@@ -62,6 +63,12 @@ class TaiApiStack(Stack):
         self._vpc = get_vpc(self, vpc)
         self._python_lambda: DockerLambda = self._create_lambda_function(security_group_allowing_db_connections)
         add_tags(self, config.tags)
+        CfnOutput(
+            self,
+            id="FunctionURL",
+            value=self._python_lambda.function_url,
+            description="The URL of the lambda function.",
+        )
 
     @property
     def lambda_function(self) -> _lambda.Function:

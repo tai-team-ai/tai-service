@@ -197,6 +197,7 @@ class BaseLambda(Construct):
         self._scope = scope
         config.vpc = get_vpc(scope, config.vpc)
         self.security_groups = config.security_groups
+        self._function_url = None
         self._config = config
         self._function_props_dict = {
             "function_name": config.function_name,
@@ -214,6 +215,11 @@ class BaseLambda(Construct):
     def lambda_function(self) -> _lambda.Function:
         """Get the Lambda function."""
         return self._lambda_function
+
+    @property
+    def function_url(self) -> Optional[str]:
+        """Get the function URL."""
+        return self._function_url
 
     @abstractmethod
     def _create_layer_with_zip_asset(self) -> None:
@@ -314,7 +320,7 @@ class BaseLambda(Construct):
     def _create_instantiated_props(self) -> None:
         config = self._config
         if config.function_url_config:
-            self._add_function_url(config.function_url_config)
+            self._function_url = self._add_function_url(config.function_url_config)
 
     def _add_function_url(self, url_config: LambdaURLConfigModel) -> _lambda.FunctionUrl:
         url = self._lambda_function.add_function_url(
