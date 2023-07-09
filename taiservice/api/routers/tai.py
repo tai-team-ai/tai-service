@@ -2,7 +2,7 @@
 import copy
 from uuid import uuid4
 from typing import Union
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
 from pydantic import Field, validator
 try:
     from .tai_schemas import(
@@ -19,6 +19,8 @@ try:
     )
     from ..routers.base_schema import BasePydanticModel
     from ..routers.class_resources_schema import ClassResourceType, Metadata
+    from ..taibackend.backend import Backend
+    from ..runtime_settings import BACKEND_ATTRIBUTE_NAME
 except ImportError:
     from routers.tai_schemas import (
         Chat,
@@ -34,14 +36,18 @@ except ImportError:
     )
     from routers.base_schema import BasePydanticModel
     from routers.class_resources_schema import ClassResourceType, Metadata
+    from taibackend.backend import Backend
+    from runtime_settings import BACKEND_ATTRIBUTE_NAME
 
 ROUTER = APIRouter()
 
 
 @ROUTER.post("/chat", response_model=ChatSessionResponse)
-def chat(chat_session: ChatSessionRequest):
+def chat(chat_session: ChatSessionRequest, request: Request) -> ChatSessionResponse:
     """Define the chat endpoint."""
     chats = chat_session.chats
+    backend: Backend = getattr(request.app.state, BACKEND_ATTRIBUTE_NAME)
+    class_snippets = backend.get_relevant_class_resources(chat_session.chats[-1].message, chat_session.class_id)
     chats.append(
         TaiTutorChat(
             message="I can help you with that!",
@@ -49,21 +55,7 @@ def chat(chat_session: ChatSessionRequest):
             tai_tutor=TaiTutorName.ALEX,
             technical_level=ResponseTechnicalLevel.EXPLAIN_LIKE_IM_IN_HIGH_SCHOOL,
             render_chat=True,
-            class_resource_snippets=[
-                ClassResourceSnippet(
-                    id=uuid4(),
-                    class_id=uuid4(),
-                    resource_snippet="Molecules are made up of atoms.",
-                    full_resource_url="https://www.google.com",
-                    preview_image_url="https://www.google.com",
-                    metadata=Metadata(
-                        title="Molecules",
-                        description="Chemistry textbook snippet.",
-                        tags=["molecules", "atoms"],
-                        resource_type=ClassResourceType.TEXTBOOK,
-                    )
-                ),
-            ],
+            class_resource_snippets=class_snippets,
         ),
     )
     return ChatSessionResponse.parse_obj(chat_session)

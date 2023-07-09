@@ -2,14 +2,14 @@
 from enum import Enum
 from textwrap import dedent
 from typing import Optional, Annotated
-from uuid import UUID, uuid4
+from uuid import UUID
 from pydantic import Field, HttpUrl
 from fastapi import Query
 # first imports are for local development, second imports are for deployment
 try:
-    from ..routers.base_schema import BasePydanticModel
+    from ..routers.base_schema import BasePydanticModel, EXAMPLE_UUID
 except ImportError:
-    from routers.base_schema import BasePydanticModel
+    from routers.base_schema import BasePydanticModel, EXAMPLE_UUID
 
 
 ClassResourceIds = Annotated[list[UUID] | None, Query()]
@@ -81,8 +81,8 @@ class BaseClassResource(BasePydanticModel):
 
 EXAMPLE_CLASS_RESOURCE = {
     # example pdf resource
-    "id": uuid4(),
-    "classId": uuid4(),
+    "id": EXAMPLE_UUID,
+    "classId": EXAMPLE_UUID,
     "fullResourceUrl": "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf",
     "previewImageUrl": "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf",
     "status": ClassResourceProcessingStatus.PROCESSING,

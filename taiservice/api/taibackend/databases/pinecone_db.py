@@ -87,16 +87,16 @@ class PineconeDB:
                 favor keyword search.
         """
         assert 0 <= alpha <= 1, "alpha must be between 0 and 1"
-        dense, sparse = hybrid_convex_scale(document.values, document.sparse_values, alpha)
+        dense, sparse = hybrid_convex_scale(document.values, document.sparse_values.dict(), alpha)
         results = self.index.query(
-            namespace=PineconeDocument.metadata.class_id,
+            namespace=str(document.metadata.class_id),
             include_values=True,
             include_metadata=True,
             vector=dense,
             sparse_vector=sparse,
             top_k=4,
         )
-        docs = PineconeDocuments(class_id=PineconeDocument.metadata.class_id, documents=[])
+        docs = PineconeDocuments(class_id=document.metadata.class_id, documents=[])
         for result in results.to_dict()['matches']:
             docs.documents.append(PineconeDocument(**result))
         return docs

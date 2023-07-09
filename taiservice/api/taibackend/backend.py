@@ -92,7 +92,7 @@ class Backend:
             openai_config=openAI_config,
         )
 
-    def get_relevant_class_resources(self, query: str, class_id: UUID) -> list[ClassResource]:
+    def get_relevant_class_resources(self, query: str, class_id: UUID) -> list[ClassResourceSnippet]:
         """Get the most relevant class resources."""
         chunk_doc = ClassResourceChunkDocument(
             class_id=class_id,
@@ -100,6 +100,7 @@ class Backend:
             full_resource_url="https://www.google.com", # this is a dummy link as it's not needed for the query
             id=uuid4(),
             metadata=DBResourceMetadata(
+                class_id=class_id,
                 title="User Query",
                 description="User Query",
                 resource_type=DBResourceType.TEXTBOOK,
@@ -107,10 +108,11 @@ class Backend:
         )
         indexer = Indexer(self._indexer_config)
         pinecone_docs = indexer.embed_documents(documents=[chunk_doc], class_id=class_id)
-        similar_docs: PineconeDocuments = self._pinecone_db.get_similar_documents(document=pinecone_docs[0], class_id=class_id)
-        uuids = [doc.id for doc in similar_docs.documents]
+        similar_docs = self._pinecone_db.get_similar_documents(document=pinecone_docs.documents[0])
+        uuids = [doc.metadata.chunk_id for doc in similar_docs.documents]
         chunk_docs = self._doc_db.get_class_resources(uuids, ClassResourceChunkDocument)
-        return self.to_api_schema(chunk_docs)
+        resources = self.to_api_schema(chunk_docs)
+        return [resource for resource in resources if isinstance(resource, ClassResourceSnippet)]
 
     def get_class_resources(self, ids: list[UUID]) -> list[ClassResource]:
         """Get the class resources."""

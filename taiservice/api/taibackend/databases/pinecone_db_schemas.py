@@ -89,6 +89,8 @@ class PineconeDocuments(BasePydanticModel):
         document: PineconeDocument
         for document in values["documents"]:
             class_id.add(document.metadata.class_id)
+        if len(class_id) == 0:
+            return values
         if len(class_id) != 1:
             raise ValueError("")
         values.update({"class_id": class_id.pop()})

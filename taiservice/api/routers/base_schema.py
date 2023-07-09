@@ -1,4 +1,5 @@
 """Define the base schema for the API models."""
+from uuid import uuid4
 from pydantic import BaseModel, Extra
 
 def to_camel_case(string: str) -> str:
@@ -16,3 +17,5 @@ class BasePydanticModel(BaseModel):
         allow_population_by_field_name = True
         validate_assignment = True
         extra = Extra.forbid
+
+EXAMPLE_UUID = uuid4()

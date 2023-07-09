@@ -8,11 +8,11 @@ from pydantic import Field, validator
 
 try:
     from .class_resources_schema import BaseClassResource
-    from .base_schema import BasePydanticModel
+    from .base_schema import BasePydanticModel, EXAMPLE_UUID
     from .class_resources_schema import BaseClassResource, ClassResourceType
 except (ImportError, KeyError):
     from routers.class_resources_schema import BaseClassResource
-    from routers.base_schema import BasePydanticModel
+    from routers.base_schema import BasePydanticModel, EXAMPLE_UUID
     from routers.class_resources_schema import BaseClassResource, ClassResourceType
 
 class TaiTutorName(str, Enum):
@@ -25,18 +25,17 @@ class TaiTutorName(str, Enum):
 class ChatRole(str, Enum):
     """Define the built-in MongoDB roles."""
 
-    TAI_TUTOR = "tai_tutor"
+    TAI_TUTOR = "taiTutor"
     STUDENT = "student"
 
 
 class ResponseTechnicalLevel(str, Enum):
     """Define the technical level of the response."""
 
-    EXPLAIN_LIKE_IM_5 = "explain_like_im_5"
-    EXPLAIN_LIKE_IM_IN_HIGH_SCHOOL = "explain_like_im_in_high_school"
-    EXPLAIN_LIKE_IM_IN_COLLEGE = "explain_like_im_in_college"
-    EXPLAIN_LIKE_IM_AN_EXPERT_IN_THE_FIELD = "explain_like_im_an_expert_in_the_field"
-
+    EXPLAIN_LIKE_IM_5 = "like5"
+    EXPLAIN_LIKE_IM_IN_HIGH_SCHOOL = "likeHighSchool"
+    EXPLAIN_LIKE_IM_IN_COLLEGE = "likeCollege"
+    EXPLAIN_LIKE_IM_AN_EXPERT_IN_THE_FIELD = "likeExpertInTheField"
 
 class ClassResourceSnippet(BaseClassResource):
     """Define the request model for the class resource snippet."""
@@ -120,8 +119,8 @@ class BaseChatSession(BasePydanticModel):
     )
 
 EXAMPLE_CHAT_SESSION_REQUEST = {
-    "id": uuid4(),
-    "classId": uuid4(),
+    "id": EXAMPLE_UUID,
+    "classId": EXAMPLE_UUID,
     "chats": [
         {
             "message": "I'm stuck on this problem.",
