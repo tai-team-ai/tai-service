@@ -1,6 +1,5 @@
 """Define tests for the pinecone db schemas."""
 import copy
-import datetime
 import uuid
 import pytest
 from pydantic import ValidationError
@@ -29,6 +28,8 @@ EXAMPLE_CHUNK_METADATA = {
     "class_id": "123e4567-e89b-12d3-a456-426614174000",
     "page_number": 1,
     "timestamp": "2021-01-01 00:00:00",
+    "vector_id": "123e4567-e89b-12d3-a456-426614174000",
+    "chunk_id": "123e4567-e89b-12d3-a456-426614174000",
 }
 EXAMPLE_CHUNK_METADATA.update(EXAMPLE_METADATA)
 EXAMPLE_PINECONE_DOCUMENT = {

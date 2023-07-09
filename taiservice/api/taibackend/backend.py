@@ -10,10 +10,11 @@ try:
     from taiservice.api.runtime_settings import TaiApiSettings
     from ..routers.class_resources_schema import (
         ClassResource,
-        Metadata as APIResourceMetadata,
-        ClassResourceType as APIResourceType,
+        BaseClassResource,
         ClassResourceProcessingStatus,
+        Metadata as APIResourceMetadata,
     )
+    from ..routers.tai_schemas import ClassResourceSnippet
     from .databases.document_db_schemas import (
         ClassResourceDocument,
         ClassResourceChunkDocument,
@@ -21,9 +22,10 @@ try:
     from .shared_schemas import (
         Metadata as DBResourceMetadata,
         ClassResourceType as DBResourceType,
+        BaseClassResourceDocument,
     )
     from .databases.document_db import DocumentDB, DocumentDBConfig
-    from .databases.pinecone_db import PineconeDB, PineconeDBConfig
+    from .databases.pinecone_db import PineconeDB, PineconeDBConfig, PineconeDocuments
     from .indexer.indexer import (
         Indexer,
         InputDocument,
@@ -34,10 +36,11 @@ except (KeyError, ImportError):
     from runtime_settings import TaiApiSettings
     from routers.class_resources_schema import (
         ClassResource,
+        BaseClassResource,
+        ClassResourceProcessingStatus,
         Metadata as APIResourceMetadata,
-        ClassResourceType as APIResourceType,
-        ClassResourceProcessingStatus
     )
+    from routers.tai_schemas import ClassResourceSnippet
     from taibackend.databases.document_db_schemas import (
         ClassResourceDocument,
         ClassResourceChunkDocument,
@@ -45,9 +48,10 @@ except (KeyError, ImportError):
     from taibackend.shared_schemas import (
         Metadata as DBResourceMetadata,
         ClassResourceType as DBResourceType,
+        BaseClassResourceDocument,
     )
     from taibackend.databases.document_db import DocumentDB, DocumentDBConfig
-    from taibackend.databases.pinecone_db import PineconeDB, PineconeDBConfig
+    from taibackend.databases.pinecone_db import PineconeDB, PineconeDBConfig, PineconeDocuments
     from taibackend.indexer.indexer import (
         Indexer,
         InputDocument,
@@ -55,7 +59,7 @@ except (KeyError, ImportError):
         OpenAIConfig,
     )
 
-class ClassResourcesBackend:
+class Backend:
     """Class to handle the class resources backend."""
     def __init__(self, runtime_settings: TaiApiSettings) -> None:
         """Initialize the class resources backend."""
@@ -88,13 +92,8 @@ class ClassResourcesBackend:
             openai_config=openAI_config,
         )
 
-    def get_relevant_class_resources(
-        self,
-        query: str,
-        class_id: UUID,
-    ) -> list[ClassResource]:
+    def get_relevant_class_resources(self, query: str, class_id: UUID) -> list[ClassResource]:
         """Get the most relevant class resources."""
-        #convert query into a chunk document:
         chunk_doc = ClassResourceChunkDocument(
             class_id=class_id,
             chunk=query,
@@ -108,13 +107,15 @@ class ClassResourcesBackend:
         )
         indexer = Indexer(self._indexer_config)
         pinecone_docs = indexer.embed_documents(documents=[chunk_doc], class_id=class_id)
-        similar_docs = self._pinecone_db.get_similar_vectors(document=pinecone_docs[0], class_id=class_id)
-        
+        similar_docs: PineconeDocuments = self._pinecone_db.get_similar_documents(document=pinecone_docs[0], class_id=class_id)
+        uuids = [doc.id for doc in similar_docs.documents]
+        chunk_docs = self._doc_db.get_class_resources(uuids, ClassResourceChunkDocument)
+        return self.to_api_schema(chunk_docs)
 
     def get_class_resources(self, ids: list[UUID]) -> list[ClassResource]:
         """Get the class resources."""
         docs = self._doc_db.get_class_resources(ids, ClassResourceDocument)
-        return self.convert_database_documents_to_api_documents(docs)
+        return self.to_api_schema(docs)
 
     def delete_class_resources(self, ids: list[UUID]) -> None:
         """Delete the class resources."""
@@ -153,7 +154,7 @@ class ClassResourcesBackend:
 
     def create_class_resources(self, class_resources: list[ClassResource]) -> None:
         """Create the class resources."""
-        input_docs = self.convert_api_documents_to_input_docs(class_resources)
+        input_docs = self.to_backend_input_docs(class_resources)
         doc_pairs: list[tuple[Indexer, ClassResourceDocument]] = []
         for input_doc in input_docs:
             ingested_doc = Indexer.ingest_document(input_doc)
@@ -195,28 +196,35 @@ class ClassResourcesBackend:
         except json.JSONDecodeError:
             return secret
 
-    def convert_database_documents_to_api_documents(self, documents: list[ClassResourceDocument]) -> list[ClassResource]:
+    @staticmethod
+    def to_api_schema(documents: list[BaseClassResourceDocument]) -> list[BaseClassResource]:
         """Convert the database documents to API documents."""
         output_documents = []
         for doc in documents:
             metadata = doc.metadata
-            output_doc = ClassResource(
+            base_doc = BaseClassResource(
                 id=doc.id,
                 class_id=doc.class_id,
                 full_resource_url=doc.full_resource_url,
                 preview_image_url=doc.preview_image_url,
-                status=doc.status,
                 metadata=APIResourceMetadata(
                     title=metadata.title,
                     description=metadata.description,
                     tags=metadata.tags,
                     resource_type=metadata.resource_type,
-                )
-            )
+                ),
+            ).dict()
+            if isinstance(doc, ClassResourceDocument):
+                output_doc = ClassResource(status=doc.status, **base_doc)
+            elif isinstance(doc, ClassResourceChunkDocument):
+                output_doc = ClassResourceSnippet(resource_snippet=doc.chunk, **base_doc)
+            else:
+                raise RuntimeError(f"Unknown document type: {doc}")
             output_documents.append(output_doc)
         return output_documents
 
-    def convert_api_documents_to_input_docs(self, resources: list[ClassResource]) -> list[InputDocument]:
+    @staticmethod
+    def to_backend_input_docs(resources: list[ClassResource]) -> list[InputDocument]:
         """Convert the API documents to database documents."""
         input_documents = []
         for resource in resources:
