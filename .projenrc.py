@@ -128,9 +128,10 @@ RUNTIME_ENV_VARS = {
 make_file.add_rule(
     targets=["build-and-run-docker"],
     recipe=[
+        "cdk synth && \\",
         "cd $(DIR) && \\",
         "docker build -t test-container . && \\",
-        f"docker run -p 8000:8000 {convert_dict_env_vars_to_docker_env_vars(RUNTIME_ENV_VARS)} test-container",
+        f"docker run --network host {convert_dict_env_vars_to_docker_env_vars(RUNTIME_ENV_VARS)} test-container",
     ],
 )
 make_file.add_rule(

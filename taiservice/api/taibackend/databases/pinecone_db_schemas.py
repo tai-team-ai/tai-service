@@ -8,7 +8,7 @@ try:
         ChunkMetadata,
         BasePydanticModel,
     )
-except ImportError:
+except (KeyError, ImportError):
     from taiservice.api.taibackend.shared_schemas import (
         ChunkMetadata,
         BasePydanticModel,
@@ -42,11 +42,22 @@ class PineconeDocument(BasePydanticModel):
     )
     sparse_values: Optional[SparseVector] = Field(
         description="The sparse vector of the class resource.",
+        alias="sparseValues",
     )
     metadata: ChunkMetadata = Field(
         ...,
         description="The metadata of the class resource.",
     )
+    score: Optional[float] = Field(
+        default=None,
+        description="The similarity score of the vector if returned in response to a query.",
+    )
+
+    class Config:
+        """Define the config for the pinecone document model."""
+        allow_population_by_field_name = True
+        validate_assignment = True
+
 
 # this is modeled to match the query response from pinecone
 # https://docs.pinecone.io/docs/python-client#indexquery
@@ -78,6 +89,8 @@ class PineconeDocuments(BasePydanticModel):
         document: PineconeDocument
         for document in values["documents"]:
             class_id.add(document.metadata.class_id)
+        if len(class_id) == 0:
+            return values
         if len(class_id) != 1:
             raise ValueError("")
         values.update({"class_id": class_id.pop()})

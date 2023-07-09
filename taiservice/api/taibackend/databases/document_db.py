@@ -101,6 +101,7 @@ class DocumentDB:
                 return [doc_model.parse_obj(document) for document in documents]
             except ValidationError:
                 continue
+        return []
 
     def upsert_class_resources(
         self,
@@ -179,6 +180,6 @@ class DocumentDB:
         collection = self._document_type_to_collection[document.__class__.__name__]
         collection.update_one(
             {"_id": document.str_id},
-            {"$set": document.dict(serialize_dates=False)},
+            {"$set": document.dict(serialize_dates=False, exclude={"id"})},
             upsert=True,
         )

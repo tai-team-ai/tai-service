@@ -2,7 +2,7 @@
 from hashlib import sha1
 import pytest
 from pydantic import ValidationError
-from tests.unit.api.databases.test_shared_schemas import (
+from tests.unit.api.backend.databases.test_shared_schemas import (
     assert_schema1_inherits_from_schema2,
     EXAMPLE_METADATA,
 )

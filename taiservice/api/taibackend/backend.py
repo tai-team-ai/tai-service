@@ -1,28 +1,57 @@
 """Define the class resources backend."""
-from typing import Any, Union
 import json
 from uuid import UUID
+from typing import Union, Any
+from uuid import uuid4
 from loguru import logger
 import boto3
 from botocore.exceptions import ClientError
 try:
     from taiservice.api.runtime_settings import TaiApiSettings
-    from ..routers.class_resources_schema import ClassResource, Metadata, ClassResourceProcessingStatus
-    from .databases.document_db_schemas import ClassResourceDocument, ClassResourceChunkDocument
+    from ..routers.class_resources_schema import (
+        ClassResource,
+        BaseClassResource,
+        ClassResourceProcessingStatus,
+        Metadata as APIResourceMetadata,
+    )
+    from ..routers.tai_schemas import ClassResourceSnippet
+    from .databases.document_db_schemas import (
+        ClassResourceDocument,
+        ClassResourceChunkDocument,
+    )
+    from .shared_schemas import (
+        Metadata as DBResourceMetadata,
+        ClassResourceType as DBResourceType,
+        BaseClassResourceDocument,
+    )
     from .databases.document_db import DocumentDB, DocumentDBConfig
-    from .databases.pinecone_db import PineconeDB, PineconeDBConfig
+    from .databases.pinecone_db import PineconeDB, PineconeDBConfig, PineconeDocuments
     from .indexer.indexer import (
         Indexer,
         InputDocument,
         IndexerConfig,
         OpenAIConfig,
     )
-except ImportError:
+except (KeyError, ImportError):
     from runtime_settings import TaiApiSettings
-    from routers.class_resources_schema import ClassResource, Metadata, ClassResourceProcessingStatus
-    from taibackend.databases.document_db_schemas import ClassResourceDocument, ClassResourceChunkDocument
+    from routers.class_resources_schema import (
+        ClassResource,
+        BaseClassResource,
+        ClassResourceProcessingStatus,
+        Metadata as APIResourceMetadata,
+    )
+    from routers.tai_schemas import ClassResourceSnippet
+    from taibackend.databases.document_db_schemas import (
+        ClassResourceDocument,
+        ClassResourceChunkDocument,
+    )
+    from taibackend.shared_schemas import (
+        Metadata as DBResourceMetadata,
+        ClassResourceType as DBResourceType,
+        BaseClassResourceDocument,
+    )
     from taibackend.databases.document_db import DocumentDB, DocumentDBConfig
-    from taibackend.databases.pinecone_db import PineconeDB, PineconeDBConfig
+    from taibackend.databases.pinecone_db import PineconeDB, PineconeDBConfig, PineconeDocuments
     from taibackend.indexer.indexer import (
         Indexer,
         InputDocument,
@@ -30,7 +59,7 @@ except ImportError:
         OpenAIConfig,
     )
 
-class ClassResourcesBackend:
+class Backend:
     """Class to handle the class resources backend."""
     def __init__(self, runtime_settings: TaiApiSettings) -> None:
         """Initialize the class resources backend."""
@@ -63,10 +92,32 @@ class ClassResourcesBackend:
             openai_config=openAI_config,
         )
 
+    def get_relevant_class_resources(self, query: str, class_id: UUID) -> list[ClassResourceSnippet]:
+        """Get the most relevant class resources."""
+        chunk_doc = ClassResourceChunkDocument(
+            class_id=class_id,
+            chunk=query,
+            full_resource_url="https://www.google.com", # this is a dummy link as it's not needed for the query
+            id=uuid4(),
+            metadata=DBResourceMetadata(
+                class_id=class_id,
+                title="User Query",
+                description="User Query",
+                resource_type=DBResourceType.TEXTBOOK,
+            )
+        )
+        indexer = Indexer(self._indexer_config)
+        pinecone_docs = indexer.embed_documents(documents=[chunk_doc], class_id=class_id)
+        similar_docs = self._pinecone_db.get_similar_documents(document=pinecone_docs.documents[0])
+        uuids = [doc.metadata.chunk_id for doc in similar_docs.documents]
+        chunk_docs = self._doc_db.get_class_resources(uuids, ClassResourceChunkDocument)
+        resources = self.to_api_schema(chunk_docs)
+        return [resource for resource in resources if isinstance(resource, ClassResourceSnippet)]
+
     def get_class_resources(self, ids: list[UUID]) -> list[ClassResource]:
         """Get the class resources."""
         docs = self._doc_db.get_class_resources(ids, ClassResourceDocument)
-        return self.convert_database_documents_to_api_documents(docs)
+        return self.to_api_schema(docs)
 
     def delete_class_resources(self, ids: list[UUID]) -> None:
         """Delete the class resources."""
@@ -105,7 +156,7 @@ class ClassResourcesBackend:
 
     def create_class_resources(self, class_resources: list[ClassResource]) -> None:
         """Create the class resources."""
-        input_docs = self.convert_api_documents_to_input_docs(class_resources)
+        input_docs = self.to_backend_input_docs(class_resources)
         doc_pairs: list[tuple[Indexer, ClassResourceDocument]] = []
         for input_doc in input_docs:
             ingested_doc = Indexer.ingest_document(input_doc)
@@ -116,7 +167,7 @@ class ClassResourcesBackend:
         for ingested_doc, class_resource in doc_pairs:
             try:
                 self._coerce_and_update_status(class_resource, ClassResourceProcessingStatus.PROCESSING)
-                indexer.index_resource(ingested_doc)
+                class_resource = indexer.index_resource(ingested_doc, class_resource)
                 self._coerce_and_update_status(class_resource, ClassResourceProcessingStatus.COMPLETED)
             except Exception as e: # pylint: disable=broad-except
                 logger.critical(f"Failed to create class resources: {e}")
@@ -129,7 +180,7 @@ class ClassResourcesBackend:
 
     def _delete_vectors_from_chunks(self, chunks: list[ClassResourceChunkDocument]) -> None:
         """Delete the vectors from the chunks."""
-        vector_ids = [chunk.vector_id for chunk in chunks]
+        vector_ids = [chunk.metadata.vector_id for chunk in chunks]
         self._pinecone_db.delete_vectors(vector_ids)
 
     def _get_secret_value(self, secret_name: str) -> Union[dict[str, Any], str]:
@@ -147,28 +198,35 @@ class ClassResourcesBackend:
         except json.JSONDecodeError:
             return secret
 
-    def convert_database_documents_to_api_documents(self, documents: list[ClassResourceDocument]) -> list[ClassResource]:
+    @staticmethod
+    def to_api_schema(documents: list[BaseClassResourceDocument]) -> list[BaseClassResource]:
         """Convert the database documents to API documents."""
         output_documents = []
         for doc in documents:
             metadata = doc.metadata
-            output_doc = ClassResource(
+            base_doc = BaseClassResource(
                 id=doc.id,
                 class_id=doc.class_id,
                 full_resource_url=doc.full_resource_url,
                 preview_image_url=doc.preview_image_url,
-                status=doc.status,
-                metadata=Metadata(
+                metadata=APIResourceMetadata(
                     title=metadata.title,
                     description=metadata.description,
                     tags=metadata.tags,
                     resource_type=metadata.resource_type,
-                )
-            )
+                ),
+            ).dict()
+            if isinstance(doc, ClassResourceDocument):
+                output_doc = ClassResource(status=doc.status, **base_doc)
+            elif isinstance(doc, ClassResourceChunkDocument):
+                output_doc = ClassResourceSnippet(resource_snippet=doc.chunk, **base_doc)
+            else:
+                raise RuntimeError(f"Unknown document type: {doc}")
             output_documents.append(output_doc)
         return output_documents
 
-    def convert_api_documents_to_input_docs(self, resources: list[ClassResource]) -> list[InputDocument]:
+    @staticmethod
+    def to_backend_input_docs(resources: list[ClassResource]) -> list[InputDocument]:
         """Convert the API documents to database documents."""
         input_documents = []
         for resource in resources:
@@ -179,7 +237,7 @@ class ClassResourcesBackend:
                 full_resource_url=resource.full_resource_url,
                 preview_image_url=resource.preview_image_url,
                 status=resource.status,
-                metadata=Metadata(
+                metadata=DBResourceMetadata(
                     title=metadata.title,
                     description=metadata.description,
                     tags=metadata.tags,

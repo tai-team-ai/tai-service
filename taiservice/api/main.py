@@ -5,14 +5,14 @@ from loguru import logger
 # first imports are for local development, second imports are for deployment
 try:
     from .runtime_settings import TaiApiSettings, BACKEND_ATTRIBUTE_NAME
-    from .taibackend.class_resources_backend import ClassResourcesBackend
+    from .taibackend.backend import Backend
     from .routers import (
         class_resources,
         tai
     )
 except ImportError as e:
     from runtime_settings import TaiApiSettings, BACKEND_ATTRIBUTE_NAME
-    from taibackend.class_resources_backend import ClassResourcesBackend
+    from taibackend.backend import Backend
     from routers import (
         class_resources,
         tai
@@ -36,7 +36,7 @@ def create_app() -> FastAPI:
         title=TITLE,
         description=DESCRIPTION,
     )
-    backend = ClassResourcesBackend(runtime_settings=runtime_settings)
+    backend = Backend(runtime_settings=runtime_settings)
     setattr(app.state, BACKEND_ATTRIBUTE_NAME, backend)
     # add exception handlers
     # configure CORS

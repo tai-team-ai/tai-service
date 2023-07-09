@@ -5,6 +5,7 @@ from typing import List
 from uuid import UUID
 from pydantic import BaseModel, Field
 import pinecone
+from pinecone_text.hybrid import hybrid_convex_scale
 # first imports are for local development, second imports are for deployment
 try:
     from .pinecone_db_schemas import PineconeDocuments, PineconeDocument
@@ -50,7 +51,7 @@ class PineconeDB:
         return pinecone.Index(self._index_name)
 
     def _export_documents(self, documents: PineconeDocuments) -> List[dict]:
-        docs = [doc.dict() for doc in documents.documents]
+        docs = [doc.dict(exclude={'score'}) for doc in documents.documents]
         return docs
 
     def _get_exported_batches(self, documents: PineconeDocuments) -> List[PineconeDocuments]:
@@ -75,17 +76,30 @@ class PineconeDB:
         """Upsert vectors into pinecone db."""
         self._execute_async_pinecone_operation("upsert", documents)
 
-    def get_similar_vectors(self, document: PineconeDocument) -> PineconeDocuments:
-        """Get similar vectors from pinecone db."""
+    def get_similar_documents(self, document: PineconeDocument, alpha=0.8) -> PineconeDocuments:
+        """
+        Get similar vectors from pinecone db.
+
+        Args:
+            document: The document to get similar vectors for.
+            alpha: The alpha value for the hybrid convex scale. Lower value
+                will favor semantic search, while a value closer to 1 will
+                favor keyword search.
+        """
+        assert 0 <= alpha <= 1, "alpha must be between 0 and 1"
+        dense, sparse = hybrid_convex_scale(document.values, document.sparse_values.dict(), alpha)
         results = self.index.query(
-            namespace=PineconeDocument.metadata.class_id,
+            namespace=str(document.metadata.class_id),
             include_values=True,
             include_metadata=True,
-            vector=document.values,
-            sparse_vector=document.sparse_vector,
+            vector=dense,
+            sparse_vector=sparse,
             top_k=4,
         )
-        return PineconeDocuments.parse_obj(**results.to_dict())
+        docs = PineconeDocuments(class_id=document.metadata.class_id, documents=[])
+        for result in results.to_dict()['matches']:
+            docs.documents.append(PineconeDocument(**result))
+        return docs
 
     def delete_vectors(self, documents: PineconeDocuments) -> None:
         """Delete vectors from pinecone db."""

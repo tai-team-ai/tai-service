@@ -1,5 +1,6 @@
 """Define tests for the TAI endpoints."""
 import pytest
+from unittest.mock import MagicMock
 from pydantic import ValidationError
 from taiservice.api.routers.tai import (
     ChatSessionRequest,
@@ -22,7 +23,7 @@ def test_chat_session_response_example_schemas():
     """Test that the example schemas for the ChatSession model are valid."""
     example_schema = ChatSessionResponse.Config.schema_extra["example"]
     try:
-        ChatSessionResponse.parse_obj(example_schema)
+        ChatSessionResponse(**example_schema)
     except ValidationError as e:
         pytest.fail(f"Failed to validate example schema: {example_schema}. Error: {str(e)}")
 
@@ -45,8 +46,10 @@ def test_resource_search_answer_example_schemas():
 def test_chat_endpoint():
     """Test that the chat endpoint works."""
     example_schema = ChatSessionRequest.Config.schema_extra["example"]
+    mock_request = MagicMock()
+    mock_request.app.state.tai_backend.get_relevant_class_resources = MagicMock(return_value=[])
     try:
-        chat(ChatSessionRequest.parse_obj(example_schema))
+        chat(ChatSessionRequest.parse_obj(example_schema), mock_request)
     except ValidationError as e:
         pytest.fail(f"Endpoint {chat} failed with example schema: {example_schema}. Error: {str(e)}")
 
