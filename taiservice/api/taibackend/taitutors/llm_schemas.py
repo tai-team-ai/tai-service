@@ -1,7 +1,6 @@
 """Define the llm schemas for interfacing with LLMs."""
 import copy
-from typing import Any, Optional, Union
-from textwrap import dedent
+from typing import Optional, Union
 from enum import Enum
 from uuid import UUID
 from pydantic import Field
@@ -12,15 +11,13 @@ from langchain.schema import (
     SystemMessage as langchainSystemMessage,
     BaseMessage as langchainBaseMessage,
 )
-from langchain.prompts.chat import (
-    BaseStringMessagePromptTemplate,
-    ChatPromptValue,
-)
 # first imports for local development, second imports for deployment
 try:
     from ..databases.document_db_schemas import ClassResourceChunkDocument
+    from ..shared_schemas import BasePydanticModel
 except (KeyError, ImportError):
     from taibackend.databases.document_db_schemas import ClassResourceChunkDocument
+    from taibackend.shared_schemas import BasePydanticModel
 
 class TaiTutorName(str, Enum):
     """Define the supported TAI tutors."""
@@ -42,12 +39,6 @@ class ResponseTechnicalLevel(str, Enum):
     EXPLAIN_LIKE_IM_IN_HIGH_SCHOOL = "likeHighSchool"
     EXPLAIN_LIKE_IM_IN_COLLEGE = "likeCollege"
     EXPLAIN_LIKE_IM_AN_EXPERT_IN_THE_FIELD = "likeExpertInTheField"
-
-class FunctionMessagePromptTemplate(BaseStringMessagePromptTemplate):
-    """Prompt template for a function message."""
-    def format(self, **kwargs: Any) -> langchainBaseMessage:
-        text = self.prompt.format(**kwargs)
-        return langchainFunctionMessage(content=text, additional_kwargs=self.additional_kwargs)
 
 class BaseMessage(langchainBaseMessage):
     """Define the base message for the TAI tutor."""
@@ -126,7 +117,7 @@ class FunctionMessage(langchainFunctionMessage, BaseMessage):
 
 
 
-class TaiChatSession(ChatPromptValue):
+class TaiChatSession(BasePydanticModel):
     """Define the model for the TAI chat session. Compatible with LangChain."""
     id: UUID = Field(
         ...,
@@ -136,6 +127,10 @@ class TaiChatSession(ChatPromptValue):
         ...,
         description="The class ID to which this chat session belongs.",
     )
+    messages: list[BaseMessage] = Field(
+        default_factory=list,
+        description="The messages in the chat session.",
+    )
 
     class Config:
         """Define the config for the model."""
@@ -143,6 +138,7 @@ class TaiChatSession(ChatPromptValue):
 
     @property
     def last_chat_message(self) -> Optional[BaseMessage]:
+        """Return the last chat message in the chat session."""
         if self.messages:
             return self.messages[-1]
         return None

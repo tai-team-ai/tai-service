@@ -325,12 +325,11 @@ class Backend:
         """Convert the API chat session to a database chat session."""
         converted_chats = []
         for chat in chat_session.chats:
-            cls.to_backend_chat_message(chat)
-            converted_chats.append(chat)
+            converted_chats.append(cls.to_backend_chat_message(chat))
         chat_session = BEChatSession(
             id=chat_session.id,
             class_id=chat_session.class_id,
-            chats=converted_chats,
+            messages=converted_chats,
         )
         return chat_session
 
@@ -361,8 +360,7 @@ class Backend:
         """Convert the database chat session to an API chat session."""
         converted_chats = []
         for chat in chat_session.messages:
-            cls.to_api_chat_message(chat)
-            converted_chats.append(chat)
+            converted_chats.append(cls.to_api_chat_message(chat))
         chat_session = APIChatSession(
             id=chat_session.id,
             class_id=chat_session.class_id,

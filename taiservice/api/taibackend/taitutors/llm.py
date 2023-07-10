@@ -67,18 +67,20 @@ class TaiLLM:
         relevant_chunks: Optional[list[ClassResourceChunkDocument]] = None,
     ) -> None:
         """Get the response from the LLMs."""
+        llm_kwargs ={}
         if relevant_chunks:
             self._append_context_chat(chat_session, relevant_chunks)
-        chain = create_openai_fn_chain(
-            functions=[get_relevant_class_resource_chunks],
-            llm=self._chat_model,
-            prompt=PromptTemplate(input_variables=[], template=""),
-        )
-        chat_message = self._chat_model(messages=chat_session, **chain.llm_kwargs)
+            chain = create_openai_fn_chain(
+                functions=[get_relevant_class_resource_chunks],
+                llm=self._chat_model,
+                prompt=PromptTemplate(input_variables=[], template=""),
+            )
+            llm_kwargs = chain.llm_kwargs
+        chat_message = self._chat_model(messages=chat_session.messages, **llm_kwargs)
         tutor_response = TaiTutorMessage(
             content=chat_message.content,
             render_chat=True,
-            **chat_session.last_chat_message.dict(exclude={"role", "render_chat"}),
+            **chat_session.last_chat_message.dict(exclude={"role", "render_chat", "content"}),
         )
         chat_session.append_chat_messages([tutor_response])
 

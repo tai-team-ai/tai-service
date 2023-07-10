@@ -33,9 +33,8 @@ ROUTER = APIRouter()
 @ROUTER.post("/chat", response_model=ChatSessionResponse)
 def chat(chat_session: ChatSessionRequest, request: Request) -> ChatSessionResponse:
     """Define the chat endpoint."""
-    chats = chat_session.chats
     backend: Backend = getattr(request.app.state, BACKEND_ATTRIBUTE_NAME)
-    chat_session = backend.get_tai_tutor_response(chats)
+    chat_session = backend.get_tai_tutor_response(chat_session)
     return ChatSessionResponse.parse_obj(chat_session)
 
 
