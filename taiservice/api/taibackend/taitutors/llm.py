@@ -16,6 +16,7 @@ try:
         TaiChatSession,
         TaiTutorMessage,
         FunctionMessage,
+        AIResponseCallingFunction,
     )
 except (KeyError, ImportError):
     from taibackend.shared_schemas import BaseOpenAIConfig
@@ -24,6 +25,7 @@ except (KeyError, ImportError):
         TaiChatSession,
         TaiTutorMessage,
         FunctionMessage,
+        AIResponseCallingFunction,
     )
 
 
@@ -77,6 +79,7 @@ class TaiLLM:
                 prompt=PromptTemplate(input_variables=[], template=""),
             )
             llm_kwargs = chain.llm_kwargs
+            llm_kwargs['function_call'] = "none"
         chat_message = self._chat_model(messages=chat_session.messages, **llm_kwargs)
         tutor_response = TaiTutorMessage(
             content=chat_message.content,
@@ -93,9 +96,12 @@ class TaiLLM:
         """Append the context chat to the chat session."""
         last_chat = chat_session.last_chat_message
         tutor_chat = TaiTutorMessage(
-            additional_kwargs={"function_call": "find_relevant_chunks"},
             render_chat=False,
-            content=json.dumps({'student_message': last_chat.content}),
+            content="",
+            function_call=AIResponseCallingFunction(
+                name="find_relevant_chunks",
+                arguments=json.dumps({'student_message': last_chat.content}),
+            ),
             tai_tutor_name=last_chat.tai_tutor_name,
         )
         function_response = ""

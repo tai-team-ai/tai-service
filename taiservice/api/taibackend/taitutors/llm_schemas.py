@@ -1,9 +1,9 @@
 """Define the llm schemas for interfacing with LLMs."""
 import copy
-from typing import Optional, Union
+from typing import Any, Optional, Union
 from enum import Enum
 from uuid import UUID
-from pydantic import Field
+from pydantic import Field, BaseModel
 from langchain.schema import (
     AIMessage,
     FunctionMessage as langchainFunctionMessage,
@@ -74,6 +74,18 @@ class StudentMessage(HumanMessage, BaseMessage):
         description="The role of the creator of the chat message.",
     )
 
+class AIResponseCallingFunction(BaseModel):
+    """Define the model for the AI response calling function."""
+
+    name: str = Field(
+        ...,
+        description="The name of the function to call.",
+    )
+    arguments: str = Field(
+        ...,
+        description="The arguments to pass to the function.",
+    )
+
 class TaiTutorMessage(AIMessage, BaseMessage):
     """Define the model for the TAI tutor chat message."""
 
@@ -85,6 +97,10 @@ class TaiTutorMessage(AIMessage, BaseMessage):
     class_resource_chunks: list[ClassResourceChunkDocument] = Field(
         default=[],
         description="The class resource chunks that were used to generate this message, if any.",
+    )
+    function_call: Optional[AIResponseCallingFunction] = Field(
+        default=None,
+        description="The function call that the assistant wants to make.",
     )
 
 class SystemMessage(langchainSystemMessage, BaseMessage):
@@ -114,6 +130,7 @@ class FunctionMessage(langchainFunctionMessage, BaseMessage):
         const=True,
         description="Function messages are never rendered. Therefore this field is always false.",
     )
+
 
 
 

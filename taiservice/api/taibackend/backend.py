@@ -12,6 +12,7 @@ try:
         StudentMessage as BEStudentMessage,
         BaseMessage as BEBaseMessage,
         TaiChatSession as BEChatSession,
+        FunctionMessage as BEFunctionMessage,
     )
     from ..runtime_settings import TaiApiSettings
     from ..routers.class_resources_schema import (
@@ -53,6 +54,7 @@ except (KeyError, ImportError):
         StudentMessage as BEStudentMessage,
         BaseMessage as BEBaseMessage,
         TaiChatSession as BEChatSession,
+        FunctionMessage as BEFunctionMessage,
     )
     from runtime_settings import TaiApiSettings
     from routers.class_resources_schema import (
@@ -387,5 +389,7 @@ class Backend:
                 technical_level=chat_message.technical_level,
                 class_resource_snippets=[snippet for snippet in snippets if isinstance(snippet, ClassResourceSnippet)],
             )
+        elif isinstance(chat_message, BEFunctionMessage):
+            return 
         else:
             raise RuntimeError(f"Unknown chat message type: {chat_message}")
