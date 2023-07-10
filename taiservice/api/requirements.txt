@@ -9,7 +9,7 @@ filetype<=1.2.0
 beautifulsoup4
 openai
 tiktoken
-langchain
+langchain==0.0.229
 pymupdf
 pinecone-text
 # # pinecone-text[splade] # This installs torch with CUDA, which is a massive package

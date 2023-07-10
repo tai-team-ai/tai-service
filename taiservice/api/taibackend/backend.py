@@ -1,8 +1,7 @@
 """Define the class resources backend."""
 import json
-from uuid import UUID
+from uuid import UUID, uuid4
 from typing import Union, Any
-from uuid import uuid4
 from loguru import logger
 import boto3
 from botocore.exceptions import ClientError

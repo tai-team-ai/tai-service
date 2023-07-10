@@ -41,7 +41,7 @@ project:Project = AwsCdkPythonApp(
         "pytest-cov",
         "uvicorn",
         "pinecone-client[grpc]",
-        "langchain",
+        "langchain==0.0.229",
         "ipykernel",
         "pymongo",
         "filetype",
