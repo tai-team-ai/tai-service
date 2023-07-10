@@ -203,3 +203,92 @@ class ChatSessionResponse(BaseChatSession):
         schema_extra = {
             "example": EXAMPLE_CHAT_SESSION_RESPONSE,
         }
+
+
+
+EXAMPLE_SEARCH_QUERY = {
+    "id": uuid4(),
+    "classId": uuid4(),
+    "chats": [
+        {
+            "message": "I'm looking for some resources on Python.",
+        },
+    ],
+}
+EXAMPLE_SEARCH_ANSWER = copy.deepcopy(EXAMPLE_SEARCH_QUERY)
+EXAMPLE_SEARCH_ANSWER["chats"].append(
+    {
+        "message": "Here are some resources on Python.",
+        "classResourceSnippets": [
+            {
+                "id": uuid4(),
+                "classId": uuid4(),
+                "resourceSnippet": "Molecules are made up of atoms.",
+                "fullResourceUrl": "https://www.google.com",
+                "previewImageUrl": "https://www.google.com",
+                "metadata": {
+                    "title": "Molecules",
+                    "description": "Molecules are made up of atoms.",
+                    "tags": ["molecules", "atoms"],
+                    "resourceType": ClassResourceType.TEXTBOOK
+                },
+            },
+        ],
+    },
+)
+
+
+class SearchFilters(BasePydanticModel):
+    """Define the search filters."""
+
+    resource_types: list[ClassResourceType] = Field(
+        default_factory=lambda: [resource_type for resource_type in ClassResourceType],
+        description="The resource types to filter by.",
+    )
+
+class ResourceSearchQuery(BaseChatSession):
+    """
+    Define the request model for the search endpoint.
+
+    *NOTE:* This is identical to the chat session request model except that 
+    this requires that only one student chat message is sent.
+    """
+
+    chats: list[StudentChat] = Field(
+        ...,
+        max_items=1,
+        description="The search query from the student.",
+    )
+    filters: SearchFilters = Field(
+        default_factory=SearchFilters,
+        description="The search filters.",
+    )
+
+    class Config:
+        """Define the configuration for the search query."""
+
+        schema_extra = {
+            "example": EXAMPLE_SEARCH_QUERY,
+        }
+
+class ResourceSearchAnswer(BaseChatSession):
+    """Define the response model for the search endpoint."""
+
+    chats: list[Union[Chat, TaiSearchResponse]] = Field(
+        ...,
+        description="The chat session message history.",
+    )
+
+    class Config:
+        """Define the configuration for the search answer."""
+
+        schema_extra = {
+            "example": EXAMPLE_SEARCH_ANSWER,
+        }
+
+    @validator("chats")
+    def validate_tai_is_last_chat(cls, chats: list[Union[Chat, TaiSearchResponse]]) -> list[Union[Chat, TaiSearchResponse]]:
+        """Validate that the TAI tutor is the last chat message."""
+        if isinstance(chats[-1], TaiSearchResponse):
+            return chats
+        raise ValueError("The TAI must be the last chat message for the search response.")

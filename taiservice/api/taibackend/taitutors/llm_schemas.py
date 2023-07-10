@@ -16,6 +16,11 @@ from langchain.prompts.chat import (
     BaseStringMessagePromptTemplate,
     ChatPromptValue,
 )
+# first imports for local development, second imports for deployment
+try:
+    from ..databases.document_db_schemas import ClassResourceChunkDocument
+except (KeyError, ImportError):
+    from taibackend.databases.document_db_schemas import ClassResourceChunkDocument
 
 class TaiTutorName(str, Enum):
     """Define the supported TAI tutors."""
@@ -64,6 +69,11 @@ class BaseMessage(langchainBaseMessage):
         description="Whether or not to render the chat message. If false, the chat message will be hidden from the student.",
     )
 
+    @property
+    def type(self) -> str:
+        """Type of the message, used for serialization."""
+        return "base"
+
 class StudentMessage(HumanMessage, BaseMessage):
     """Define the model for the student chat message."""
 
@@ -80,6 +90,10 @@ class TaiTutorMessage(AIMessage, BaseMessage):
         default=ChatRole.TAI_TUTOR,
         const=True,
         description="The role of the creator of the chat message.",
+    )
+    class_resource_chunks: list[ClassResourceChunkDocument] = Field(
+        default=[],
+        description="The class resource chunks that were used to generate this message, if any.",
     )
 
 class SystemMessage(langchainSystemMessage, BaseMessage):
@@ -109,6 +123,7 @@ class FunctionMessage(langchainFunctionMessage, BaseMessage):
         const=True,
         description="Function messages are never rendered. Therefore this field is always false.",
     )
+
 
 
 class TaiChatSession(ChatPromptValue):

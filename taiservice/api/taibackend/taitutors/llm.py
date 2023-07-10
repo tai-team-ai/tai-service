@@ -49,7 +49,7 @@ class ChatOpenAIConfig(BaseOpenAIConfig):
         use_enum_values = True
 
 
-class TaiChat:
+class TaiLLM:
     """Define the interface for connecting to LLMs."""
     def __init__(self, config: ChatOpenAIConfig):
         """Initialize the LLMs interface."""
@@ -61,11 +61,11 @@ class TaiChat:
             streaming=config.stream_response,
         )
 
-    def get_chat_response(
+    def add_tai_tutor_chat_response(
         self,
         chat_session: TaiChatSession,
         relevant_chunks: Optional[list[ClassResourceChunkDocument]] = None,
-    ) -> TaiChatSession:
+    ) -> None:
         """Get the response from the LLMs."""
         if relevant_chunks:
             self._append_context_chat(chat_session, relevant_chunks)
