@@ -1,5 +1,6 @@
 """Define the llms interface used for the TAI chat backend."""
 from enum import Enum
+import json
 from typing import Optional
 from langchain.chat_models import ChatOpenAI
 from langchain import PromptTemplate
@@ -90,18 +91,20 @@ class TaiLLM:
         relevant_chunks: list[ClassResourceChunkDocument] = None,
     ) -> None:
         """Append the context chat to the chat session."""
+        last_chat = chat_session.last_chat_message
         tutor_chat = TaiTutorMessage(
             additional_kwargs={"function_call": "find_relevant_chunks"},
             render_chat=False,
-            **chat_session.last_chat_message.dict(exclude={"role", "render_chat"}),
+            content=json.dumps({'student_message': last_chat.content}),
+            tai_tutor_name=last_chat.tai_tutor_name,
         )
         function_response = ""
         for chunk in relevant_chunks:
             function_response += f"{chunk.dict(serialize_dates=True)}\n\n"
-        FunctionMessage(
+        func_message = FunctionMessage(
             name="find_relevant_chunks",
             render_chat=False,
             content=function_response,
-            **chat_session.last_chat_message.dict(exclude={"role", "render_chat"}),
+            **chat_session.last_chat_message.dict(exclude={"role", "render_chat", "content"}),
         )
-        chat_session.append_chat_messages([tutor_chat, function_response])
+        chat_session.append_chat_messages([tutor_chat, func_message])

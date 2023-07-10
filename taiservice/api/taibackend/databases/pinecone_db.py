@@ -82,9 +82,8 @@ class PineconeDB:
 
         Args:
             document: The document to get similar vectors for.
-            alpha: The alpha value for the hybrid convex scale. Lower value
-                will favor semantic search, while a value closer to 1 will
-                favor keyword search.
+            alpha: The alpha value for the hybrid convex scale  
+            between 0 and 1 where 0 == sparse only and 1 == dense only
         """
         assert 0 <= alpha <= 1, "alpha must be between 0 and 1"
         dense, sparse = hybrid_convex_scale(document.values, document.sparse_values.dict(), alpha)

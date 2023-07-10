@@ -143,10 +143,10 @@ class TaiChatSession(BasePydanticModel):
             return self.messages[-1]
         return None
 
-    def append_chat_messages(self, message: Union[list[BaseMessage], BaseMessage]) -> None:
+    def append_chat_messages(self, new_messages: Union[list[BaseMessage], BaseMessage]) -> None:
         """Append a chat message to the chat session."""
-        if isinstance(message, BaseMessage):
-            message = [message]
-        messages = copy.deepcopy(self.messages)
-        messages.extend(message)
-        self.messages = messages
+        if isinstance(new_messages, BaseMessage):
+            new_messages = [new_messages]
+        msgs = copy.deepcopy(self.messages)
+        msgs.extend(new_messages)
+        self.messages = msgs
