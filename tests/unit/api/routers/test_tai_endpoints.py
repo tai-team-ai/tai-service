@@ -67,7 +67,7 @@ def test_chat_endpoint():
         )
     )
     mock_response = ChatSessionResponse.parse_obj(mock_chat_session)
-    mock_request.app.state.tai_backend.get_tai_tutor_response = MagicMock(return_value=mock_response)
+    mock_request.app.state.tai_backend.get_tai_response = MagicMock(return_value=mock_response)
     try:
         chat(ChatSessionRequest.parse_obj(example_schema), mock_request)
     except ValidationError as e:
@@ -76,8 +76,16 @@ def test_chat_endpoint():
 def test_search_endpoint():
     """Test that the search endpoint works."""
     example_schema = ResourceSearchQuery.Config.schema_extra["example"]
+    mock_request = MagicMock()
+    mock_response = ResourceSearchAnswer(
+        summary_snippet="This is a summary snippet.",
+        suggested_resources=[],
+        other_resources=[],
+        **example_schema,
+    )
+    mock_request.app.state.tai_backend.search = MagicMock(return_value=mock_response)
     try:
-        search(ResourceSearchQuery.parse_obj(example_schema))
+        search(ResourceSearchQuery.parse_obj(example_schema), mock_request)
     except ValidationError as e:
         pytest.fail(f"Endpoint {search} failed with example schema: {example_schema}. Error: {str(e)}")
 

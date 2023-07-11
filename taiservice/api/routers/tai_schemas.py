@@ -53,7 +53,7 @@ class Chat(BasePydanticModel):
         ...,
         description="The role of the creator of the chat message.",
     )
-    message: str = Field(
+    message: Union[str, dict] = Field(
         ...,
         description="The contents of the chat message. You can send an empty string to get a response from the TAI tutor.",
     )
@@ -103,19 +103,7 @@ class StudentChat(BaseStudentChat):
     )
 
 
-class TaiSearchResponse(Chat):
-    """Define the model for the TAI chat message."""
-    role: ChatRole = Field(
-        default=ChatRole.FUNCTION,
-        const=True,
-        description="The role of the creator of the chat message.",
-    )
-    class_resource_snippets: list[ClassResourceSnippet] = Field(
-        ...,
-        description="The class resources that were used to generate the response.",
-    )
-
-class TaiTutorChat(TaiSearchResponse):
+class TaiTutorChat(Chat):
     """Define the model for the TAI Tutor chat message."""
 
     role: ChatRole = Field(
@@ -131,6 +119,11 @@ class TaiTutorChat(TaiSearchResponse):
         ...,
         description="The technical level of the response.",
     )
+    class_resource_snippets: list[ClassResourceSnippet] = Field(
+        ...,
+        description="The class resources that were used to generate the response.",
+    )
+
 
 class BaseChatSession(BasePydanticModel):
     """Define the request model for the chat endpoint."""
@@ -164,6 +157,19 @@ EXAMPLE_CHAT_SESSION_REQUEST = {
 
 
 EXAMPLE_CHAT_SESSION_RESPONSE = copy.deepcopy(EXAMPLE_CHAT_SESSION_REQUEST)
+EXAMPLE_CLASS_RESOURCE_SNIPPET = {
+    "id": uuid4(),
+    "classId": uuid4(),
+    "resourceSnippet": "Molecules are made up of atoms.",
+    "fullResourceUrl": "https://www.google.com",
+    "previewImageUrl": "https://www.google.com",
+    "metadata": {
+        "title": "Molecules",
+        "description": "Molecules are made up of atoms.",
+        "tags": ["molecules", "atoms"],
+        "resourceType": ClassResourceType.TEXTBOOK
+    },
+}
 EXAMPLE_CHAT_SESSION_RESPONSE["chats"].append(
     {
         "message": "I can help you with that!",
@@ -171,19 +177,7 @@ EXAMPLE_CHAT_SESSION_RESPONSE["chats"].append(
         "taiTutor": TaiTutorName.ALEX,
         "technicalLevel": ResponseTechnicalLevel.EXPLAIN_LIKE_IM_IN_HIGH_SCHOOL,
         "classResourceSnippets": [
-            {
-                "id": uuid4(),
-                "classId": uuid4(),
-                "resourceSnippet": "Molecules are made up of atoms.",
-                "fullResourceUrl": "https://www.google.com",
-                "previewImageUrl": "https://www.google.com",
-                "metadata": {
-                    "title": "Molecules",
-                    "description": "Molecules are made up of atoms.",
-                    "tags": ["molecules", "atoms"],
-                    "resourceType": ClassResourceType.TEXTBOOK
-                },
-            },
+            copy.deepcopy(EXAMPLE_CLASS_RESOURCE_SNIPPET),
         ],
         "renderChat": True,
     },
@@ -191,7 +185,6 @@ EXAMPLE_CHAT_SESSION_RESPONSE["chats"].append(
 
 class ChatSessionRequest(BaseChatSession):
     """Define the request model for the chat endpoint."""
-
     chats: list[Union[StudentChat, TaiTutorChat]] = Field(
         ...,
         description="The chat session message history.",
@@ -199,13 +192,12 @@ class ChatSessionRequest(BaseChatSession):
 
     class Config:
         """Define the configuration for the chat session."""
-
         schema_extra = {
             "example": EXAMPLE_CHAT_SESSION_REQUEST,
         }
 
     @validator("chats")
-    def validate_student_is_last_chat(cls, chats: list[Union[StudentChat, TaiSearchResponse]]) -> list[Union[StudentChat, TaiSearchResponse]]:
+    def validate_student_is_last_chat(cls, chats: list[Chat]) -> list[Chat]:
         """Validate that the student is the last chat message."""
         if chats[-1].role != ChatRole.STUDENT:
             raise ValueError("The student must be the last chat message.")
@@ -221,7 +213,7 @@ class ChatSessionResponse(BaseChatSession):
     )
 
     @validator("chats")
-    def validate_tai_is_last_chat(cls, chats: list[Union[StudentChat, TaiTutorChat]]) -> list[Union[StudentChat, TaiTutorChat]]:
+    def validate_tai_is_last_chat(cls, chats: list[Chat]) -> list[Chat]:
         """Validate that the TAI tutor is the last chat message."""
         if chats[-1].role != ChatRole.TAI_TUTOR:
             raise ValueError("The TAI tutor must be the last chat message.")
@@ -239,54 +231,41 @@ class ChatSessionResponse(BaseChatSession):
 EXAMPLE_SEARCH_QUERY = {
     "id": uuid4(),
     "classId": uuid4(),
-    "chats": [
-        {
-            "message": "I'm looking for some resources on Python.",
-        },
-    ],
+    "query": "Python",
 }
 EXAMPLE_SEARCH_ANSWER = copy.deepcopy(EXAMPLE_SEARCH_QUERY)
-EXAMPLE_SEARCH_ANSWER["chats"].append(
+EXAMPLE_SEARCH_ANSWER.update(
     {
-        "message": "Here are some resources on Python.",
-        "classResourceSnippets": [
-            {
-                "id": uuid4(),
-                "classId": uuid4(),
-                "resourceSnippet": "Molecules are made up of atoms.",
-                "fullResourceUrl": "https://www.google.com",
-                "previewImageUrl": "https://www.google.com",
-                "metadata": {
-                    "title": "Molecules",
-                    "description": "Molecules are made up of atoms.",
-                    "tags": ["molecules", "atoms"],
-                    "resourceType": ClassResourceType.TEXTBOOK
-                },
-            },
+        "summary_snippet": "Python is a programming language.",
+        "suggested_resources": [
+            copy.deepcopy(EXAMPLE_CLASS_RESOURCE_SNIPPET),
         ],
-    },
+        "other_resources": [
+            copy.deepcopy(EXAMPLE_CLASS_RESOURCE_SNIPPET),
+        ],
+    }
 )
 
 
 class SearchFilters(BasePydanticModel):
     """Define the search filters."""
-
     resource_types: list[ClassResourceType] = Field(
         default_factory=lambda: [resource_type for resource_type in ClassResourceType],
         description="The resource types to filter by.",
     )
 
-class ResourceSearchQuery(BaseChatSession):
-    """
-    Define the request model for the search endpoint.
-
-    *NOTE:* This is identical to the chat session request model except that 
-    this requires that only one student chat message is sent.
-    """
-
-    chats: list[BaseStudentChat] = Field(
+class ResourceSearchQuery(BasePydanticModel):
+    """Define the request model for the search endpoint."""
+    id: UUID = Field(
         ...,
-        max_items=1,
+        description="The ID of the search.",
+    )
+    class_id: UUID = Field(
+        ...,
+        description="The ID of the class that the search is for.",
+    )
+    query: str = Field(
+        ...,
         description="The search query from the student.",
     )
     filters: SearchFilters = Field(
@@ -296,29 +275,27 @@ class ResourceSearchQuery(BaseChatSession):
 
     class Config:
         """Define the configuration for the search query."""
-
         schema_extra = {
             "example": EXAMPLE_SEARCH_QUERY,
         }
 
-class ResourceSearchAnswer(BaseChatSession):
+class ResourceSearchAnswer(ResourceSearchQuery):
     """Define the response model for the search endpoint."""
-
-    chats: list[Union[BaseStudentChat, TaiSearchResponse]] = Field(
+    summary_snippet: str = Field(
         ...,
-        description="The chat session message history.",
+        description="The summary snippet of the search results.",
+    )
+    suggested_resources: list[ClassResourceSnippet] = Field(
+        ...,
+        description="The suggested resources that should appear at the top of the search results.",
+    )
+    other_resources: list[ClassResourceSnippet] = Field(
+        ...,
+        description="The other resources. These can be grouped by class resource type.",
     )
 
     class Config:
         """Define the configuration for the search answer."""
-
         schema_extra = {
             "example": EXAMPLE_SEARCH_ANSWER,
         }
-
-    @validator("chats")
-    def validate_tai_is_last_chat(cls, chats: list[Union[Chat, TaiSearchResponse]]) -> list[Union[Chat, TaiSearchResponse]]:
-        """Validate that the TAI tutor is the last chat message."""
-        if isinstance(chats[-1], TaiSearchResponse):
-            return chats
-        raise ValueError("The TAI must be the last chat message for the search response.")
