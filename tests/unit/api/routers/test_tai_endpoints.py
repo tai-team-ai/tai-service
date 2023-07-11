@@ -1,6 +1,6 @@
 """Define tests for the TAI endpoints."""
-import pytest
 from unittest.mock import MagicMock
+import pytest
 from pydantic import ValidationError
 from taiservice.api.routers.tai import (
     chat,
@@ -14,7 +14,6 @@ from taiservice.api.routers.tai_schemas import (
     TaiTutorChat,
     TaiTutorName as ApiTaiTutorName,
     ResponseTechnicalLevel as ApiTechnicalLevel,
-    ResponseTechnicalLevel,
 )
 from taiservice.api.taibackend.taitutors.llm_schemas import (
     TaiTutorName as BETaiTutorName,
@@ -63,8 +62,8 @@ def test_chat_endpoint():
             message="Hello!",
             class_resource_snippets=[],
             render_chat=True,
-            tai_tutor=TaiTutorName.ALEX,
-            technical_level=ResponseTechnicalLevel.EXPLAIN_LIKE_IM_5,
+            tai_tutor=ApiTaiTutorName.ALEX,
+            technical_level=ApiTechnicalLevel.EXPLAIN_LIKE_IM_5,
         )
     )
     mock_response = ChatSessionResponse.parse_obj(mock_chat_session)

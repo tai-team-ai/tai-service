@@ -271,7 +271,7 @@ class Backend:
         return output_documents
 
     @staticmethod
-    def to_backend_resource(documents: list[BaseClassResource]) -> list[BaseClassResourceDocument]:
+    def to_backend_resources(documents: list[BaseClassResource]) -> list[BaseClassResourceDocument]:
         """Convert the API documents to database documents."""
         output_documents = []
         for doc in documents:
@@ -352,7 +352,7 @@ class Backend:
                 **msg.dict(exclude={"render_chat"}),
             )
         elif isinstance(chat_message, APITaiTutorChat):
-            chunks = cls.to_backend_resource(chat_message.class_resource_snippets)
+            chunks = cls.to_backend_resources(chat_message.class_resource_snippets)
             return BETaiTutorMessage(
                 render_chat=chat_message.render_chat,
                 tai_tutor_name=chat_message.tai_tutor,
