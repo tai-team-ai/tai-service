@@ -84,7 +84,7 @@ class TaiLLM:
         tutor_response = TaiTutorMessage(
             content=chat_message.content,
             render_chat=True,
-            **chat_session.last_chat_message.dict(exclude={"role", "render_chat", "content"}),
+            **chat_session.last_student_message.dict(exclude={"role", "render_chat", "content"}),
         )
         chat_session.append_chat_messages([tutor_response])
 

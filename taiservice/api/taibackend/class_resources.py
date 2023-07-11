@@ -2,8 +2,8 @@
 from fastapi import APIRouter, Request
 # first imports are for local development, second imports are for deployment
 try:
-    from .class_resources_schema import ClassResource, ClassResources, ClassResourceIds
-    from ..taibackend.backend import Backend
+    from ..routers.class_resources_schema import ClassResource, ClassResources, ClassResourceIds
+    from .backend import Backend
     from ..runtime_settings import BACKEND_ATTRIBUTE_NAME
 except ImportError:
     from routers.class_resources_schema import ClassResource, ClassResources, ClassResourceIds

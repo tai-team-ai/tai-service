@@ -27,6 +27,7 @@ class ChatRole(str, Enum):
 
     TAI_TUTOR = "taiTutor"
     STUDENT = "student"
+    FUNCTION = "function"
 
 
 class ResponseTechnicalLevel(str, Enum):
@@ -48,13 +49,35 @@ class ClassResourceSnippet(BaseClassResource):
 
 class Chat(BasePydanticModel):
     """Define the model for the chat message."""
-
+    role: ChatRole = Field(
+        ...,
+        description="The role of the creator of the chat message.",
+    )
     message: str = Field(
         ...,
         description="The contents of the chat message. You can send an empty string to get a response from the TAI tutor.",
     )
     render_chat: bool = Field(
         default=True,
+        description="Whether or not to render the chat message. If false, the chat message will be hidden from the student.",
+    )
+
+
+class FunctionChat(Chat):
+    """Define the model for the function chat message."""
+
+    role: ChatRole = Field(
+        default=ChatRole.FUNCTION,
+        const=True,
+        description="The role of the creator of the chat message.",
+    )
+    function_name: str = Field(
+        ...,
+        description="The name of the function that created the chat.",
+    )
+    render_chat: bool = Field(
+        default=False,
+        const=True,
         description="Whether or not to render the chat message. If false, the chat message will be hidden from the student.",
     )
 
@@ -185,7 +208,7 @@ class ChatSessionRequest(BaseChatSession):
 class ChatSessionResponse(BaseChatSession):
     """Define the response model for the chat endpoint."""
 
-    chats: list[Union[StudentChat, TaiTutorChat]] = Field(
+    chats: list[Union[StudentChat, TaiTutorChat, FunctionChat]] = Field(
         ...,
         description="The chat session message history.",
     )

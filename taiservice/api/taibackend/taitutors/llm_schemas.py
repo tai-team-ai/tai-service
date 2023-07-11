@@ -31,6 +31,7 @@ class ChatRole(str, Enum):
 
     TAI_TUTOR = "taiTutor"
     STUDENT = "student"
+    FUNCTION = "function"
 
 class ResponseTechnicalLevel(str, Enum):
     """Define the technical level of the response."""
@@ -47,14 +48,6 @@ class BaseMessage(langchainBaseMessage):
         ...,
         description="The role of the user that generated this message.",
     )
-    tai_tutor_name: TaiTutorName = Field(
-        ...,
-        description="The name of the TAI tutor that generated this message.",
-    )
-    technical_level: ResponseTechnicalLevel = Field(
-        default=ResponseTechnicalLevel.EXPLAIN_LIKE_IM_IN_HIGH_SCHOOL,
-        description="The technical level of the response.",
-    )
     render_chat: bool = Field(
         default=True,
         description="Whether or not to render the chat message. If false, the chat message will be hidden from the student.",
@@ -65,7 +58,19 @@ class BaseMessage(langchainBaseMessage):
         """Type of the message, used for serialization."""
         return "base"
 
-class StudentMessage(HumanMessage, BaseMessage):
+class TutorStudentBaseMessage(BaseMessage):
+    """Define the base message for the TAI tutor and student."""
+    tai_tutor_name: TaiTutorName = Field(
+        ...,
+        description="The name of the TAI tutor that generated this message.",
+    )
+    technical_level: ResponseTechnicalLevel = Field(
+        default=ResponseTechnicalLevel.EXPLAIN_LIKE_IM_IN_HIGH_SCHOOL,
+        description="The technical level of the response.",
+    )
+
+
+class StudentMessage(HumanMessage, TutorStudentBaseMessage):
     """Define the model for the student chat message."""
 
     role: ChatRole = Field(
@@ -86,7 +91,7 @@ class AIResponseCallingFunction(BaseModel):
         description="The arguments to pass to the function.",
     )
 
-class TaiTutorMessage(AIMessage, BaseMessage):
+class TaiTutorMessage(AIMessage, TutorStudentBaseMessage):
     """Define the model for the TAI tutor chat message."""
 
     role: ChatRole = Field(
@@ -121,7 +126,7 @@ class FunctionMessage(langchainFunctionMessage, BaseMessage):
     """Define the model for the function chat message."""
 
     role: ChatRole = Field(
-        default=ChatRole.TAI_TUTOR,
+        default=ChatRole.FUNCTION,
         const=True,
         description="The role of the creator of the chat message.",
     )
@@ -130,8 +135,6 @@ class FunctionMessage(langchainFunctionMessage, BaseMessage):
         const=True,
         description="Function messages are never rendered. Therefore this field is always false.",
     )
-
-
 
 
 class TaiChatSession(BasePydanticModel):
@@ -158,6 +161,14 @@ class TaiChatSession(BasePydanticModel):
         """Return the last chat message in the chat session."""
         if self.messages:
             return self.messages[-1]
+        return None
+
+    @property
+    def last_student_message(self) -> Optional[StudentMessage]:
+        """Return the last student message in the chat session."""
+        for message in reversed(self.messages):
+            if isinstance(message, StudentMessage):
+                return message
         return None
 
     def append_chat_messages(self, new_messages: Union[list[BaseMessage], BaseMessage]) -> None:

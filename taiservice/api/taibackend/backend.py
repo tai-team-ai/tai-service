@@ -27,7 +27,7 @@ try:
         Chat as APIChat,
         StudentChat as APIStudentChat,
         TaiTutorChat as APITaiTutorChat,
-        
+        FunctionChat as APIFunctionChat,
     )
     from .databases.document_db_schemas import (
         ClassResourceDocument,
@@ -69,6 +69,7 @@ except (KeyError, ImportError):
         Chat as APIChat,
         StudentChat as APIStudentChat,
         TaiTutorChat as APITaiTutorChat,
+        FunctionChat as APIFunctionChat,
     )
     from taibackend.databases.document_db_schemas import (
         ClassResourceDocument,
@@ -338,21 +339,32 @@ class Backend:
     @classmethod
     def to_backend_chat_message(cls, chat_message: APIChat) -> BEBaseMessage:
         """Convert the API chat message to a database chat message."""
+        msg = BEBaseMessage(
+            role=chat_message.role,
+            content=chat_message.message,
+            render_chat=chat_message.render_chat,
+        )
         if isinstance(chat_message, APIStudentChat):
             return BEStudentMessage(
                 render_chat=chat_message.render_chat,
-                content=chat_message.message,
                 tai_tutor_name=chat_message.requested_tai_tutor,
                 technical_level=chat_message.requested_technical_level,
+                **msg.dict(exclude={"render_chat"}),
             )
         elif isinstance(chat_message, APITaiTutorChat):
             chunks = cls.to_backend_resource(chat_message.class_resource_snippets)
             return BETaiTutorMessage(
                 render_chat=chat_message.render_chat,
-                content=chat_message.message,
                 tai_tutor_name=chat_message.tai_tutor,
                 technical_level=chat_message.technical_level,
                 class_resource_chunks=[chunk for chunk in chunks if isinstance(chunk, ClassResourceChunkDocument)],
+                **msg.dict(exclude={"render_chat"}),
+            )
+        elif isinstance(chat_message, APIFunctionChat):
+            return BEFunctionMessage(
+                function_name=chat_message.function_name,
+                name=chat_message.function_name,
+                **msg.dict(),
             )
         else:
             raise RuntimeError(f"Unknown chat message type: {chat_message}")
@@ -373,23 +385,31 @@ class Backend:
     @classmethod
     def to_api_chat_message(cls, chat_message: BEBaseMessage) -> APIChat:
         """Convert the database chat message to an API chat message."""
+        msg = APIChat(
+            message=chat_message.content,
+            role=chat_message.role,
+            render_chat=chat_message.render_chat,
+        )
         if isinstance(chat_message, BEStudentMessage):
             return APIStudentChat(
                 render_chat=chat_message.render_chat,
-                message=chat_message.content,
                 requested_tai_tutor=chat_message.tai_tutor_name,
                 requested_technical_level=chat_message.technical_level,
+                **msg.dict(exclude={"render_chat"}),
             )
         elif isinstance(chat_message, BETaiTutorMessage):
             snippets = cls.to_api_resources(chat_message.class_resource_chunks)
             return APITaiTutorChat(
                 render_chat=chat_message.render_chat,
-                message=chat_message.content,
                 tai_tutor=chat_message.tai_tutor_name,
                 technical_level=chat_message.technical_level,
                 class_resource_snippets=[snippet for snippet in snippets if isinstance(snippet, ClassResourceSnippet)],
+                **msg.dict(exclude={"render_chat"}),
             )
         elif isinstance(chat_message, BEFunctionMessage):
-            return 
+            return APIFunctionChat(
+                function_name=chat_message.name,
+                **msg.dict(),
+            )
         else:
             raise RuntimeError(f"Unknown chat message type: {chat_message}")
