@@ -89,7 +89,7 @@ class TaiLLM:
             self._append_synthetic_function_call_to_chat(
                 chat_session,
                 function_to_call=get_relevant_class_resource_chunks,
-                function_kwargs={'student_message': chat_session.last_human_message},
+                function_kwargs={'student_message': chat_session.last_human_message.content},
                 relevant_chunks=relevant_chunks,
             )
             chain = create_openai_fn_chain(
