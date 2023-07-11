@@ -141,8 +141,10 @@ class Backend:
     def search(self, query: ResourceSearchQuery) -> ResourceSearchAnswer:
         """Search for class resources."""
         chunks = self.get_relevant_class_resources(query.query, query.class_id)
-        tai_llm = self._get_tai_llm()
-        snippet = tai_llm.create_search_result_summary_snippet(query.query, chunks)
+        snippet = ""
+        if chunks:
+            tai_llm = self._get_tai_llm()
+            snippet = tai_llm.create_search_result_summary_snippet(query.query, chunks)
         search_answer = ResourceSearchAnswer(
             summary_snippet=snippet,
             suggested_resources=self.to_api_resources(chunks),
