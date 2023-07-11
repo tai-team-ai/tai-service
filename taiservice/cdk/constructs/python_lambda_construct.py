@@ -181,6 +181,10 @@ class DockerLambdaConfigModel(BaseLambdaConfigModel):
             "a fastAPI factory function."
         )
     )
+    custom_docker_commands: list[str] = Field(
+        default=[],
+        description="A list of custom docker commands to run before final build copy.",
+    )
 
 
 class BaseLambda(Construct):
@@ -429,7 +433,15 @@ class DockerLambda(BaseLambda):
         else:
             self.dockerfile_content = [f"FROM public.ecr.aws/lambda/{self._config.runtime} AS {self._previous_stage_name}"]
 
+    def _add_custom_docker_commands(self) -> None:
+        stage_name = "add-custom-docker-commands"
+        self.dockerfile_content.append(f"FROM {self._previous_stage_name} AS {stage_name}")
+        self.dockerfile_content.extend(self._config.custom_docker_commands)
+        self._previous_stage_name = stage_name
+
     def _create_docker_file(self) -> str:
+        if self._config.custom_docker_commands:
+            self._add_custom_docker_commands()
         self._copy_build_context_to_container()
         self._add_handler_cmd()
         docker_file_path = Path(self._build_context_folder) / "Dockerfile"

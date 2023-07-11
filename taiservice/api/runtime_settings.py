@@ -75,4 +75,12 @@ class TaiApiSettings(BaseSettings):
     model_name: ModelName = Field(
         default=ModelName.GPT_TURBO,
         description="The name of the model to use for the llm tutor.",
+
+    nltk_data: str = Field(
+        default="/var/task/nltk_data",
+        description="The path to the nltk data.",
+    )
+    transformers_cache: str = Field(
+        default="/tmp/transformers_cache",
+        description="The path to the transformers cache.",
     )

@@ -130,5 +130,9 @@ class TaiApiStack(Stack):
                 auth_type=_lambda.FunctionUrlAuthType.NONE,
             ),
             run_as_webserver=True,
+            custom_docker_commands=[
+                "RUN mkdir -p /var/task/nltk_data",  # Create directory for model
+                f"RUN python -m nltk.downloader -d {self._settings.nltk_data} punkt stopwords",  # Download the model and save it to the directory
+            ]
         )
         return lambda_config
