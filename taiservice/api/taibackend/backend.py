@@ -1,7 +1,7 @@
 """Define the class resources backend."""
 import json
 from uuid import UUID, uuid4
-from typing import Union, Any
+from typing import Optional, Union, Any
 from loguru import logger
 import boto3
 from botocore.exceptions import ClientError
@@ -28,6 +28,8 @@ try:
         StudentChat as APIStudentChat,
         TaiTutorChat as APITaiTutorChat,
         FunctionChat as APIFunctionChat,
+        ResourceSearchQuery,
+        ResourceSearchAnswer,
     )
     from .databases.document_db_schemas import (
         ClassResourceDocument,
@@ -70,6 +72,8 @@ except (KeyError, ImportError):
         StudentChat as APIStudentChat,
         TaiTutorChat as APITaiTutorChat,
         FunctionChat as APIFunctionChat,
+        ResourceSearchQuery,
+        ResourceSearchAnswer,
     )
     from taibackend.databases.document_db_schemas import (
         ClassResourceDocument,
@@ -126,19 +130,28 @@ class Backend:
         )
         self._indexer = Indexer(self._indexer_config)
 
-    def get_tai_tutor_response(self, chat_session: APIChatSession, stream: bool=False) -> APIChatSession:
+    def get_tai_response(self, chat_session: APIChatSession, stream: bool=False) -> APIChatSession:
         """Get and add the tai tutor response to the chat session."""
-        config = ChatOpenAIConfig(
-            api_key=self._openai_api_key,
-            request_timeout=self._runtime_settings.openAI_request_timeout,
-            stream_response=stream,
-            model_name=self._runtime_settings.model_name,
-        )
-        tai_llm = TaiLLM(config)
         session = self.to_backend_chat_session(chat_session)
         chunks = self.get_relevant_class_resources(session.last_chat_message.content, session.class_id)
+        tai_llm = self._get_tai_llm(stream)
         tai_llm.add_tai_tutor_chat_response(session, chunks)
         return self.to_api_chat_session(session)
+
+    def search(self, query: ResourceSearchQuery) -> ResourceSearchAnswer:
+        """Search for class resources."""
+        chunks = self.get_relevant_class_resources(query.query, query.class_id)
+        snippet = ""
+        if chunks:
+            tai_llm = self._get_tai_llm()
+            snippet = tai_llm.create_search_result_summary_snippet(query.query, chunks)
+        search_answer = ResourceSearchAnswer(
+            summary_snippet=snippet,
+            suggested_resources=self.to_api_resources(chunks),
+            other_resources=[],
+            **query.dict(),
+        )
+        return search_answer
 
     def get_relevant_class_resources(self, query: str, class_id: UUID) -> list[ClassResourceChunkDocument]:
         """Get the most relevant class resources."""
@@ -183,6 +196,16 @@ class Backend:
         except Exception as e:
             logger.critical(f"Failed to delete class resources: {e}")
             raise RuntimeError(f"Failed to delete class resources: {e}") from e
+
+    def _get_tai_llm(self, stream: bool=False) -> TaiLLM:
+        """Initialize the openai api."""
+        config = ChatOpenAIConfig(
+            api_key=self._openai_api_key,
+            request_timeout=self._runtime_settings.openAI_request_timeout,
+            stream_response=stream,
+            model_name=self._runtime_settings.model_name,
+        )
+        return TaiLLM(config)
 
     def _coerce_status_to(self, class_resources: list[ClassResourceDocument], status: ClassResourceProcessingStatus) -> None:
         """Coerce the status of the class resources to the given status."""
@@ -404,6 +427,7 @@ class Backend:
                 tai_tutor=chat_message.tai_tutor_name,
                 technical_level=chat_message.technical_level,
                 class_resource_snippets=[snippet for snippet in snippets if isinstance(snippet, ClassResourceSnippet)],
+                function_call=chat_message.function_call,
                 **msg.dict(exclude={"render_chat"}),
             )
         elif isinstance(chat_message, BEFunctionMessage):

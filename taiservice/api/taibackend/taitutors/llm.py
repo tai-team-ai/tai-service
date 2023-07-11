@@ -2,6 +2,8 @@
 from enum import Enum
 import json
 from typing import Optional
+from uuid import UUID
+from uuid import uuid4
 from langchain.chat_models import ChatOpenAI
 from langchain import PromptTemplate
 from langchain.chat_models.base import BaseChatModel
@@ -15,8 +17,14 @@ try:
     from .llm_schemas import (
         TaiChatSession,
         TaiTutorMessage,
+        TaiTutorName,
+        StudentMessage,
+        SearchQuery,
         FunctionMessage,
         AIResponseCallingFunction,
+        SUMMARIZER_SYSTEM_PROMPT,
+        SUMMARIZER_USER_PROMPT,
+        ValidatedFormatString,
     )
 except (KeyError, ImportError):
     from taibackend.shared_schemas import BaseOpenAIConfig
@@ -24,8 +32,14 @@ except (KeyError, ImportError):
     from taibackend.taitutors.llm_schemas import (
         TaiChatSession,
         TaiTutorMessage,
+        TaiTutorName,
+        StudentMessage,
+        SearchQuery,
         FunctionMessage,
         AIResponseCallingFunction,
+        SUMMARIZER_SYSTEM_PROMPT,
+        SUMMARIZER_USER_PROMPT,
+        ValidatedFormatString,
     )
 
 
@@ -72,7 +86,12 @@ class TaiLLM:
         """Get the response from the LLMs."""
         llm_kwargs ={}
         if relevant_chunks:
-            self._append_context_chat(chat_session, relevant_chunks)
+            self._append_synthetic_function_call_to_chat(
+                chat_session,
+                function_to_call=get_relevant_class_resource_chunks,
+                function_kwargs={'student_message': chat_session.last_human_message.content},
+                relevant_chunks=relevant_chunks,
+            )
             chain = create_openai_fn_chain(
                 functions=[get_relevant_class_resource_chunks],
                 llm=self._chat_model,
@@ -80,37 +99,70 @@ class TaiLLM:
             )
             llm_kwargs = chain.llm_kwargs
             llm_kwargs['function_call'] = "none"
-        chat_message = self._chat_model(messages=chat_session.messages, **llm_kwargs)
+        self._append_model_response(chat_session)
+
+    def create_search_result_summary_snippet(self, search_query: str, chunks: list[ClassResourceChunkDocument]) -> str:
+        """Create a snippet of the search result summary."""
+        documents = "\n".join([chunk.simplified_string for chunk in chunks])
+        format_str = ValidatedFormatString(
+            format_string=SUMMARIZER_USER_PROMPT,
+            kwargs={"search_query": search_query, "documents": documents},
+        )
+        session: TaiChatSession = TaiChatSession.from_message(
+            SearchQuery(content=format_str.format()),
+            class_id=uuid4(),
+        )
+        session.insert_system_prompt(SUMMARIZER_SYSTEM_PROMPT)
+        self.add_tai_tutor_chat_response(session)
+        return session.last_chat_message.content
+
+    def _append_model_response(self, chat_session: TaiChatSession) -> None:
+        """Get the response from the LLMs."""
+        chat_message = self._chat_model(messages=chat_session.messages)
         tutor_response = TaiTutorMessage(
             content=chat_message.content,
             render_chat=True,
-            **chat_session.last_student_message.dict(exclude={"role", "render_chat", "content"}),
+            **chat_session.last_human_message.dict(exclude={"role", "render_chat", "content"}),
         )
         chat_session.append_chat_messages([tutor_response])
 
-    def _append_context_chat(
+    def _chat_session_from_user_query(self, query: str, class_id: UUID) -> TaiChatSession:
+        """Create a chat session from a string."""
+        session = TaiChatSession.from_message(
+            class_id=class_id,
+            message=StudentMessage(
+                content=query,
+                tai_tutor_name=TaiTutorName.ALEX,
+            )
+        )
+        return session
+
+    def _append_synthetic_function_call_to_chat(
         self,
         chat_session: TaiChatSession,
+        function_to_call: callable,
+        function_kwargs: dict,
         relevant_chunks: list[ClassResourceChunkDocument] = None,
     ) -> None:
         """Append the context chat to the chat session."""
-        last_chat = chat_session.last_chat_message
+        last_student_chat = chat_session.last_human_message
         tutor_chat = TaiTutorMessage(
             render_chat=False,
             content="",
             function_call=AIResponseCallingFunction(
-                name="find_relevant_chunks",
-                arguments=json.dumps({'student_message': last_chat.content}),
+                name=function_to_call.__name__,
+                arguments=json.dumps(function_kwargs),
             ),
-            tai_tutor_name=last_chat.tai_tutor_name,
+            tai_tutor_name=last_student_chat.tai_tutor_name,
         )
-        function_response = ""
-        for chunk in relevant_chunks:
-            function_response += f"{chunk.dict(serialize_dates=True)}\n\n"
-        func_message = FunctionMessage(
+        func_message = self._function_msg_from_chunks(relevant_chunks)
+        chat_session.append_chat_messages([tutor_chat, func_message])
+
+    def _function_msg_from_chunks(self, chunks: list[ClassResourceChunkDocument]) -> FunctionMessage:
+        """Create a function message from the chunks."""
+        msg = FunctionMessage(
             name="find_relevant_chunks",
             render_chat=False,
-            content=function_response,
-            **chat_session.last_chat_message.dict(exclude={"role", "render_chat", "content"}),
+            content="\n".join([chunk.simplified_string for chunk in chunks]),
         )
-        chat_session.append_chat_messages([tutor_chat, func_message])
+        return msg

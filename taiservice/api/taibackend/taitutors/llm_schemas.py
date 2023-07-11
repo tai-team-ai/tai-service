@@ -1,9 +1,12 @@
 """Define the llm schemas for interfacing with LLMs."""
 import copy
-from typing import Any, Optional, Union
+import re
+from textwrap import dedent
+from typing import Optional, Union
 from enum import Enum
 from uuid import UUID
-from pydantic import Field, BaseModel
+from uuid import uuid4
+from pydantic import Field, BaseModel, validator
 from langchain.schema import (
     AIMessage,
     FunctionMessage as langchainFunctionMessage,
@@ -57,10 +60,20 @@ class BaseMessage(langchainBaseMessage):
         """Type of the message, used for serialization."""
         return "base"
 
+class SearchQuery(BaseMessage, HumanMessage):
+    """Define the model for the search query."""
+    role: ChatRole = Field(
+        default=ChatRole.STUDENT,
+        const=True,
+        description="The role of the creator of the chat message.",
+    )
+
+
+
 class TutorAndStudentBaseMessage(BaseMessage):
     """Define the base message for the TAI tutor and student."""
     tai_tutor_name: TaiTutorName = Field(
-        ...,
+        default=TaiTutorName.FIN,
         description="The name of the TAI tutor that generated this message.",
     )
     technical_level: ResponseTechnicalLevel = Field(
@@ -163,10 +176,10 @@ class TaiChatSession(BasePydanticModel):
         return None
 
     @property
-    def last_student_message(self) -> Optional[StudentMessage]:
+    def last_human_message(self) -> Optional[HumanMessage]:
         """Return the last student message in the chat session."""
         for message in reversed(self.messages):
-            if isinstance(message, StudentMessage):
+            if isinstance(message, HumanMessage):
                 return message
         return None
 
@@ -177,3 +190,56 @@ class TaiChatSession(BasePydanticModel):
         msgs = copy.deepcopy(self.messages)
         msgs.extend(new_messages)
         self.messages = msgs
+
+    def insert_system_prompt(self, prompt: str) -> None:
+        """Insert a system prompt to the beginning of the chat session."""
+        self.messages.insert(0, SystemMessage(content=prompt))
+
+    @staticmethod
+    def from_message(message: BaseMessage, class_id: UUID) -> "TaiChatSession":
+        """Create a new chat session from a message."""
+        return TaiChatSession(
+            id=uuid4(),
+            class_id=class_id,
+            messages=[message],
+        )
+
+
+class ValidatedFormatString(BasePydanticModel):
+    """Define the model for the key safe format string."""
+    format_string: str = Field(
+        ...,
+        description="The format string.",
+    )
+    kwargs: dict[str, str] = Field(
+        ...,
+        description="The keys in the format string.",
+    )
+
+    @validator("kwargs")
+    def validate_keys(cls, keys: dict[str, str], values: dict) -> dict[str, str]:
+        """Validate the keys and ensure all are in the format string and there are no extra keys in format string."""
+        format_string_keys = re.findall(r"\{([a-zA-Z0-9_]+)\}", values["format_string"])
+        for key in keys:
+            if key not in format_string_keys:
+                raise ValueError(f"Key {key} in keys not found in format string.")
+        for key in format_string_keys:
+            if key not in keys:
+                raise ValueError(f"Key {key} in format string not found in keys.")
+        return keys
+
+    def format(self) -> str:
+        """Format the format string."""
+        return self.format_string.format(**self.kwargs)
+
+SUMMARIZER_SYSTEM_PROMPT = dedent(
+    """You are a summarizer. You will be given a search query and a list of documents. You're
+    job is to summarize the documents. If you are not provided a list of documents, you should 
+    not respond with anything."""
+)
+SUMMARIZER_USER_PROMPT = dedent(
+    """Student search query: {search_query}
+    Returned search result documents:
+    {documents}
+    Snippet (Summary of the search results):"""
+)
