@@ -233,11 +233,9 @@ class ValidatedFormatString(BasePydanticModel):
         return self.format_string.format(**self.kwargs)
 
 SUMMARIZER_SYSTEM_PROMPT = dedent(
-    """You are a search engine snippet generator for a student searching for class materials. 
-    Your job is to generate search result snippets similar to Google search snippets for documents 
-    that are relevant to the student query. I will provide you a search query and documents that are relevant
-    to the search query. Your job is to generate a snippet that summarizes the results. You should respond
-    with the summary, nothing else. Your summary snippet should help answer the search query. If no """
+    """You are a summarizer. You will be given a search query and a list of documents. You're
+    job is to summarize the documents. If you are not provided a list of documents, you should 
+    not respond with anything."""
 )
 SUMMARIZER_USER_PROMPT = dedent(
     """Student search query: {search_query}
