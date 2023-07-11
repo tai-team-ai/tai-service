@@ -49,7 +49,7 @@ def test_ClassResourceDocument_to_ClassResource():
         status=ClassResourceProcessingStatus.COMPLETED,
         **base_dict
     )
-    api_schema = Backend.to_api_schema([class_resource_doc])
+    api_schema = Backend.to_api_resources([class_resource_doc])
     assert len(api_schema) == 1
     assert isinstance(api_schema[0], ClassResource)
 
@@ -60,7 +60,7 @@ def test_ClassResourceChunkDocument_to_ClassResourceSnippet():
     base_dict["chunk"] = "dummy chunk"
     base_dict["metadata"]["class_id"] = base_dict["class_id"]
     class_resource_chunk_doc = ClassResourceChunkDocument(**base_dict)
-    api_schema = Backend.to_api_schema([class_resource_chunk_doc])
+    api_schema = Backend.to_api_resources([class_resource_chunk_doc])
     assert len(api_schema) == 1
     assert isinstance(api_schema[0], ClassResourceSnippet)
 
@@ -70,4 +70,4 @@ def test_unsupported_document_types_throw_exception():
     base_dict = get_valid_BaseClassResourceDocument_dict()
     base_doc = BaseClassResourceDocument(**base_dict)
     with pytest.raises(RuntimeError): # Assuming a RuntimeError is what's thrown for unsupported types
-        Backend.to_api_schema([base_doc])
+        Backend.to_api_resources([base_doc])

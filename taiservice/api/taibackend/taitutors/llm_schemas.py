@@ -24,7 +24,6 @@ class TaiTutorName(str, Enum):
 
     FIN = "fin"
     ALEX = "alex"
-    NA = "na"
 
 class ChatRole(str, Enum):
     """Define the built-in MongoDB roles."""
@@ -58,7 +57,7 @@ class BaseMessage(langchainBaseMessage):
         """Type of the message, used for serialization."""
         return "base"
 
-class TutorStudentBaseMessage(BaseMessage):
+class TutorAndStudentBaseMessage(BaseMessage):
     """Define the base message for the TAI tutor and student."""
     tai_tutor_name: TaiTutorName = Field(
         ...,
@@ -70,7 +69,7 @@ class TutorStudentBaseMessage(BaseMessage):
     )
 
 
-class StudentMessage(HumanMessage, TutorStudentBaseMessage):
+class StudentMessage(HumanMessage, TutorAndStudentBaseMessage):
     """Define the model for the student chat message."""
 
     role: ChatRole = Field(
@@ -91,7 +90,7 @@ class AIResponseCallingFunction(BaseModel):
         description="The arguments to pass to the function.",
     )
 
-class TaiTutorMessage(AIMessage, TutorStudentBaseMessage):
+class TaiTutorMessage(AIMessage, TutorAndStudentBaseMessage):
     """Define the model for the TAI tutor chat message."""
 
     role: ChatRole = Field(

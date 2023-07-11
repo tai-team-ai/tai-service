@@ -362,9 +362,9 @@ class Backend:
             )
         elif isinstance(chat_message, APIFunctionChat):
             return BEFunctionMessage(
-                function_name=chat_message.function_name,
                 name=chat_message.function_name,
-                **msg.dict(),
+                render_chat=chat_message.render_chat,
+                **msg.dict(exclude={"render_chat"}),
             )
         else:
             raise RuntimeError(f"Unknown chat message type: {chat_message}")
@@ -409,7 +409,8 @@ class Backend:
         elif isinstance(chat_message, BEFunctionMessage):
             return APIFunctionChat(
                 function_name=chat_message.name,
-                **msg.dict(),
+                render_chat=chat_message.render_chat,
+                **msg.dict(exclude={"render_chat"}),
             )
         else:
             raise RuntimeError(f"Unknown chat message type: {chat_message}")

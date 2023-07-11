@@ -82,14 +82,17 @@ class FunctionChat(Chat):
     )
 
 
-class StudentChat(Chat):
-    """Define the model for the student chat message."""
-
+class BaseStudentChat(Chat):
+    """Define the base model for the student chat message."""
     role: ChatRole = Field(
         default=ChatRole.STUDENT,
         const=True,
         description="The role of the creator of the chat message.",
     )
+
+class StudentChat(BaseStudentChat):
+    """Define the model for the student chat message."""
+
     requested_tai_tutor: Optional[TaiTutorName] = Field(
         ...,
         description="The name of the TAI tutor to use in the response.",
@@ -102,7 +105,11 @@ class StudentChat(Chat):
 
 class TaiSearchResponse(Chat):
     """Define the model for the TAI chat message."""
-
+    role: ChatRole = Field(
+        default=ChatRole.FUNCTION,
+        const=True,
+        description="The role of the creator of the chat message.",
+    )
     class_resource_snippets: list[ClassResourceSnippet] = Field(
         ...,
         description="The class resources that were used to generate the response.",
@@ -277,7 +284,7 @@ class ResourceSearchQuery(BaseChatSession):
     this requires that only one student chat message is sent.
     """
 
-    chats: list[StudentChat] = Field(
+    chats: list[BaseStudentChat] = Field(
         ...,
         max_items=1,
         description="The search query from the student.",
@@ -297,7 +304,7 @@ class ResourceSearchQuery(BaseChatSession):
 class ResourceSearchAnswer(BaseChatSession):
     """Define the response model for the search endpoint."""
 
-    chats: list[Union[Chat, TaiSearchResponse]] = Field(
+    chats: list[Union[BaseStudentChat, TaiSearchResponse]] = Field(
         ...,
         description="The chat session message history.",
     )
