@@ -425,6 +425,7 @@ class Backend:
                 tai_tutor=chat_message.tai_tutor_name,
                 technical_level=chat_message.technical_level,
                 class_resource_snippets=[snippet for snippet in snippets if isinstance(snippet, ClassResourceSnippet)],
+                function_call=chat_message.function_call,
                 **msg.dict(exclude={"render_chat"}),
             )
         elif isinstance(chat_message, BEFunctionMessage):

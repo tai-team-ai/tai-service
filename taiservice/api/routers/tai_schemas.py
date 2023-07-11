@@ -103,6 +103,18 @@ class StudentChat(BaseStudentChat):
     )
 
 
+class AIResponseCallingFunction(BasePydanticModel):
+    """Define the model for the AI response calling function."""
+
+    name: str = Field(
+        ...,
+        description="The name of the function to call.",
+    )
+    arguments: str = Field(
+        ...,
+        description="The arguments to pass to the function.",
+    )
+
 class TaiTutorChat(Chat):
     """Define the model for the TAI Tutor chat message."""
 
@@ -122,6 +134,10 @@ class TaiTutorChat(Chat):
     class_resource_snippets: list[ClassResourceSnippet] = Field(
         ...,
         description="The class resources that were used to generate the response.",
+    )
+    function_call: Optional[AIResponseCallingFunction] = Field(
+        default=None,
+        description="The function call that the assistant wants to make.",
     )
 
 
