@@ -168,3 +168,16 @@ class StatefulClassResourceDocument(BaseClassResourceDocument):
             "contents."
         )
     )
+
+
+class BaseOpenAIConfig(BaseModel):
+    """Define the base OpenAI config."""
+    api_key: str = Field(
+        ...,
+        description="The API key of the OpenAI API.",
+    )
+    request_timeout: int = Field(
+        ...,
+        le=30,
+        description="The timeout for requests to the OpenAI API.",
+    )

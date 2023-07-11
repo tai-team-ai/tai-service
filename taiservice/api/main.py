@@ -2,19 +2,21 @@
 from fastapi import APIRouter, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from loguru import logger
+
+from .taibackend import class_resources
+
+from taiservice.api.taibackend import class_resources
 # first imports are for local development, second imports are for deployment
 try:
     from .runtime_settings import TaiApiSettings, BACKEND_ATTRIBUTE_NAME
     from .taibackend.backend import Backend
     from .routers import (
-        class_resources,
         tai
     )
 except ImportError as e:
     from runtime_settings import TaiApiSettings, BACKEND_ATTRIBUTE_NAME
     from taibackend.backend import Backend
     from routers import (
-        class_resources,
         tai
     )
 

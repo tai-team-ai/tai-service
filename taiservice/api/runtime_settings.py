@@ -3,8 +3,10 @@ from pydantic import Field, BaseSettings
 # first imports are for local development, second imports are for deployment
 try:
     from .taibackend.databases.pinecone_db import Environment as PineconeEnvironment
+    from .taibackend.taitutors.llm import ModelName
 except ImportError:
     from taibackend.databases.pinecone_db import Environment as PineconeEnvironment
+    from taibackend.taitutors.llm import ModelName
 
 BACKEND_ATTRIBUTE_NAME = "tai_backend"
 
@@ -70,6 +72,10 @@ class TaiApiSettings(BaseSettings):
         default=50,
         description="The batch size for OpenAI requests.",
     )
+    model_name: ModelName = Field(
+        default=ModelName.GPT_TURBO,
+        description="The name of the model to use for the llm tutor.",
+
     nltk_data: str = Field(
         default="/var/task/nltk_data",
         description="The path to the nltk data.",

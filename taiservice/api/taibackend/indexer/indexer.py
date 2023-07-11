@@ -26,7 +26,7 @@ try:
         InputDocument,
         InputDataIngestStrategy,
     )
-    from ..shared_schemas import ChunkMetadata
+    from ..shared_schemas import ChunkMetadata, BaseOpenAIConfig
     from ..databases.pinecone_db import PineconeDBConfig, PineconeDB
     from ..databases.pinecone_db_schemas import (
         PineconeDocuments,
@@ -37,7 +37,6 @@ try:
     from ..databases.document_db_schemas import (
         ClassResourceChunkDocument,
         ClassResourceDocument,
-        ClassResourceProcessingStatus,
     )
 except ImportError:
     from taibackend.indexer.data_ingestors import (
@@ -53,7 +52,7 @@ except ImportError:
         InputDocument,
         InputDataIngestStrategy,
     )
-    from taibackend.shared_schemas import ChunkMetadata
+    from taibackend.shared_schemas import ChunkMetadata, BaseOpenAIConfig
     from taibackend.databases.pinecone_db_schemas import (
         PineconeDocuments,
         PineconeDocument,
@@ -64,21 +63,11 @@ except ImportError:
     from taibackend.databases.document_db_schemas import (
         ClassResourceChunkDocument,
         ClassResourceDocument,
-        ClassResourceProcessingStatus,
     )
 
 
-class OpenAIConfig(BaseModel):
+class OpenAIConfig(BaseOpenAIConfig):
     """Define the OpenAI config."""
-    api_key: str = Field(
-        ...,
-        description="The API key of the OpenAI API.",
-    )
-    request_timeout: int = Field(
-        ...,
-        le=30,
-        description="The timeout for requests to the OpenAI API.",
-    )
     batch_size: int = Field(
         ...,
         ge=1,
