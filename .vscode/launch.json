@@ -5,7 +5,11 @@
       "name": "FastAPI",
       "request": "launch",
       "type": "python",
-      "args": ["taiservice.api.main:create_app", "--reload", "--factory"],
+      "args": [
+        "taiservice.api.main:create_app",
+        "--reload",
+        "--factory"
+      ],
       "env": {
         "PINECONE_DB_API_KEY_SECRET_NAME": "dev/tai_service/pinecone_db/api_key",
         "PINECONE_DB_ENVIRONMENT": "us-east-1-aws",
@@ -20,7 +24,8 @@
         "DOC_DB_CLASS_RESOURCE_CHUNK_COLLECTION_NAME": "class_resource_chunk",
         "OPENAI_API_KEY_SECRET_NAME": "dev/tai_service/openai/api_key",
         "AWS_DEFAULT_REGION": "us-east-1",
-        "COLD_STORE_BUCKET_NAME": "tai-service-class-resource-cold-store-dev"
+        "COLD_STORE_BUCKET_NAME": "tai-service-class-resource-cold-store",
+        "FRONTED_DATA_TRANSFER_BUCKET_NAME": "frontend-data-transfer"
       },
       "program": "${workspaceFolder}/.venv/bin/uvicorn"
     }

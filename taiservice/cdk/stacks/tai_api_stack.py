@@ -10,6 +10,7 @@ from aws_cdk import (
     Size as StorageSize,
     CfnOutput,
     RemovalPolicy,
+    aws_iam as iam,
 )
 from ...api.runtime_settings import TaiApiSettings
 from .stack_config_models import StackConfigBaseModel
@@ -48,6 +49,7 @@ class TaiApiStack(Stack):
         config: StackConfigBaseModel,
         api_settings: TaiApiSettings,
         vpc: Union[ec2.IVpc, ec2.Vpc, str],
+        frontend_user: iam.User,
         security_group_allowing_db_connections: ec2.SecurityGroup,
     ) -> None:
         """Initialize the stack for the TAI API service."""
@@ -65,8 +67,19 @@ class TaiApiStack(Stack):
         self._vpc = get_vpc(self, vpc)
         self._removal_policy = config.removal_policy
         api_settings.cold_store_bucket_name = (api_settings.cold_store_bucket_name + config.stack_suffix)[:50]
-        self._bucket: VersionedBucket = self._create_bucket()
+        self._cold_store_bucket: VersionedBucket = self._create_bucket(
+            name=api_settings.cold_store_bucket_name,
+            public_read_access=True,
+        )
         self._python_lambda: DockerLambda = self._create_lambda_function(security_group_allowing_db_connections)
+        self._cold_store_bucket.grant_write_access(self._python_lambda.role)
+        api_settings.frontend_data_transfer_bucket_name = (api_settings.frontend_data_transfer_bucket_name + config.stack_suffix)[:50]
+        self._frontend_transfer_bucket: VersionedBucket = self._create_bucket(
+            name=api_settings.frontend_data_transfer_bucket_name,
+            public_read_access=False,
+        )
+        self._frontend_transfer_bucket.grant_write_access(frontend_user)
+        self._frontend_transfer_bucket.grant_read_access(self._python_lambda.role)
         add_tags(self, config.tags)
         CfnOutput(
             self,
@@ -80,10 +93,10 @@ class TaiApiStack(Stack):
         """Return the lambda function."""
         return self._python_lambda.lambda_function
 
-    def _create_bucket(self) -> VersionedBucket:
+    def _create_bucket(self, name: str, public_read_access: bool) -> VersionedBucket:
         config = VersionedBucketConfigModel(
-            bucket_name=self._settings.cold_store_bucket_name,
-            public_read_access=True,
+            bucket_name=name,
+            public_read_access=public_read_access,
             removal_policy=self._removal_policy,
             delete_objects_on_bucket_removal=True if self._removal_policy == RemovalPolicy.DESTROY else False,
         )

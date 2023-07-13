@@ -225,6 +225,11 @@ class BaseLambda(Construct):
         """Get the function URL."""
         return self._function_url.url
 
+    @property
+    def role(self) -> iam.Role:
+        """Get the role."""
+        return self._lambda_function.role
+
     @abstractmethod
     def _create_layer_with_zip_asset(self) -> None:
         """Create the layer with the zip asset."""

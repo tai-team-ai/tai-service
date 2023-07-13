@@ -127,6 +127,18 @@ class VersionedBucket(Construct):
         """Update the removal policy for the bucket."""
         self.bucket.apply_removal_policy(removal_policy)
 
+    def grant_read_access(self, role: iam.Role) -> None:
+        """Grant read access to the bucket."""
+        self.bucket.grant_read(role)
+
+    def grant_write_access(self, role: iam.Role) -> None:
+        """Grant write access to the bucket."""
+        self.bucket.grant_write(role)
+
+    def grant_read_write_access(self, role: iam.Role) -> None:
+        """Grant read and write access to the bucket."""
+        self.bucket.grant_read_write(role)
+
     def replicate_to_destination_bucket(
         self,
         destinantion_bucket: Union[s3.Bucket, str],
