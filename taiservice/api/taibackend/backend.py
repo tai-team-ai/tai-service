@@ -131,6 +131,7 @@ class Backend:
             pinecone_db_config=self._pinecone_db_config,
             document_db_config=self._doc_db_config,
             openai_config=openAI_config,
+            cold_store_bucket_name=runtime_settings.cold_store_bucket_name,
         )
         self._indexer = Indexer(self._indexer_config)
 
@@ -233,8 +234,6 @@ class Backend:
         doc_pairs: list[tuple[Indexer, ClassResourceDocument]] = []
         for input_doc in input_docs:
             ingested_doc = Indexer.ingest_document(input_doc)
-            if ingested_doc.input_format != InputFormat.RAW_URL
-                ingested_doc.full_resource_url = self._upload_to_s3(ingested_doc)
             doc = ClassResourceDocument.from_ingested_doc(ingested_doc)
             self._coerce_and_update_status(doc, ClassResourceProcessingStatus.PENDING)
             doc_pairs.append((ingested_doc, doc))
@@ -246,20 +245,6 @@ class Backend:
             except Exception as e: # pylint: disable=broad-except
                 logger.critical(f"Failed to create class resources: {e}")
                 self._coerce_and_update_status(class_resource, ClassResourceProcessingStatus.FAILED)
-
-    def _upload_to_s3(self, doc: IngestedDocument) -> str:
-        """Put the ingested document to s3."""
-        try:
-            s3 = boto3.resource("s3")
-            bucket = s3.Bucket(self._runtime_settings.cold_store_bucket_name)
-            filepath = str(doc.data_pointer)
-            object_key = f"{str(doc.class_id)}/{doc.id_as_str}{doc.data_pointer.suffix}"
-            bucket.upload_file(filepath, object_key)
-            obj = s3.Object(self._runtime_settings.cold_store_bucket_name, object_key)
-            return obj.meta.client.meta.endpoint_url + "/" + obj.bucket_name + "/" + obj.key
-        except Exception as e: # pylint: disable=broad-except
-            logger.critical(f"Failed to upload to s3: {e}")
-            raise RuntimeError(f"Failed to upload to s3: {e}") from e
 
     def _chunks_from_class_resource(self, class_resources: ClassResourceDocument) -> list[ClassResourceChunkDocument]:
         """Get the chunks from the class resources."""

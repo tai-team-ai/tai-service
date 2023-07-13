@@ -55,6 +55,7 @@ project:Project = AwsCdkPythonApp(
         "torch -f https://download.pytorch.org/whl/cpu",
         "transformers",
         "pymupdf",
+        "pdf2image",
     ],
 )
 

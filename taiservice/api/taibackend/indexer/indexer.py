@@ -4,8 +4,9 @@ from pathlib import Path
 from typing import Optional
 from uuid import UUID, uuid4
 import traceback
+import boto3
 from loguru import logger
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, HttpUrl
 from langchain.embeddings import OpenAIEmbeddings
 from langchain import document_loaders
 from langchain.document_loaders.base import BaseLoader
@@ -19,6 +20,12 @@ try:
         get_total_page_count,
         S3ObjectIngestor,
         URLIngestor,
+        Ingestor,
+    )
+    from .screenshotters import (
+        ResourceScreenshotter,
+        PDFScreenshotter,
+        HTMLScreenshotter,
     )
     from .data_ingestor_schema import (
         IngestedDocument,
@@ -45,6 +52,12 @@ except ImportError:
         get_total_page_count,
         S3ObjectIngestor,
         URLIngestor,
+        Ingestor,
+    )
+    from taibackend.indexer.screenshotters import (
+        ResourceScreenshotter,
+        PDFScreenshotter,
+        HTMLScreenshotter,
     )
     from taibackend.indexer.data_ingestor_schema import (
         IngestedDocument,
@@ -90,6 +103,10 @@ class IndexerConfig(BaseModel):
         ...,
         description="The OpenAI config.",
     )
+    cold_store_bucket_name: str = Field(
+        ...,
+        description="The name of the cold store bucket.",
+    )
 
 
 class Indexer:
@@ -106,6 +123,7 @@ class Indexer:
             request_timeout=indexer_config.openai_config.request_timeout,
         )
         self._batch_size = indexer_config.openai_config.batch_size
+        self._cold_store_bucket_name = indexer_config.cold_store_bucket_name
 
     def index_resource(
         self,
@@ -114,6 +132,8 @@ class Indexer:
     ) -> ClassResourceDocument:
         """Index a document."""
         try:
+            if ingested_document.input_format != InputFormat.RAW_URL:
+                ingested_document.preview_image_url = self._create_and_upload_screenshot(ingested_document)
             chunk_documents = self._load_and_split_document(ingested_document)
             class_resource_document.class_resource_chunk_ids = [chunk_doc.id for chunk_doc in chunk_documents]
             vector_documents = self.embed_documents(chunk_documents, class_resource_document.class_id)
@@ -123,6 +143,40 @@ class Indexer:
             logger.error(traceback.format_exc())
             raise RuntimeError("Failed to index resource.") from e
         return class_resource_document
+
+    def _create_and_upload_screenshot(self, ingested_document: IngestedDocument) -> Optional[HttpUrl]:
+        try:
+            path_to_screenshot = self._screenshot_resource(ingested_document)
+            return self._upload_to_s3(ingested_document, path_to_screenshot)
+        except Exception as e: # pylint: disable=broad-except
+            logger.warning(f"Failed to create and upload screenshot: {e}")
+            logger.error(traceback.format_exc())
+
+    def _upload_to_s3(self, doc: IngestedDocument, file_path: Path=None) -> Optional[HttpUrl]:
+        """Put the ingested document to s3."""
+        try:
+            s3 = boto3.resource("s3")
+            bucket = s3.Bucket(self._cold_store_bucket_name)
+            filepath = file_path if file_path else doc.data_pointer
+            object_key = f"{str(doc.class_id)}/{doc.id_as_str}{filepath.suffix}"
+            bucket.upload_file(str(filepath.resolve()), object_key)
+            obj = s3.Object(self._cold_store_bucket_name, object_key)
+            return obj.meta.client.meta.endpoint_url + "/" + obj.bucket_name + "/" + obj.key
+        except Exception as e: # pylint: disable=broad-except
+            logger.critical(f"Failed to upload to s3: {e}")
+            raise RuntimeError(f"Failed to upload to s3: {e}") from e
+
+    def _screenshot_resource(self, doc: IngestedDocument) -> Path:
+        """Take a screenshot of the resource."""
+        strategy_map: dict[InputFormat, ResourceScreenshotter] = {
+            InputFormat.PDF: PDFScreenshotter,
+            InputFormat.HTML: HTMLScreenshotter,
+        }
+        try:
+            screenshotter = strategy_map[doc.input_format]
+            return screenshotter.create_screenshot(doc.data_pointer)
+        except KeyError as e:
+            raise NotImplementedError(f"Screenshotting for {doc.input_format} is not implemented.") from e
 
     def _load_vectors_to_vector_store(self, vector_documents: PineconeDocuments) -> None:
         """Load vectors to vector store."""
@@ -237,10 +291,12 @@ class Indexer:
     @staticmethod
     def ingest_document(document: InputDocument) -> IngestedDocument:
         """Ingest a document."""
-        if document.input_data_ingest_strategy == InputDataIngestStrategy.S3_FILE_DOWNLOAD:
-            ingestor = S3ObjectIngestor()
-        elif document.input_data_ingest_strategy == InputDataIngestStrategy.URL_DOWNLOAD:
-            ingestor = URLIngestor()
-        else:
+        mapping: dict[InputDataIngestStrategy, Ingestor] = {
+            InputDataIngestStrategy.S3_FILE_DOWNLOAD: S3ObjectIngestor,
+            InputDataIngestStrategy.URL_DOWNLOAD: URLIngestor,
+        }
+        try:
+            ingestor = mapping[document.input_data_ingest_strategy]
+        except KeyError as e:
             raise NotImplementedError(f"Unsupported input data ingest strategy: {document.input_data_ingest_strategy}")
         return ingestor.ingest_data(document)

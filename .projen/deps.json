@@ -37,6 +37,10 @@
       "type": "devenv"
     },
     {
+      "name": "pdf2image",
+      "type": "devenv"
+    },
+    {
       "name": "pinecone-client[grpc]",
       "type": "devenv"
     },

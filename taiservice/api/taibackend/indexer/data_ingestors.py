@@ -1,6 +1,6 @@
 """Define data ingestors used by the indexer."""
-from typing import List, Optional
-from abc import ABC
+from typing import Optional
+from abc import ABC, abstractmethod
 from enum import Enum
 from pathlib import Path
 import traceback
@@ -79,11 +79,13 @@ def get_page_number(doc: Document) -> Optional[int]:
 
 class Ingestor(ABC):
     """Define the ingestor class."""
-    def ingest_data(self, input_data: InputDocument) -> IngestedDocument:
+    @abstractmethod
+    @classmethod
+    def ingest_data(cls, input_data: InputDocument) -> IngestedDocument:
         """Ingest the data."""
-        raise NotImplementedError
 
-    def _get_file_type(self, path: Path) -> str:
+    @staticmethod
+    def _get_file_type(path: Path) -> str:
         """Get the file type."""
         def check_file_type(path: Path, extension_enum: Enum) -> bool:
             """Check if the file type matches given extensions."""
@@ -116,7 +118,8 @@ class S3ObjectIngestor(Ingestor):
 
     This class is used for ingesting data from S3.
     """
-    def ingest_data(self, input_data: InputDocument) -> IngestedDocument:
+    @classmethod
+    def ingest_data(cls, input_data: InputDocument) -> IngestedDocument:
         """Ingest the data from S3."""
         tmp_path = Path(f"/tmp/{input_data.id}")
         # Download the file using the requests library
@@ -126,8 +129,8 @@ class S3ObjectIngestor(Ingestor):
             f.write(response.content)
         document = IngestedDocument(
             data_pointer=tmp_path,
-            input_format=self._get_file_type(tmp_path),
-            loading_strategy=LOADING_STRATEGY_MAPPING[self._get_file_type(tmp_path)],
+            input_format=cls._get_file_type(tmp_path),
+            loading_strategy=LOADING_STRATEGY_MAPPING[cls._get_file_type(tmp_path)],
             **input_data.dict(),
         )
         return document
@@ -138,7 +141,8 @@ class URLIngestor(Ingestor):
 
     This class is used for ingesting data from a URL.
     """
-    def ingest_data(self, input_data: InputDocument) -> IngestedDocument:
+    @classmethod
+    def ingest_data(cls, input_data: InputDocument) -> IngestedDocument:
         """Ingest the data from a URL."""
         remote_file_url = input_data.full_resource_url
         tmp_path = Path(f"/tmp/{remote_file_url.split('/')[-1]}")
@@ -149,8 +153,8 @@ class URLIngestor(Ingestor):
             f.write(r.content)
         document = IngestedDocument(
             data_pointer=tmp_path,
-            input_format=self._get_file_type(tmp_path),
-            loading_strategy=LOADING_STRATEGY_MAPPING[self._get_file_type(tmp_path)],
+            input_format=cls._get_file_type(tmp_path),
+            loading_strategy=LOADING_STRATEGY_MAPPING[cls._get_file_type(tmp_path)],
             **input_data.dict(),
         )
         return document
