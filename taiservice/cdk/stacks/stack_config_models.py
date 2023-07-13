@@ -3,8 +3,7 @@ import os
 import re
 from typing import Optional
 
-from loguru import logger
-from pydantic import BaseModel, BaseSettings, Field, validator, Extra
+from pydantic import BaseModel, BaseSettings, Field, validator, Extra, root_validator
 from pygit2 import Repository
 from aws_cdk import (
     Environment,
@@ -47,7 +46,7 @@ class AWSDeploymentSettings(BaseSettings):
         description="The AWS environment to deploy to.",
     )
     deployment_type: DeploymentType = Field(
-        default=DeploymentType.DEV,
+        default=DeploymentType.PROD,
         env="DEPLOYMENT_TYPE",
         description="The deployment type. This is used to isolate stacks from various environments.",
     )
@@ -103,6 +102,10 @@ class StackConfigBaseModel(BaseModel):
             resources to include the staging stack suffix.
         """,
     )
+    stack_suffix: str = Field(
+        default="",
+        description="The stack suffix to append to resources in the stack if duplicate_stack_for_development is enabled.",
+    )
     stack_id: str = Field(
         ...,
         description="The ID of the stack.",
@@ -137,16 +140,21 @@ class StackConfigBaseModel(BaseModel):
         validate_assignment = True
         extra = Extra.forbid
 
-    @validator("stack_name", "stack_id")
-    def add_suffix_to_names(cls, name: str, values: dict) -> str:
-        """Add the staging stack suffix to the resource name."""
+    @root_validator()
+    def create_suffix(cls, values: dict) -> dict:
+        """Create the stack suffix."""
         branch_name = Repository(os.getcwd()).head.shorthand
         branch_name = re.sub(r"[^a-zA-Z0-9]", '-', branch_name)
         is_main = branch_name == "main" or branch_name == "master" or \
-            branch_name == "production" or branch_name == "prod" or branch_name == "dev"
+            branch_name == "production" or branch_name == "prod"
         if is_main or not values["duplicate_stack_for_development"]:
-            return name
-        return f"{name}-{branch_name}"
+            return values
+        deploy_settings: AWSDeploymentSettings = values["deployment_settings"]
+        stack_suffix = f"-{branch_name[:6]}-{deploy_settings.deployment_type.value}"
+        values["stack_suffix"] = stack_suffix
+        values["stack_name"] = f"{values['stack_name']}{stack_suffix}"
+        values["stack_id"] = f"{values['stack_id']}{stack_suffix}"
+        return values
 
     @validator("termination_protection")
     def validate_on_if_prod(cls, termination_protection: bool, values: dict) -> bool:
