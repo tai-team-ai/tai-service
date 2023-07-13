@@ -84,3 +84,7 @@ class TaiApiSettings(BaseSettings):
         default="/tmp/transformers_cache",
         description="The path to the transformers cache.",
     )
+    cold_store_bucket_name: str = Field(
+        ...,
+        description="The name of the cold store bucket.",
+    )

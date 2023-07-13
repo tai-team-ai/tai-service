@@ -16,7 +16,7 @@ from aws_cdk import (
 )
 
 
-class VersionedPrivateBucketConfigModel(BaseModel):
+class VersionedBucketConfigModel(BaseModel):
     """Define the configuration for the bucket construct."""
 
     bucket_name: str = Field(
@@ -39,6 +39,10 @@ class VersionedPrivateBucketConfigModel(BaseModel):
         ),
         description="The lifecycle rules for the bucket.",
     )
+    public_read_access: bool = Field(
+        default=False,
+        description="Whether or not to allow public read access.",
+    )
 
     class Config:
         """Define the Pydantic model configuration."""
@@ -53,7 +57,7 @@ class VersionedPrivateBucketConfigModel(BaseModel):
         return values
 
 
-class VersionedPrivateBucket(Construct):
+class VersionedBucket(Construct):
     """
     Define a private bucket construct.
 
@@ -65,40 +69,51 @@ class VersionedPrivateBucket(Construct):
         self,
         scope: Construct,
         construct_id: str,
-        config: VersionedPrivateBucketConfigModel,
+        config: VersionedBucketConfigModel,
         **kwargs,
     ) -> None:
         """Initialize the construct."""
         super().__init__(scope, construct_id, **kwargs)
-
+        self._config = config
         if config.bucket:
             self.bucket = config.bucket
         else:
+            public_access = s3.BlockPublicAccess(
+                block_public_acls=True,
+                block_public_policy=False if config.public_read_access else True,
+                ignore_public_acls=True,
+                restrict_public_buckets=False if config.public_read_access else True,
+            )
             self.bucket = s3.Bucket(
                 self,
                 construct_id,
                 bucket_name=config.bucket_name,
                 removal_policy=config.removal_policy,
                 encryption=s3.BucketEncryption.S3_MANAGED,
-                block_public_access=s3.BlockPublicAccess.BLOCK_ALL,
-                public_read_access=False,
-                object_ownership=s3.ObjectOwnership.BUCKET_OWNER_PREFERRED,
+                block_public_access=public_access,
+                public_read_access=config.public_read_access,
                 versioned=True,
                 metrics=[self._create_metrics_for_bucket()],
                 lifecycle_rules=[
                     s3.LifecycleRule(
                         id="DeleteOldVersions",
-                        noncurrent_versions_to_retain=1
+                        noncurrent_versions_to_retain=1,
+                        noncurrent_version_expiration=Duration.days(30),
                     ),
                 ],
             )
-    
+
+    @property
+    def bucket_name(self) -> str:
+        """Return the bucket name."""
+        return self.bucket.bucket_name
+
     def _create_metrics_for_bucket(self) -> s3.BucketMetrics:
         """Create metrics for the bucket."""
         metrics = s3.BucketMetrics(
-            id=f"{self.bucket.node.id}-Metrics",
+            id=f"{self._config.bucket_name}-Metrics",
             tag_filters={
-                "Bucket": self.bucket.bucket_name,
+                "Bucket": self._config.bucket_name,
             },
         )
         return metrics

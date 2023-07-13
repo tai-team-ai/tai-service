@@ -20,6 +20,7 @@ from ..constructs.python_lambda_construct import (
     LambdaURLConfigModel,
     LambdaRuntime,
 )
+from ..constructs.bucket_construct import VersionedBucket, VersionedBucketConfigModel
 from ..constructs.construct_helpers import (
     get_secret_arn_from_name,
     create_restricted_security_group,
@@ -61,19 +62,36 @@ class TaiApiStack(Stack):
         self._namer = lambda name: f"{config.stack_name}-{name}"
         self._settings = api_settings
         self._vpc = get_vpc(self, vpc)
-        self._python_lambda: DockerLambda = self._create_lambda_function(security_group_allowing_db_connections)
+        self._deployment_suffix = f"-{config.deployment_settings.deployment_type.value}"
+        self._removal_policy = config.removal_policy
+        self._bucket: VersionedBucket = self._create_bucket()
+        self._settings.cold_store_bucket_name = self._bucket.bucket_name
+        # self._python_lambda: DockerLambda = self._create_lambda_function(security_group_allowing_db_connections)
         add_tags(self, config.tags)
         CfnOutput(
             self,
             id="FunctionURL",
-            value=self._python_lambda.function_url,
+            value="self._python_lambda.function_url",
             description="The URL of the lambda function.",
         )
 
-    @property
-    def lambda_function(self) -> _lambda.Function:
-        """Return the lambda function."""
-        return self._python_lambda.lambda_function
+    # @property
+    # def lambda_function(self) -> _lambda.Function:
+    #     """Return the lambda function."""
+    #     return self._python_lambda.lambda_function
+
+    def _create_bucket(self) -> VersionedBucket:
+        config = VersionedBucketConfigModel(
+            bucket_name=self._settings.cold_store_bucket_name + self._deployment_suffix,
+            public_read_access=True,
+            removal_policy=self._removal_policy,
+        )
+        bucket = VersionedBucket(
+            scope=self,
+            construct_id=f"{config.bucket_name}-bucket",
+            config=config,
+        )
+        return bucket
 
     def _create_lambda_function(self, security_group_allowing_db_connections: ec2.SecurityGroup) -> DockerLambda:
         config = self._get_lambda_config(security_group_allowing_db_connections)
