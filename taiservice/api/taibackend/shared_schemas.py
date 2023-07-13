@@ -153,7 +153,7 @@ class BaseClassResourceDocument(BasePydanticModel):
         return datetime.utcnow()
 
     @property
-    def str_id(self) -> str:
+    def id_as_str(self) -> str:
         """Return the string representation of the id."""
         return str(self.id)
 

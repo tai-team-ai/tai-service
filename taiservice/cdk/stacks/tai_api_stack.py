@@ -66,19 +66,19 @@ class TaiApiStack(Stack):
         self._removal_policy = config.removal_policy
         self._bucket: VersionedBucket = self._create_bucket()
         self._settings.cold_store_bucket_name = self._bucket.bucket_name
-        # self._python_lambda: DockerLambda = self._create_lambda_function(security_group_allowing_db_connections)
+        self._python_lambda: DockerLambda = self._create_lambda_function(security_group_allowing_db_connections)
         add_tags(self, config.tags)
         CfnOutput(
             self,
             id="FunctionURL",
-            value="self._python_lambda.function_url",
+            value=self._python_lambda.function_url,
             description="The URL of the lambda function.",
         )
 
-    # @property
-    # def lambda_function(self) -> _lambda.Function:
-    #     """Return the lambda function."""
-    #     return self._python_lambda.lambda_function
+    @property
+    def lambda_function(self) -> _lambda.Function:
+        """Return the lambda function."""
+        return self._python_lambda.lambda_function
 
     def _create_bucket(self) -> VersionedBucket:
         config = VersionedBucketConfigModel(

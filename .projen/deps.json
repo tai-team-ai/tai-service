@@ -29,7 +29,7 @@
       "type": "devenv"
     },
     {
-      "name": "langchain",
+      "name": "langchain==0.0.229",
       "type": "devenv"
     },
     {
