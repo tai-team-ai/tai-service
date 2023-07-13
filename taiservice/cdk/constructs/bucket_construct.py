@@ -16,7 +16,7 @@ from aws_cdk import (
 )
 
 
-class VersionedBucketConfigModel(BaseModel):
+class   VersionedBucketConfigModel(BaseModel):
     """Define the configuration for the bucket construct."""
 
     bucket_name: str = Field(
@@ -42,6 +42,10 @@ class VersionedBucketConfigModel(BaseModel):
     public_read_access: bool = Field(
         default=False,
         description="Whether or not to allow public read access.",
+    )
+    delete_objects_on_bucket_removal: bool = Field(
+        default=False,
+        description="Whether or not to automatically delete objects on removal.",
     )
 
     class Config:
@@ -89,6 +93,7 @@ class VersionedBucket(Construct):
                 construct_id,
                 bucket_name=config.bucket_name,
                 removal_policy=config.removal_policy,
+                auto_delete_objects=config.delete_objects_on_bucket_removal,
                 encryption=s3.BucketEncryption.S3_MANAGED,
                 block_public_access=public_access,
                 public_read_access=config.public_read_access,

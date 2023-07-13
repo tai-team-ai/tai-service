@@ -69,6 +69,7 @@ env_file: TextFile = TextFile(
         'DOC_DB_READ_WRITE_USER_PASSWORD_SECRET_NAME="dev/tai_service/document_DB/read_write_user_password"',
         'DOC_DB_ADMIN_USER_PASSWORD_SECRET_NAME="dev/tai_service/document_DB/admin_password"',
         'AWS_DEPLOYMENT_ACCOUNT_ID="645860363137"',
+        'DEPLOYMENT_TYPE="dev"',
     ]
 )
 make_file: Makefile = Makefile(
