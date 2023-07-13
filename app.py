@@ -14,6 +14,7 @@ from taiservice.cdk.stacks.stack_config_models import (
     AWSDeploymentSettings,
     DeploymentType,
 )
+from taiservice.cdk.stacks.frontend_stack import TaiFrontendServerStack
 
 app: App = App()
 load_dotenv()
@@ -23,16 +24,19 @@ is_prod_deployment = AWS_DEPLOYMENT_SETTINGS.deployment_type == DeploymentType.P
 TERMINATION_PROTECTION = True if is_prod_deployment else False
 REMOVAL_POLICY = RemovalPolicy.RETAIN if is_prod_deployment else RemovalPolicy.DESTROY
 TAGS = {'blame': 'jacob'}
+BASE_SETTINGS = {
+    "deployment_settings": AWS_DEPLOYMENT_SETTINGS,
+    "termination_protection": TERMINATION_PROTECTION,
+    "removal_policy": REMOVAL_POLICY,
+    "tags": TAGS,
+}
 search_databases_config = StackConfigBaseModel(
 	stack_id="tai-search-service-databases",
 	stack_name="tai-search-service-databases",
 	description="Stack for the search service databases. This stack contains the document " \
     	"database and the pinecone database used by the tai search service.",
-    deployment_settings=AWS_DEPLOYMENT_SETTINGS,
     duplicate_stack_for_development=False,
-    termination_protection=TERMINATION_PROTECTION,
-    removal_policy=REMOVAL_POLICY,
-    tags=TAGS,
+    **BASE_SETTINGS,
 )
 search_service_databases: SearchServiceDatabases = SearchServiceDatabases(
     scope=app,
@@ -41,23 +45,37 @@ search_service_databases: SearchServiceDatabases = SearchServiceDatabases(
     pinecone_db_settings=PINECONE_DB_SETTINGS,
 )
 
+
 tai_api_config = StackConfigBaseModel(
     stack_id="tai-api",
     stack_name="tai-api",
     description="Stack for the tai api service. This stack contains the tai api service.",
-    deployment_settings=AWS_DEPLOYMENT_SETTINGS,
     duplicate_stack_for_development=True,
-    termination_protection=TERMINATION_PROTECTION,
-    removal_policy=REMOVAL_POLICY,
-    tags=TAGS,
+    **BASE_SETTINGS,
 )
 TAI_API_SETTINGS.doc_db_fully_qualified_domain_name = search_service_databases.document_db.fully_qualified_domain_name
-tai_api = TaiApiStack(
+tai_api: TaiApiStack = TaiApiStack(
     scope=app,
     config=tai_api_config,
     api_settings=TAI_API_SETTINGS,
     vpc=search_service_databases.vpc,
     security_group_allowing_db_connections=search_service_databases.security_group_for_connecting_to_doc_db,
 )
+
+
+frontend_server_config = StackConfigBaseModel(
+    stack_id="tai-frontend-server",
+    stack_name="tai-frontend-server",
+    description="Stack for the frontend server of the T.A.I. service. This stack contains the " \
+        "implementation of the required frontend resources.",
+    duplicate_stack_for_development=False,
+    **BASE_SETTINGS,
+)
+frontend_server: TaiFrontendServerStack = TaiFrontendServerStack(
+    scope=app,
+    config=frontend_server_config,
+    data_transfer_bucket=tai_api.frontend_transfer_bucket,
+)
+
 
 app.synth()

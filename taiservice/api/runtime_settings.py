@@ -88,3 +88,7 @@ class TaiApiSettings(BaseSettings):
         ...,
         description="The name of the cold store bucket.",
     )
+    frontend_data_transfer_bucket_name: str = Field(
+        ...,
+        description="The name of the frontend transfer bucket.",
+    )
