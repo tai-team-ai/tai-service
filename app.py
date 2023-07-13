@@ -35,7 +35,7 @@ search_databases_config = StackConfigBaseModel(
 	stack_name="tai-search-service-databases",
 	description="Stack for the search service databases. This stack contains the document " \
     	"database and the pinecone database used by the tai search service.",
-    duplicate_stack_for_development=True,
+    duplicate_stack_for_development=False,
     **BASE_SETTINGS,
 )
 search_service_databases: SearchServiceDatabases = SearchServiceDatabases(

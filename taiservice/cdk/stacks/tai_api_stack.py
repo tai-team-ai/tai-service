@@ -91,6 +91,7 @@ class TaiApiStack(Stack):
         """Return the lambda function."""
         return self._python_lambda.lambda_function
 
+    @property
     def frontend_transfer_bucket(self) -> VersionedBucket:
         """Return the frontend transfer bucket."""
         return self._frontend_transfer_bucket
