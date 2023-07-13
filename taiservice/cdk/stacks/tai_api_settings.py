@@ -21,4 +21,5 @@ TAI_API_SETTINGS = DeploymentTaiApiSettings(
     pinecone_db_environment=PINECONE_DB_SETTINGS.environment,
     pinecone_db_index_name=PINECONE_DB_SETTINGS.indexes[0].name,
     openAI_api_key_secret_name=os.environ.get("OPENAI_API_KEY_SECRET_NAME"),
+    cold_store_bucket_name="tai-service-class-resource-cold-store",
 )

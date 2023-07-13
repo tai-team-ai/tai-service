@@ -124,6 +124,7 @@ RUNTIME_ENV_VARS = {
     "DOC_DB_CLASS_RESOURCE_CHUNK_COLLECTION_NAME": "class_resource_chunk",
     "OPENAI_API_KEY_SECRET_NAME": "dev/tai_service/openai/api_key",
     "AWS_DEFAULT_REGION": "us-east-1",
+    "COLD_STORE_BUCKET_NAME": "tai-service-class-resource-cold-store",
 }
 make_file.add_rule(
     targets=["build-and-run-docker"],

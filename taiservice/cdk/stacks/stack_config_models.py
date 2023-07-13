@@ -8,6 +8,7 @@ from pydantic import BaseModel, BaseSettings, Field, validator, Extra
 from pygit2 import Repository
 from aws_cdk import (
     Environment,
+    RemovalPolicy,
 )
 
 
@@ -124,6 +125,10 @@ class StackConfigBaseModel(BaseModel):
         default_factory=dict,
         description="The tags to apply to the stack.",
     )
+    removal_policy: RemovalPolicy = Field(
+        default=RemovalPolicy.RETAIN,
+        description="The removal policy for the stack.",
+    )
 
     class Config:
         """Define configuration for stack configuration."""
@@ -150,6 +155,14 @@ class StackConfigBaseModel(BaseModel):
         if settings.deployment_type == DeploymentType.PROD:
             assert termination_protection is True, "Termination protection must be enabled for prod deployments."
         return termination_protection
+
+    @validator("removal_policy")
+    def validate_retain_if_prod(cls, removal_policy: RemovalPolicy, values: dict) -> RemovalPolicy:
+        """Validate that the removal policy is retain if the deployment type is prod."""
+        settings: AWSDeploymentSettings = values["deployment_settings"]
+        if settings.deployment_type == DeploymentType.PROD:
+            assert removal_policy == RemovalPolicy.RETAIN, "Removal policy must be retain for prod deployments."
+        return removal_policy
 
     @validator("tags")
     def tags_include_blame_tag(cls, tags: dict) -> dict:

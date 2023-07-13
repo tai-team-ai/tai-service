@@ -6,7 +6,7 @@ boto3-stubs[essential]
 boto3-stubs[secretsmanager]
 filetype
 ipykernel
-langchain
+langchain==0.0.229
 openai
 pinecone-client[grpc]
 pinecone-text

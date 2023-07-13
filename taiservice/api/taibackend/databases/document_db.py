@@ -168,7 +168,7 @@ class DocumentDB:
     def _delete_document(self, doc: BaseClassResourceDocument) -> None:
         """Delete the chunks of the class resource."""
         collection = self._document_type_to_collection[doc.__class__.__name__]
-        collection.delete_one({"_id": doc.str_id})
+        collection.delete_one({"_id": doc.id_as_str})
 
     def upsert_documents(self, documents: list[BaseClassResourceDocument]) -> None:
         """Upsert the chunks of the class resource."""
@@ -179,7 +179,7 @@ class DocumentDB:
         """Upsert the chunks of the class resource."""
         collection = self._document_type_to_collection[document.__class__.__name__]
         collection.update_one(
-            {"_id": document.str_id},
+            {"_id": document.id_as_str},
             {"$set": document.dict(serialize_dates=False, exclude={"id"})},
             upsert=True,
         )
