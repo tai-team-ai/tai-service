@@ -27,6 +27,7 @@ class InputFormat(str, Enum):
     LATEX = "latex"
     MARKDOWN = "markdown"
     HTML = "html"
+    RAW_URL = "raw_url"
 
 
 class MarkdownExtension(str, Enum):
@@ -122,7 +123,6 @@ class IngestedDocument(StatefulClassResourceDocument):
         ...,
         description="The format of the input document.",
     )
-
     loading_strategy: LoadingStrategy = Field(
         ...,
         description="The loading strategy for the input document.",

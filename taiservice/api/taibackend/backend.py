@@ -49,6 +49,7 @@ try:
         IndexerConfig,
         OpenAIConfig,
         IngestedDocument,
+        InputFormat,
     )
 except (KeyError, ImportError):
     from taibackend.taitutors.llm import TaiLLM, ChatOpenAIConfig
@@ -94,6 +95,7 @@ except (KeyError, ImportError):
         IndexerConfig,
         OpenAIConfig,
         IngestedDocument,
+        InputFormat,
     )
 
 class Backend:
@@ -231,8 +233,9 @@ class Backend:
         doc_pairs: list[tuple[Indexer, ClassResourceDocument]] = []
         for input_doc in input_docs:
             ingested_doc = Indexer.ingest_document(input_doc)
+            if ingested_doc.input_format != InputFormat.RAW_URL
+                ingested_doc.full_resource_url = self._upload_to_s3(ingested_doc)
             doc = ClassResourceDocument.from_ingested_doc(ingested_doc)
-            doc.full_resource_url = self._upload_to_s3(ingested_doc)
             self._coerce_and_update_status(doc, ClassResourceProcessingStatus.PENDING)
             doc_pairs.append((ingested_doc, doc))
         for ingested_doc, class_resource in doc_pairs:
