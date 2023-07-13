@@ -5,6 +5,7 @@ from aws_cdk import (
     aws_iam as iam,
 )
 from taiservice.cdk.stacks.stack_config_models import StackConfigBaseModel
+from taiservice.cdk.constructs.bucket_construct import VersionedBucket
 
 class TaiFrontendServerStack(Stack):
     """Define the stack for the TAI API service."""
@@ -13,6 +14,7 @@ class TaiFrontendServerStack(Stack):
         self,
         scope: Construct,
         config: StackConfigBaseModel,
+        data_transfer_bucket: VersionedBucket,
     ) -> None:
         """Initialize the stack for the TAI API service."""
         super().__init__(
@@ -30,6 +32,7 @@ class TaiFrontendServerStack(Stack):
             id=self._namer("frontend-user"),
             user_name=self._namer("frontend-user"),
         )
+        data_transfer_bucket.grant_write_access(self._user)
 
     @property
     def user(self) -> iam.User:

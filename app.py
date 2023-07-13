@@ -46,6 +46,23 @@ search_service_databases: SearchServiceDatabases = SearchServiceDatabases(
 )
 
 
+tai_api_config = StackConfigBaseModel(
+    stack_id="tai-api",
+    stack_name="tai-api",
+    description="Stack for the tai api service. This stack contains the tai api service.",
+    duplicate_stack_for_development=True,
+    **BASE_SETTINGS,
+)
+TAI_API_SETTINGS.doc_db_fully_qualified_domain_name = search_service_databases.document_db.fully_qualified_domain_name
+tai_api: TaiApiStack = TaiApiStack(
+    scope=app,
+    config=tai_api_config,
+    api_settings=TAI_API_SETTINGS,
+    vpc=search_service_databases.vpc,
+    security_group_allowing_db_connections=search_service_databases.security_group_for_connecting_to_doc_db,
+)
+
+
 frontend_server_config = StackConfigBaseModel(
     stack_id="tai-frontend-server",
     stack_name="tai-frontend-server",
@@ -57,24 +74,8 @@ frontend_server_config = StackConfigBaseModel(
 frontend_server: TaiFrontendServerStack = TaiFrontendServerStack(
     scope=app,
     config=frontend_server_config,
+    data_transfer_bucket=tai_api.frontend_transfer_bucket,
 )
 
-
-tai_api_config = StackConfigBaseModel(
-    stack_id="tai-api",
-    stack_name="tai-api",
-    description="Stack for the tai api service. This stack contains the tai api service.",
-    duplicate_stack_for_development=True,
-    **BASE_SETTINGS,
-)
-TAI_API_SETTINGS.doc_db_fully_qualified_domain_name = search_service_databases.document_db.fully_qualified_domain_name
-tai_api = TaiApiStack(
-    scope=app,
-    config=tai_api_config,
-    api_settings=TAI_API_SETTINGS,
-    vpc=search_service_databases.vpc,
-    frontend_user=frontend_server.user,
-    security_group_allowing_db_connections=search_service_databases.security_group_for_connecting_to_doc_db,
-)
 
 app.synth()

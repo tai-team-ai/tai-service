@@ -49,7 +49,6 @@ class TaiApiStack(Stack):
         config: StackConfigBaseModel,
         api_settings: TaiApiSettings,
         vpc: Union[ec2.IVpc, ec2.Vpc, str],
-        frontend_user: iam.User,
         security_group_allowing_db_connections: ec2.SecurityGroup,
     ) -> None:
         """Initialize the stack for the TAI API service."""
@@ -78,7 +77,6 @@ class TaiApiStack(Stack):
             name=api_settings.frontend_data_transfer_bucket_name,
             public_read_access=False,
         )
-        self._frontend_transfer_bucket.grant_write_access(frontend_user)
         self._frontend_transfer_bucket.grant_read_access(self._python_lambda.role)
         add_tags(self, config.tags)
         CfnOutput(
@@ -92,6 +90,10 @@ class TaiApiStack(Stack):
     def lambda_function(self) -> _lambda.Function:
         """Return the lambda function."""
         return self._python_lambda.lambda_function
+
+    def frontend_transfer_bucket(self) -> VersionedBucket:
+        """Return the frontend transfer bucket."""
+        return self._frontend_transfer_bucket
 
     def _create_bucket(self, name: str, public_read_access: bool) -> VersionedBucket:
         config = VersionedBucketConfigModel(
