@@ -153,8 +153,8 @@ class TaiApiStack(Stack):
             runtime_environment=self._settings,
             requirements_file_path=API_DIR / "requirements.txt",
             files_to_copy_into_handler_dir=MODULES_TO_COPY_INTO_API_DIR,
-            timeout=Duration.minutes(3),
-            memory_size=3000,
+            timeout=Duration.minutes(4),
+            memory_size=10000,
             ephemeral_storage_size=StorageSize.gibibytes(3),
             vpc=self._vpc,
             subnet_selection=ec2.SubnetSelection(subnet_type=subnet_type),
@@ -167,7 +167,7 @@ class TaiApiStack(Stack):
             run_as_webserver=True,
             custom_docker_commands=[
                 "RUN mkdir -p /var/task/nltk_data",  # Create directory for model
-                f"RUN python -m nltk.downloader -d {self._settings.nltk_data} punkt stopwords",  # Download the model and save it to the directory
+                f"RUN python -m nltk.downloader -d {self._settings.nltk_data} punkt stopwords averaged_perceptron_tagger",  # Download the model and save it to the directory
                 "RUN apt-get update && apt-get install -y poppler-utils build-essential python3-dev python3-pip python3-setuptools python3-wheel python3-cffi libcairo2 libpango-1.0-0 libpangocairo-1.0-0 libgdk-pixbuf2.0-0 libffi-dev shared-mime-info",  # Install poppler-utils for pdf python packages
             ]
         )

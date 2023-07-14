@@ -302,7 +302,7 @@ class Backend:
             if isinstance(doc, ClassResourceDocument):
                 output_doc = ClassResource(status=doc.status, **base_doc)
             elif isinstance(doc, ClassResourceChunkDocument):
-                output_doc = ClassResourceSnippet(resource_snippet=doc.chunk, **base_doc)
+                output_doc = ClassResourceSnippet(resource_snippet=doc.chunk, raw_snippet_url=doc.raw_chunk_url, **base_doc)
             else:
                 raise RuntimeError(f"Unknown document type: {doc}")
             output_documents.append(output_doc)

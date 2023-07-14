@@ -7,18 +7,18 @@ from loguru import logger
 # first imports are for local development, second imports are for deployment
 try:
     from .routers import class_resources
-    from .taibackend.backend import Backend
-    from .runtime_settings import TaiApiSettings, BACKEND_ATTRIBUTE_NAME
     from .routers import (
         tai
     )
+    from .taibackend.backend import Backend
+    from .runtime_settings import TaiApiSettings, BACKEND_ATTRIBUTE_NAME
 except ImportError:
-    from taiservice.api.routers import class_resources
-    from taibackend.backend import Backend
-    from runtime_settings import TaiApiSettings, BACKEND_ATTRIBUTE_NAME
+    from routers import class_resources
     from routers import (
         tai
     )
+    from taibackend.backend import Backend
+    from runtime_settings import TaiApiSettings, BACKEND_ATTRIBUTE_NAME
 
 TITLE = "T.A.I. Service"
 DESCRIPTION = "A service for the T.A.I. project."

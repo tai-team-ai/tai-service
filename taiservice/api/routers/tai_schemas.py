@@ -45,6 +45,18 @@ class ClassResourceSnippet(BaseClassResource):
         ...,
         description="The snippet of the class resource. This is analogous to Google search snippets.",
     )
+    raw_snippet_url: str = Field(
+        ...,
+        description="The url of the raw snippet of the class resource.",
+    )
+    rank: int = Field(
+        default=0,
+        description="The rank of the class resource snippet.",
+    )
+    relevance_score: float = Field(
+        default=0.0,
+        description="The relevance score of the class resource snippet.",
+    )
 
 
 class Chat(BasePydanticModel):
