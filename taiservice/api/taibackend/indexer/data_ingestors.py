@@ -6,6 +6,7 @@ from pathlib import Path
 import traceback
 import filetype
 from bs4 import BeautifulSoup
+from pydantic import HttpUrl
 import tiktoken
 from loguru import logger
 import requests
@@ -85,7 +86,7 @@ class Ingestor(ABC):
         """Ingest the data."""
 
     @staticmethod
-    def _get_file_type(path: Path) -> str:
+    def _get_file_type(path: Path) -> InputFormat:
         """Get the file type."""
         def check_file_type(path: Path, extension_enum: Enum) -> bool:
             """Check if the file type matches given extensions."""
@@ -121,15 +122,15 @@ class S3ObjectIngestor(Ingestor):
     @classmethod
     def ingest_data(cls, input_data: InputDocument) -> IngestedDocument:
         """Ingest the data from S3."""
-        tmp_path = Path(f"/tmp/{input_data.id}")
-        # Download the file using the requests library
+        tmp_path = Path(f"/tmp/{input_data.full_resource_url.split('/')[-1]}")
         response = requests.get(input_data.full_resource_url, timeout=10)
         response.raise_for_status() # Raise an error if the download fails
         with open(tmp_path, "wb") as f:
             f.write(response.content)
+        file_type = cls._get_file_type(tmp_path)
         document = IngestedDocument(
             data_pointer=tmp_path,
-            input_format=cls._get_file_type(tmp_path),
+            input_format=file_type,
             loading_strategy=LOADING_STRATEGY_MAPPING[cls._get_file_type(tmp_path)],
             **input_data.dict(),
         )

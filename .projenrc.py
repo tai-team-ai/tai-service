@@ -56,6 +56,8 @@ project:Project = AwsCdkPythonApp(
         "transformers",
         "pymupdf",
         "pdf2image",
+        "PyPDF2",
+        "weasyprint",
     ],
 )
 

@@ -168,6 +168,7 @@ class TaiApiStack(Stack):
             custom_docker_commands=[
                 "RUN mkdir -p /var/task/nltk_data",  # Create directory for model
                 f"RUN python -m nltk.downloader -d {self._settings.nltk_data} punkt stopwords",  # Download the model and save it to the directory
+                "RUN apt-get update && apt-get install -y poppler-utils",  # Install poppler-utils for pdf python packages
             ]
         )
         return lambda_config

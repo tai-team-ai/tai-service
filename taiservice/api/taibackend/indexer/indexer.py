@@ -1,7 +1,7 @@
 """Define the indexer module."""
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-from typing import Optional
+from typing import Literal, Optional
 from uuid import UUID, uuid4
 import traceback
 import boto3
@@ -23,7 +23,7 @@ try:
         Ingestor,
     )
     from .screenshotters import (
-        ResourceScreenshotter,
+        ResourceUtility,
         PDF,
         HTML,
     )
@@ -55,7 +55,7 @@ except ImportError:
         Ingestor,
     )
     from taibackend.indexer.screenshotters import (
-        ResourceScreenshotter,
+        ResourceUtility,
         PDF,
         HTML,
     )
@@ -124,6 +124,7 @@ class Indexer:
         )
         self._batch_size = indexer_config.openai_config.batch_size
         self._cold_store_bucket_name = indexer_config.cold_store_bucket_name
+        self._s3_prefix = ""
 
     def index_resource(
         self,
@@ -132,9 +133,13 @@ class Indexer:
     ) -> ClassResourceDocument:
         """Index a document."""
         try:
-            if ingested_document.input_format != InputFormat.RAW_URL:
-                ingested_document.preview_image_url = self._create_and_upload_screenshot(ingested_document)
+            self._s3_prefix = f"{ingested_document.class_id}/{ingested_document.id}/"
+            not_raw_url = ingested_document.input_format != InputFormat.RAW_URL
+            if not_raw_url:
+                self._upload_ingested_document_to_s3(ingested_document)
             chunk_documents = self._load_and_split_document(ingested_document)
+            if not_raw_url:
+                self._upload_chunk_documents_to_s3(chunk_documents, ingested_document)
             class_resource_document.class_resource_chunk_ids = [chunk_doc.id for chunk_doc in chunk_documents]
             vector_documents = self.embed_documents(chunk_documents, class_resource_document.class_id)
             self._load_class_resources_to_db(class_resource_document, chunk_documents)
@@ -144,39 +149,81 @@ class Indexer:
             raise RuntimeError("Failed to index resource.") from e
         return class_resource_document
 
-    def _create_and_upload_screenshot(self, ingested_document: IngestedDocument) -> Optional[HttpUrl]:
-        try:
-            path_to_screenshot = self._screenshot_resource(ingested_document)
-            return self._upload_to_s3(ingested_document, path_to_screenshot)
-        except Exception as e: # pylint: disable=broad-except
-            logger.warning(f"Failed to create and upload screenshot: {e}")
-            logger.error(traceback.format_exc())
+    def _upload_ingested_document_to_s3(self, doc: IngestedDocument):
+        """
+        Upload the ingested document to s3.
 
-    def _upload_to_s3(self, doc: IngestedDocument, file_path: Path=None) -> Optional[HttpUrl]:
+        This method will upload the screenshot and the full resource to s3, then attach 
+        the s3 urls to the ingested document.
+        """
+        try:
+            screenshot_paths = self._process_resource(doc, data_to_get="screenshot", title_page_only=True)
+            object_keys = [f"{self._s3_prefix}{screenshot_paths[0].name}"]
+            doc.preview_image_url = self._upload_to_cold_store(screenshot_paths, object_keys)[0]
+            object_keys = [f"{self._s3_prefix}{doc.data_pointer.name}"]
+            doc.full_resource_url = self._upload_to_cold_store([doc.data_pointer], object_keys)[0]
+        except Exception as e: # pylint: disable=broad-except
+            logger.error(traceback.format_exc())
+            raise RuntimeError(f"Failed to upload ingested document to s3: {e}") from e
+
+    def _upload_chunk_documents_to_s3(self, chunk_documents: list[ClassResourceChunkDocument], ingested_doc: IngestedDocument):
+        """
+        Upload the chunk documents to s3.
+
+        This method will upload the screenshots for each chunk document to s3, then attach
+        the s3 urls to the chunk documents.
+        """
+        try:
+            data_to_get = ["screenshot", "split_page"]
+            data = {}
+            for data_type in data_to_get:
+                paths = self._process_resource(ingested_doc, data_to_get=data_type)
+                object_keys = [f"{self._s3_prefix}page={page_num}/{data_type}{path.suffix}" for page_num, path in enumerate(paths)]
+                # add all urls to a dict where teh page number is the key
+                urls = {page_num: url for page_num, url in enumerate(self._upload_to_cold_store(paths, object_keys))}
+                data[data_type] = urls
+            for chunk_doc in chunk_documents:
+                chunk_doc.preview_image_url = data["screenshot"][chunk_doc.metadata.page_number]
+                chunk_doc.raw_chunk_url = data["split_page"][chunk_doc.metadata.page_number]
+        except Exception as e: # pylint: disable=broad-except
+            logger.warning(f"Failed to upload chunk documents: {e}")
+            logger.warning(traceback.format_exc())
+
+    def _upload_to_cold_store(self, file_paths: list[Path], object_keys: list[str]) -> Optional[list[HttpUrl]]:
         """Put the ingested document to s3."""
         try:
             s3 = boto3.resource("s3")
             bucket = s3.Bucket(self._cold_store_bucket_name)
-            filepath = file_path if file_path else doc.data_pointer
-            object_key = f"{str(doc.class_id)}/{doc.id_as_str}{filepath.suffix}"
-            bucket.upload_file(str(filepath.resolve()), object_key)
-            obj = s3.Object(self._cold_store_bucket_name, object_key)
-            return obj.meta.client.meta.endpoint_url + "/" + obj.bucket_name + "/" + obj.key
+            urls = []
+            for filepath, object_key in zip(file_paths, object_keys):
+                bucket.upload_file(str(filepath.resolve()), object_key)
+                obj = s3.Object(self._cold_store_bucket_name, object_key)
+                urls.append(obj.meta.client.meta.endpoint_url + "/" + obj.bucket_name + "/" + obj.key)
+            return urls
         except Exception as e: # pylint: disable=broad-except
             logger.critical(f"Failed to upload to s3: {e}")
             raise RuntimeError(f"Failed to upload to s3: {e}") from e
 
-    def _screenshot_resource(self, doc: IngestedDocument) -> Path:
+    def _process_resource(
+        self,
+        doc: IngestedDocument,
+        data_to_get: Literal["screenshot", "split_page"],
+        title_page_only: bool = False,
+    ) -> Optional[list[Path]]:
         """Take a screenshot of the resource."""
-        strategy_map: dict[InputFormat, ResourceScreenshotter] = {
+        strategy_map: dict[InputFormat, ResourceUtility] = {
             InputFormat.PDF: PDF,
             InputFormat.HTML: HTML,
         }
         try:
-            screenshotter = strategy_map[doc.input_format]
-            return screenshotter.create_screenshot(doc.data_pointer)
+            utility = strategy_map[doc.input_format]
+            last_page = 1 if title_page_only else None
+            if data_to_get == "screenshot":
+                return utility.create_screenshots(doc.data_pointer, last_page_to_include=last_page)
+            elif data_to_get == "split_page":
+                return utility.split_resource(doc.data_pointer, last_page_to_include=last_page)
         except KeyError as e:
-            raise NotImplementedError(f"Screen-shotting for {doc.input_format} is not implemented.") from e
+            raise NotImplementedError(f"Utility for {doc.input_format} is not implemented.") from e
 
     def _load_vectors_to_vector_store(self, vector_documents: PineconeDocuments) -> None:
         """Load vectors to vector store."""
@@ -210,12 +257,13 @@ class Indexer:
         split_docs: list[Document] = []
         try:
             Loader: BaseLoader = getattr(document_loaders, document.loading_strategy)
+            data_pointer = document.data_pointer
             try:
                 # try to treat the pointer as a Path object and resolve it and convert to str
-                document.data_pointer = str(Path(document.data_pointer).resolve())
+                data_pointer = str(Path(document.data_pointer).resolve())
             except Exception: # pylint: disable=broad-except
-                logger.warning(f"Failed to resolve path: {document.data_pointer}")
-            loader: BaseLoader = Loader(document.data_pointer)
+                logger.warning(f"Failed to resolve path: {data_pointer}")
+            loader: BaseLoader = Loader(data_pointer)
             splitter: TextSplitter = get_splitter_text_splitter(document.input_format)
             split_docs = loader.load_and_split(splitter)
         except Exception as e: # pylint: disable=broad-except
@@ -297,6 +345,6 @@ class Indexer:
         }
         try:
             ingestor = mapping[document.input_data_ingest_strategy]
-        except KeyError as e:
-            raise NotImplementedError(f"Unsupported input data ingest strategy: {document.input_data_ingest_strategy}")
+        except KeyError as e: # pylint: disable=broad-except
+            raise NotImplementedError(f"Unsupported input data ingest strategy: {document.input_data_ingest_strategy}") from e
         return ingestor.ingest_data(document)
