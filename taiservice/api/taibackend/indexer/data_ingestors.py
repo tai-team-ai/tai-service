@@ -79,8 +79,8 @@ def get_page_number(doc: Document) -> Optional[int]:
 
 class Ingestor(ABC):
     """Define the ingestor class."""
-    @abstractmethod
     @classmethod
+    @abstractmethod
     def ingest_data(cls, input_data: InputDocument) -> IngestedDocument:
         """Ingest the data."""
 

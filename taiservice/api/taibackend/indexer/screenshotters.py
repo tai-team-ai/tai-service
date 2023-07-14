@@ -13,6 +13,7 @@ except ImportError:
 
 class ResourceScreenshotter(ABC):
     """Define the interface for screen-shotting class resources."""
+    @classmethod
     @abstractmethod
     def create_screenshot(self, input_path: Path) -> Optional[Path]:
         """Get the screenshot of the ingested resource."""

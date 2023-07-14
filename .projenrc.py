@@ -127,7 +127,7 @@ RUNTIME_ENV_VARS = {
     "OPENAI_API_KEY_SECRET_NAME": "dev/tai_service/openai/api_key",
     "AWS_DEFAULT_REGION": "us-east-1",
     "COLD_STORE_BUCKET_NAME": "tai-service-class-resource-cold-store",
-    "FRONTED_DATA_TRANSFER_BUCKET_NAME": "frontend-data-transfer",
+    "FRONTEND_DATA_TRANSFER_BUCKET_NAME": "frontend-data-transfer",
 }
 make_file.add_rule(
     targets=["build-and-run-docker"],
