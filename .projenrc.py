@@ -57,7 +57,8 @@ project:Project = AwsCdkPythonApp(
         "pymupdf",
         "pdf2image",
         "PyPDF2",
-        "weasyprint",
+        "weasyprint==52.5",
+        "unstructured",
     ],
 )
 

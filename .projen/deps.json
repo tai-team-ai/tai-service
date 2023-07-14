@@ -62,6 +62,10 @@
       "type": "devenv"
     },
     {
+      "name": "PyPDF2",
+      "type": "devenv"
+    },
+    {
       "name": "pytest",
       "type": "devenv"
     },
@@ -82,7 +86,15 @@
       "type": "devenv"
     },
     {
+      "name": "unstructured",
+      "type": "devenv"
+    },
+    {
       "name": "uvicorn",
+      "type": "devenv"
+    },
+    {
+      "name": "weasyprint==52.5",
       "type": "devenv"
     },
     {

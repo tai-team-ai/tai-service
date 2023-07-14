@@ -4,9 +4,9 @@ from abc import ABC, abstractmethod
 from enum import Enum
 from pathlib import Path
 import traceback
+import urllib.request
 import filetype
 from bs4 import BeautifulSoup
-from pydantic import HttpUrl
 import tiktoken
 from loguru import logger
 import requests
@@ -146,12 +146,13 @@ class URLIngestor(Ingestor):
     def ingest_data(cls, input_data: InputDocument) -> IngestedDocument:
         """Ingest the data from a URL."""
         remote_file_url = input_data.full_resource_url
-        tmp_path = Path(f"/tmp/{remote_file_url.split('/')[-1]}")
-        r = requests.get(remote_file_url, timeout=5)
-        if r.status_code != 200:
-            raise ValueError(f"Could not download file from {remote_file_url}.")
-        with open(tmp_path, "wb") as f:
-            f.write(r.content)
+        # remove the last slash if no charactesr follow it
+        path = remote_file_url.path
+        if path[-1] == "/":
+            path = path[:-1]
+        tmp_path = Path(f"/tmp/{path}.html")
+        tmp_path.parent.mkdir(parents=True, exist_ok=True)
+        urllib.request.urlretrieve(remote_file_url, tmp_path)
         document = IngestedDocument(
             data_pointer=tmp_path,
             input_format=cls._get_file_type(tmp_path),

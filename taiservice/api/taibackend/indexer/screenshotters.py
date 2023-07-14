@@ -5,6 +5,7 @@ from typing import Optional
 from pdf2image import convert_from_path
 from PyPDF2 import PdfReader, PdfWriter
 from loguru import logger
+from weasyprint import HTML as WeasyHTML
 
 
 class ResourceUtility(ABC):
@@ -122,7 +123,16 @@ class HTML(ResourceUtility):
         last_page_to_include: Optional[int] = None
     ) -> Optional[list[Path]]:
         """Create screenshots for all pages in the resource."""
+        pdf_path = input_path.parent / f"{input_path.stem}.pdf"
+        WeasyHTML(input_path).write_pdf(pdf_path)
+        return cls._get_screenshot_from_pdf(pdf_path, start_page, last_page_to_include)
 
+    @classmethod
+    def split_resource(cls, input_path: Path, last_page_to_include: Optional[int] = None) -> Optional[list[Path]]:
+        """Split the resource into multiple resources."""
+        pdf_path = input_path.parent / f"{input_path.stem}.pdf"
+        WeasyHTML(input_path).write_pdf(pdf_path)
+        return cls._get_pdf_pages_from_pdf(pdf_path, last_page_to_include)
 
 
 class RawURL(ResourceUtility):

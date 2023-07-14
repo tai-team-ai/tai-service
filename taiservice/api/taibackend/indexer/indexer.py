@@ -134,12 +134,17 @@ class Indexer:
         """Index a document."""
         try:
             self._s3_prefix = f"{ingested_document.class_id}/{ingested_document.id}/"
-            not_raw_url = ingested_document.input_format != InputFormat.RAW_URL
-            if not_raw_url:
+            if ingested_document.input_format != InputFormat.RAW_URL:
                 self._upload_ingested_document_to_s3(ingested_document)
+                class_resource_document.full_resource_url = ingested_document.full_resource_url
+                class_resource_document.preview_image_url = ingested_document.preview_image_url
             chunk_documents = self._load_and_split_document(ingested_document)
-            if not_raw_url:
+            if ingested_document.input_format == InputFormat.PDF:
                 self._upload_chunk_documents_to_s3(chunk_documents, ingested_document)
+            else:
+                for chunk_document in chunk_documents:
+                    chunk_document.preview_image_url = ingested_document.preview_image_url
+                    chunk_document.raw_chunk_url = ingested_document.full_resource_url
             class_resource_document.class_resource_chunk_ids = [chunk_doc.id for chunk_doc in chunk_documents]
             vector_documents = self.embed_documents(chunk_documents, class_resource_document.class_id)
             self._load_class_resources_to_db(class_resource_document, chunk_documents)

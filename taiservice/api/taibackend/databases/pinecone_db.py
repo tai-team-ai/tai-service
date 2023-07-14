@@ -1,6 +1,8 @@
 """Define the pinecone database."""
-from enum import Enum
+from concurrent.futures import ThreadPoolExecutor, Future
 from multiprocessing.pool import ApplyResult
+from enum import Enum
+import os
 from typing import List
 from uuid import UUID
 from pydantic import BaseModel, Field
@@ -51,7 +53,7 @@ class PineconeDB:
         return pinecone.Index(self._index_name)
 
     def _export_documents(self, documents: PineconeDocuments) -> List[dict]:
-        docs = [doc.dict(exclude={'score'}) for doc in documents.documents]
+        docs = [doc.dict(exclude={'score'}, exclude_none=True) for doc in documents.documents]
         return docs
 
     def _get_exported_batches(self, documents: PineconeDocuments) -> List[PineconeDocuments]:
@@ -63,14 +65,24 @@ class PineconeDB:
 
     def _execute_async_pinecone_operation(self, index_operation_name: str, documents: PineconeDocuments) -> None:
         batches = self._get_exported_batches(documents)
-        with pinecone.Index(self._index_name, pool_threads=self._number_threads) as index:
-            async_results = []
-            operation = getattr(index, index_operation_name)
-            for batch in batches:
-                async_results.append(operation(batch, async_req=True, namespace=str(documents.class_id)))
-            async_result: ApplyResult
-            for async_result in async_results:
-                async_result.get()
+        if not os.environ.get("AWS_LAMBDA_FUNCTION_NAME"):
+            with pinecone.Index(self._index_name, pool_threads=self._number_threads) as index:
+                async_results = []
+                operation = getattr(index, index_operation_name)
+                for batch in batches:
+                    async_results.append(operation(batch, async_req=True, namespace=str(documents.class_id)))
+                async_result: ApplyResult
+                for async_result in async_results:
+                    async_result.get()
+        else:
+            with ThreadPoolExecutor(max_workers=self._number_threads) as executor:
+                results = []
+                operation = getattr(self.index, index_operation_name)
+                for batch in batches:
+                    results.append(executor.submit(operation, batch, async_req=True, namespace=str(documents.class_id)))
+                future: Future
+                for future in results:
+                    future.result()
 
     def upsert_vectors(self, documents: PineconeDocuments) -> None:
         """Upsert vectors into pinecone db."""
@@ -97,7 +109,9 @@ class PineconeDB:
         )
         docs = PineconeDocuments(class_id=document.metadata.class_id, documents=[])
         for result in results.to_dict()['matches']:
-            docs.documents.append(PineconeDocument(**result))
+            doc = PineconeDocument(**result)
+            if doc.score > 0.65:
+                docs.documents.append(doc)
         return docs
 
     def delete_vectors(self, documents: PineconeDocuments) -> None:

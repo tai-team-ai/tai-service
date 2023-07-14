@@ -14,9 +14,12 @@ pinecone-text
 projen==0.71.72
 pymongo
 pymupdf
+PyPDF2
 pytest
 pytest-cov
 tiktoken
 torch -f https://download.pytorch.org/whl/cpu
 transformers
+unstructured
 uvicorn
+weasyprint==52.5
