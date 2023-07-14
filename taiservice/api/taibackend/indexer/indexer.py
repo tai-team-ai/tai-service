@@ -24,8 +24,8 @@ try:
     )
     from .screenshotters import (
         ResourceScreenshotter,
-        PDFScreenshotter,
-        HTMLScreenshotter,
+        PDF,
+        HTML,
     )
     from .data_ingestor_schema import (
         IngestedDocument,
@@ -56,8 +56,8 @@ except ImportError:
     )
     from taibackend.indexer.screenshotters import (
         ResourceScreenshotter,
-        PDFScreenshotter,
-        HTMLScreenshotter,
+        PDF,
+        HTML,
     )
     from taibackend.indexer.data_ingestor_schema import (
         IngestedDocument,
@@ -169,14 +169,14 @@ class Indexer:
     def _screenshot_resource(self, doc: IngestedDocument) -> Path:
         """Take a screenshot of the resource."""
         strategy_map: dict[InputFormat, ResourceScreenshotter] = {
-            InputFormat.PDF: PDFScreenshotter,
-            InputFormat.HTML: HTMLScreenshotter,
+            InputFormat.PDF: PDF,
+            InputFormat.HTML: HTML,
         }
         try:
             screenshotter = strategy_map[doc.input_format]
             return screenshotter.create_screenshot(doc.data_pointer)
         except KeyError as e:
-            raise NotImplementedError(f"Screenshotting for {doc.input_format} is not implemented.") from e
+            raise NotImplementedError(f"Screen-shotting for {doc.input_format} is not implemented.") from e
 
     def _load_vectors_to_vector_store(self, vector_documents: PineconeDocuments) -> None:
         """Load vectors to vector store."""

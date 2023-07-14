@@ -14,7 +14,7 @@ except ImportError:
 class ResourceScreenshotter(ABC):
     """Define the interface for screen-shotting class resources."""
     @abstractmethod
-    def create_screenshot(self, input: Path) -> Optional[Path]:
+    def create_screenshot(self, input_path: Path) -> Optional[Path]:
         """Get the screenshot of the ingested resource."""
 
     def _get_screenshot_from_pdf(self, path: Path) -> Path:
@@ -26,33 +26,33 @@ class ResourceScreenshotter(ABC):
             return save_path
         logger.warning(f"Could not get screenshot from PDF {path}")
 
-class PDFScreenshotter(ResourceScreenshotter):
+class PDF(ResourceScreenshotter):
     """Define the PDF screenshotter."""
-    def create_screenshot(self, input: Path) -> Path:
+    def create_screenshot(self, input_path: Path) -> Path:
         """Get the screenshot of the ingested PDF."""
-        return self._get_screenshot_from_pdf(input)
+        return self._get_screenshot_from_pdf(input_path)
 
 
-class GenericTextScreenshotter(ResourceScreenshotter):
-    def create_screenshot(self, input: Path) -> Path:
-        raise NotImplementedError
+class GenericText(ResourceScreenshotter):
+    def create_screenshot(self, input_path: Path) -> Path:
+        raise NotImplementedError(f"Screen-shotting method {self.__class__.__name__} not implemented.")
 
 
-class LatexScreenshotter(ResourceScreenshotter):
-    def create_screenshot(self, input: Path) -> Path:
-        raise NotImplementedError
+class Latex(ResourceScreenshotter):
+    def create_screenshot(self, input_path: Path) -> Path:
+        raise NotImplementedError(f"Screen-shotting method {self.__class__.__name__} not implemented.")
 
 
-class MarkdownScreenshotter(ResourceScreenshotter):
-    def create_screenshot(self, input: Path) -> Path:
-        raise NotImplementedError
+class Markdown(ResourceScreenshotter):
+    def create_screenshot(self, input_path: Path) -> Path:
+        raise NotImplementedError(f"Screen-shotting method {self.__class__.__name__} not implemented.")
 
 
-class HTMLScreenshotter(ResourceScreenshotter):
-    def create_screenshot(self, input: Path) -> Path:
-        raise NotImplementedError
+class HTML(ResourceScreenshotter):
+    def create_screenshot(self, input_path: Path) -> Path:
+        raise NotImplementedError(f"Screen-shotting method {self.__class__.__name__} not implemented.")
 
 
-class RawURLScreenshotter(ResourceScreenshotter):
-    def create_screenshot(self, input: Path) -> Path:
-        raise NotImplementedError
+class RawURL(ResourceScreenshotter):
+    def create_screenshot(self, input_path: Path) -> Path:
+        raise NotImplementedError(f"Screen-shotting method {self.__class__.__name__} not implemented.")
