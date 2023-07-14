@@ -100,12 +100,14 @@ class PineconeDB:
             include_metadata=True,
             vector=dense,
             sparse_vector=sparse,
-            top_k=4,
+            top_k=5,
         )
         docs = PineconeDocuments(class_id=document.metadata.class_id, documents=[])
-        for result in results.to_dict()['matches']:
+        matches = results.to_dict()['matches']
+        threshold = 0.65 * alpha + 11 * (1 - alpha)
+        for result in matches:
             doc = PineconeDocument(**result)
-            if doc.score > 0.65:
+            if doc.score > threshold:
                 docs.documents.append(doc)
         return docs
 

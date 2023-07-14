@@ -285,6 +285,7 @@ class Indexer:
                 metadata=ChunkMetadata(
                     class_id=document.class_id,
                     page_number=get_page_number(split_doc),
+                    vector_id=uuid4(),
                     **ingested_doc_metadata.dict(),
                 ),
                 **document.dict(exclude={"id", "metadata"}),

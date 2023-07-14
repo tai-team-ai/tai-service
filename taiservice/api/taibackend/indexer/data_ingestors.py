@@ -52,15 +52,16 @@ def number_tokens(text: str) -> int:
 def get_splitter_text_splitter(input_format: InputFormat) -> TextSplitter:
     """Get the splitter strategy."""
     strategy_instructions = SPLITTER_STRATEGY_MAPPING.get(input_format)
+    kwargs = {
+        'chunk_size': 250,
+        'chunk_overlap': 50,
+        'length_function': number_tokens,
+    }
     if strategy_instructions is None:
         raise ValueError("The input format is not supported.")
     if strategy_instructions in Language:
-        return RecursiveCharacterTextSplitter()
-    splitter: TextSplitter = getattr(text_splitter, strategy_instructions)(
-        chunk_size=400,
-        chunk_overlap=150,
-        length_function=number_tokens,
-    )
+        return RecursiveCharacterTextSplitter(**kwargs)
+    splitter: TextSplitter = getattr(text_splitter, strategy_instructions)(**kwargs)
     return splitter
 
 

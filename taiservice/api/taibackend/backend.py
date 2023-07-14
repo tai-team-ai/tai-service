@@ -174,7 +174,7 @@ class Backend:
             )
         )
         pinecone_docs = self._indexer.embed_documents(documents=[chunk_doc], class_id=class_id)
-        similar_docs = self._pinecone_db.get_similar_documents(document=pinecone_docs.documents[0])
+        similar_docs = self._pinecone_db.get_similar_documents(document=pinecone_docs.documents[0], alpha=0.7)
         uuids = [doc.metadata.chunk_id for doc in similar_docs.documents]
         chunk_docs = self._doc_db.get_class_resources(uuids, ClassResourceChunkDocument)
         return [doc for doc in chunk_docs if isinstance(doc, ClassResourceChunkDocument)]
