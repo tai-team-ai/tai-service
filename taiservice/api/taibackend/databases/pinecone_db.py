@@ -109,6 +109,8 @@ class PineconeDB:
             doc = PineconeDocument(**result)
             if doc.score > threshold:
                 docs.documents.append(doc)
+        # sort the documents by score
+        docs.documents.sort(key=lambda doc: doc.score, reverse=True)
         return docs
 
     def delete_vectors(self, documents: PineconeDocuments) -> None:
