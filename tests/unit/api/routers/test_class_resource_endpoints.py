@@ -4,7 +4,7 @@ import pytest
 from pydantic import ValidationError
 from taiservice.api.taibackend import shared_schemas as backend_shared_schemas
 from taiservice.api.taibackend.databases import document_db_schemas as backend_db_schemas
-from taiservice.api.taibackend.class_resources import (
+from taiservice.api.routers.class_resources import (
     ClassResources,
     create_class_resource,
 )
@@ -23,8 +23,9 @@ def test_create_class_resource_endpoint():
     """Test that the search endpoint works."""
     example_schema = ClassResources.Config.schema_extra["example"]
     request_mock = MagicMock()
+    response_mock = MagicMock()
     try:
-        create_class_resource(ClassResources.parse_obj(example_schema), request_mock)
+        create_class_resource(ClassResources.parse_obj(example_schema), request_mock, response_mock)
     except ValidationError as e:
         pytest.fail(f"Endpoint {create_class_resource} failed with example schema: {example_schema}. Error: {str(e)}")
 

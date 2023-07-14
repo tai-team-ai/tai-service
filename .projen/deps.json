@@ -37,6 +37,10 @@
       "type": "devenv"
     },
     {
+      "name": "pdf2image",
+      "type": "devenv"
+    },
+    {
       "name": "pinecone-client[grpc]",
       "type": "devenv"
     },
@@ -55,6 +59,10 @@
     },
     {
       "name": "pymupdf",
+      "type": "devenv"
+    },
+    {
+      "name": "PyPDF2",
       "type": "devenv"
     },
     {
@@ -78,7 +86,15 @@
       "type": "devenv"
     },
     {
+      "name": "unstructured",
+      "type": "devenv"
+    },
+    {
       "name": "uvicorn",
+      "type": "devenv"
+    },
+    {
+      "name": "weasyprint==52.5",
       "type": "devenv"
     },
     {

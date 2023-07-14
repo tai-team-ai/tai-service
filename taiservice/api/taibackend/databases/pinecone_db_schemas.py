@@ -41,6 +41,7 @@ class PineconeDocument(BasePydanticModel):
         description="The dense vector of the class resource.",
     )
     sparse_values: Optional[SparseVector] = Field(
+        default=None,
         description="The sparse vector of the class resource.",
         alias="sparseValues",
     )

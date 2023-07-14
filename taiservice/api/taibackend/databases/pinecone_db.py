@@ -1,6 +1,8 @@
 """Define the pinecone database."""
-from enum import Enum
+from concurrent.futures import ThreadPoolExecutor, Future
 from multiprocessing.pool import ApplyResult
+from enum import Enum
+import os
 from typing import List
 from uuid import UUID
 from pydantic import BaseModel, Field
@@ -51,7 +53,7 @@ class PineconeDB:
         return pinecone.Index(self._index_name)
 
     def _export_documents(self, documents: PineconeDocuments) -> List[dict]:
-        docs = [doc.dict(exclude={'score'}) for doc in documents.documents]
+        docs = [doc.dict(exclude={'score'}, exclude_none=True) for doc in documents.documents]
         return docs
 
     def _get_exported_batches(self, documents: PineconeDocuments) -> List[PineconeDocuments]:
@@ -63,14 +65,19 @@ class PineconeDB:
 
     def _execute_async_pinecone_operation(self, index_operation_name: str, documents: PineconeDocuments) -> None:
         batches = self._get_exported_batches(documents)
-        with pinecone.Index(self._index_name, pool_threads=self._number_threads) as index:
-            async_results = []
-            operation = getattr(index, index_operation_name)
+        if not os.environ.get("AWS_LAMBDA_FUNCTION_NAME"):
+            with pinecone.Index(self._index_name, pool_threads=self._number_threads) as index:
+                async_results = []
+                operation = getattr(index, index_operation_name)
+                for batch in batches:
+                    async_results.append(operation(batch, async_req=True, namespace=str(documents.class_id)))
+                async_result: ApplyResult
+                for async_result in async_results:
+                    async_result.get()
+        else:
             for batch in batches:
-                async_results.append(operation(batch, async_req=True, namespace=str(documents.class_id)))
-            async_result: ApplyResult
-            for async_result in async_results:
-                async_result.get()
+                operation = getattr(self.index, index_operation_name)
+                operation(batch, namespace=str(documents.class_id))
 
     def upsert_vectors(self, documents: PineconeDocuments) -> None:
         """Upsert vectors into pinecone db."""
@@ -93,11 +100,17 @@ class PineconeDB:
             include_metadata=True,
             vector=dense,
             sparse_vector=sparse,
-            top_k=4,
+            top_k=5,
         )
         docs = PineconeDocuments(class_id=document.metadata.class_id, documents=[])
-        for result in results.to_dict()['matches']:
-            docs.documents.append(PineconeDocument(**result))
+        matches = results.to_dict()['matches']
+        threshold = 0.65 * alpha + 11 * (1 - alpha)
+        for result in matches:
+            doc = PineconeDocument(**result)
+            if doc.score > threshold:
+                docs.documents.append(doc)
+        # sort the documents by score
+        docs.documents.sort(key=lambda doc: doc.score, reverse=True)
         return docs
 
     def delete_vectors(self, documents: PineconeDocuments) -> None:

@@ -1,9 +1,10 @@
 """Define data ingestors used by the indexer."""
-from typing import List, Optional
-from abc import ABC
+from typing import Optional
+from abc import ABC, abstractmethod
 from enum import Enum
 from pathlib import Path
 import traceback
+import urllib.request
 import filetype
 from bs4 import BeautifulSoup
 import tiktoken
@@ -51,15 +52,16 @@ def number_tokens(text: str) -> int:
 def get_splitter_text_splitter(input_format: InputFormat) -> TextSplitter:
     """Get the splitter strategy."""
     strategy_instructions = SPLITTER_STRATEGY_MAPPING.get(input_format)
+    kwargs = {
+        'chunk_size': 250,
+        'chunk_overlap': 50,
+        'length_function': number_tokens,
+    }
     if strategy_instructions is None:
         raise ValueError("The input format is not supported.")
     if strategy_instructions in Language:
-        return RecursiveCharacterTextSplitter()
-    splitter: TextSplitter = getattr(text_splitter, strategy_instructions)(
-        chunk_size=400,
-        chunk_overlap=150,
-        length_function=number_tokens,
-    )
+        return RecursiveCharacterTextSplitter(**kwargs)
+    splitter: TextSplitter = getattr(text_splitter, strategy_instructions)(**kwargs)
     return splitter
 
 
@@ -79,11 +81,13 @@ def get_page_number(doc: Document) -> Optional[int]:
 
 class Ingestor(ABC):
     """Define the ingestor class."""
-    def ingest_data(self, input_data: InputDocument) -> IngestedDocument:
+    @classmethod
+    @abstractmethod
+    def ingest_data(cls, input_data: InputDocument) -> IngestedDocument:
         """Ingest the data."""
-        raise NotImplementedError
 
-    def _get_file_type(self, path: Path) -> str:
+    @staticmethod
+    def _get_file_type(path: Path) -> InputFormat:
         """Get the file type."""
         def check_file_type(path: Path, extension_enum: Enum) -> bool:
             """Check if the file type matches given extensions."""
@@ -116,18 +120,19 @@ class S3ObjectIngestor(Ingestor):
 
     This class is used for ingesting data from S3.
     """
-    def ingest_data(self, input_data: InputDocument) -> IngestedDocument:
+    @classmethod
+    def ingest_data(cls, input_data: InputDocument) -> IngestedDocument:
         """Ingest the data from S3."""
-        tmp_path = Path(f"/tmp/{input_data.id}")
-        # Download the file using the requests library
+        tmp_path = Path(f"/tmp/{input_data.full_resource_url.split('/')[-1]}")
         response = requests.get(input_data.full_resource_url, timeout=10)
         response.raise_for_status() # Raise an error if the download fails
         with open(tmp_path, "wb") as f:
             f.write(response.content)
+        file_type = cls._get_file_type(tmp_path)
         document = IngestedDocument(
             data_pointer=tmp_path,
-            input_format=self._get_file_type(tmp_path),
-            loading_strategy=LOADING_STRATEGY_MAPPING[self._get_file_type(tmp_path)],
+            input_format=file_type,
+            loading_strategy=LOADING_STRATEGY_MAPPING[cls._get_file_type(tmp_path)],
             **input_data.dict(),
         )
         return document
@@ -138,19 +143,21 @@ class URLIngestor(Ingestor):
 
     This class is used for ingesting data from a URL.
     """
-    def ingest_data(self, input_data: InputDocument) -> IngestedDocument:
+    @classmethod
+    def ingest_data(cls, input_data: InputDocument) -> IngestedDocument:
         """Ingest the data from a URL."""
         remote_file_url = input_data.full_resource_url
-        tmp_path = Path(f"/tmp/{remote_file_url.split('/')[-1]}")
-        r = requests.get(remote_file_url, timeout=5)
-        if r.status_code != 200:
-            raise ValueError(f"Could not download file from {remote_file_url}.")
-        with open(tmp_path, "wb") as f:
-            f.write(r.content)
+        # remove the last slash if no charactesr follow it
+        path = remote_file_url.path
+        if path[-1] == "/":
+            path = path[:-1]
+        tmp_path = Path(f"/tmp/{path}.html")
+        tmp_path.parent.mkdir(parents=True, exist_ok=True)
+        urllib.request.urlretrieve(remote_file_url, tmp_path)
         document = IngestedDocument(
             data_pointer=tmp_path,
-            input_format=self._get_file_type(tmp_path),
-            loading_strategy=LOADING_STRATEGY_MAPPING[self._get_file_type(tmp_path)],
+            input_format=cls._get_file_type(tmp_path),
+            loading_strategy=LOADING_STRATEGY_MAPPING[cls._get_file_type(tmp_path)],
             **input_data.dict(),
         )
         return document

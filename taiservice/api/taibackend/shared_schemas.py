@@ -102,7 +102,7 @@ class ChunkMetadata(Metadata):
         description="The page number of the class resource.",
     )
     vector_id: UUID = Field(
-        default=uuid4(),
+        default_factory=uuid4,
         description="The ID of the class resource chunk vector.",
     )
     chunk_id: Optional[UUID] = Field(
@@ -130,7 +130,7 @@ class BaseClassResourceDocument(BasePydanticModel):
         ...,
         description="The URL of the class resource.",
     )
-    preview_image_url: Optional[str] = Field(
+    preview_image_url: Optional[HttpUrl] = Field(
         default=None,
         description="The URL of the image preview of the class resource.",
     )

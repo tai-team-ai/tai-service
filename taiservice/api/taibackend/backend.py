@@ -1,11 +1,12 @@
 """Define the class resources backend."""
 import json
 from uuid import UUID, uuid4
-from typing import Optional, Union, Any
+from typing import Union, Any
 from loguru import logger
 import boto3
 from botocore.exceptions import ClientError
 try:
+    from .errors import DuplicateClassResourceError
     from ..taibackend.taitutors.llm import TaiLLM, ChatOpenAIConfig
     from ..taibackend.taitutors.llm_schemas import (
         TaiTutorMessage as BETaiTutorMessage,
@@ -51,6 +52,7 @@ try:
         IngestedDocument,
     )
 except (KeyError, ImportError):
+    from taibackend.errors import DuplicateClassResourceError
     from taibackend.taitutors.llm import TaiLLM, ChatOpenAIConfig
     from taibackend.taitutors.llm_schemas import (
         TaiTutorMessage as BETaiTutorMessage,
@@ -58,23 +60,6 @@ except (KeyError, ImportError):
         BaseMessage as BEBaseMessage,
         TaiChatSession as BEChatSession,
         FunctionMessage as BEFunctionMessage,
-    )
-    from runtime_settings import TaiApiSettings
-    from routers.class_resources_schema import (
-        ClassResource,
-        BaseClassResource,
-        ClassResourceProcessingStatus,
-        Metadata as APIResourceMetadata,
-    )
-    from routers.tai_schemas import (
-        ClassResourceSnippet,
-        BaseChatSession as APIChatSession,
-        Chat as APIChat,
-        StudentChat as APIStudentChat,
-        TaiTutorChat as APITaiTutorChat,
-        FunctionChat as APIFunctionChat,
-        ResourceSearchQuery,
-        ResourceSearchAnswer,
     )
     from taibackend.databases.document_db_schemas import (
         ClassResourceDocument,
@@ -95,6 +80,24 @@ except (KeyError, ImportError):
         OpenAIConfig,
         IngestedDocument,
     )
+    from runtime_settings import TaiApiSettings
+    from routers.class_resources_schema import (
+        ClassResource,
+        BaseClassResource,
+        ClassResourceProcessingStatus,
+        Metadata as APIResourceMetadata,
+    )
+    from routers.tai_schemas import (
+        ClassResourceSnippet,
+        BaseChatSession as APIChatSession,
+        Chat as APIChat,
+        StudentChat as APIStudentChat,
+        TaiTutorChat as APITaiTutorChat,
+        FunctionChat as APIFunctionChat,
+        ResourceSearchQuery,
+        ResourceSearchAnswer,
+    )
+
 
 class Backend:
     """Class to handle the class resources backend."""
@@ -129,6 +132,7 @@ class Backend:
             pinecone_db_config=self._pinecone_db_config,
             document_db_config=self._doc_db_config,
             openai_config=openAI_config,
+            cold_store_bucket_name=runtime_settings.cold_store_bucket_name,
         )
         self._indexer = Indexer(self._indexer_config)
 
@@ -170,7 +174,7 @@ class Backend:
             )
         )
         pinecone_docs = self._indexer.embed_documents(documents=[chunk_doc], class_id=class_id)
-        similar_docs = self._pinecone_db.get_similar_documents(document=pinecone_docs.documents[0])
+        similar_docs = self._pinecone_db.get_similar_documents(document=pinecone_docs.documents[0], alpha=0.7)
         uuids = [doc.metadata.chunk_id for doc in similar_docs.documents]
         chunk_docs = self._doc_db.get_class_resources(uuids, ClassResourceChunkDocument)
         return [doc for doc in chunk_docs if isinstance(doc, ClassResourceChunkDocument)]
@@ -231,8 +235,9 @@ class Backend:
         doc_pairs: list[tuple[Indexer, ClassResourceDocument]] = []
         for input_doc in input_docs:
             ingested_doc = Indexer.ingest_document(input_doc)
+            if self._is_duplicate_class_resource(ingested_doc):
+                raise DuplicateClassResourceError(f"Duplicate class resource: {ingested_doc.id} in class {ingested_doc.class_id}")
             doc = ClassResourceDocument.from_ingested_doc(ingested_doc)
-            doc.full_resource_url = self._upload_to_s3(ingested_doc)
             self._coerce_and_update_status(doc, ClassResourceProcessingStatus.PENDING)
             doc_pairs.append((ingested_doc, doc))
         for ingested_doc, class_resource in doc_pairs:
@@ -244,19 +249,12 @@ class Backend:
                 logger.critical(f"Failed to create class resources: {e}")
                 self._coerce_and_update_status(class_resource, ClassResourceProcessingStatus.FAILED)
 
-    def _upload_to_s3(self, doc: IngestedDocument) -> str:
-        """Put the ingested document to s3."""
-        try:
-            s3 = boto3.resource("s3")
-            bucket = s3.Bucket(self._runtime_settings.cold_store_bucket_name)
-            filepath = str(doc.data_pointer)
-            object_key = f"{str(doc.class_id)}/{doc.id_as_str}{doc.data_pointer.suffix}"
-            bucket.upload_file(filepath, object_key)
-            obj = s3.Object(self._runtime_settings.cold_store_bucket_name, object_key)
-            return obj.meta.client.meta.endpoint_url + "/" + obj.bucket_name + "/" + obj.key
-        except Exception as e: # pylint: disable=broad-except
-            logger.critical(f"Failed to upload to s3: {e}")
-            raise RuntimeError(f"Failed to upload to s3: {e}") from e
+    def _is_duplicate_class_resource(self, doc: IngestedDocument) -> bool:
+        """Check if the document can be created."""
+        class_resource_docs = self._doc_db.get_class_resources_for_class(doc.class_id)
+        doc_ids = set([class_resource_doc.id for class_resource_doc in class_resource_docs])
+        doc_hashes = ([class_resource_doc.hashed_document_contents for class_resource_doc in class_resource_docs])
+        return doc.id in doc_ids or doc.hashed_document_contents in doc_hashes
 
     def _chunks_from_class_resource(self, class_resources: ClassResourceDocument) -> list[ClassResourceChunkDocument]:
         """Get the chunks from the class resources."""
@@ -304,7 +302,7 @@ class Backend:
             if isinstance(doc, ClassResourceDocument):
                 output_doc = ClassResource(status=doc.status, **base_doc)
             elif isinstance(doc, ClassResourceChunkDocument):
-                output_doc = ClassResourceSnippet(resource_snippet=doc.chunk, **base_doc)
+                output_doc = ClassResourceSnippet(resource_snippet=doc.chunk, raw_snippet_url=doc.raw_chunk_url, **base_doc)
             else:
                 raise RuntimeError(f"Unknown document type: {doc}")
             output_documents.append(output_doc)

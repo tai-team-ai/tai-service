@@ -89,19 +89,18 @@ class DocumentDB:
         """Return the supported document models."""
         return self._doc_models
 
-    def get_class_resources(self, ids: list[UUID], doc_class: BaseClassResourceDocument) -> list[BaseClassResourceDocument]:
+    def get_class_resources(self, ids: list[UUID], DocClass: BaseClassResourceDocument) -> list[BaseClassResourceDocument]:
         """Return the full class resources."""
-        collection = self._document_type_to_collection[doc_class.__name__]
+        collection = self._document_type_to_collection[DocClass.__name__]
         ids = [str(id) for id in ids]
         documents = list(collection.find({"_id": {"$in": ids}}))
-        # cast to the most specific document type
-        # iterate over the documents models: BaseClassResourceDocument, ClassResourceDocument, ClassResourceChunkDocument
-        for doc_model in self.supported_doc_models:
-            try:
-                return [doc_model.parse_obj(document) for document in documents]
-            except ValidationError:
-                continue
-        return []
+        return [DocClass.parse_obj(document) for document in documents]
+
+    def get_class_resources_for_class(self, class_id: UUID) -> list[ClassResourceDocument]:
+        """Return the full class resources for a class."""
+        col = self._document_type_to_collection[ClassResourceDocument.__name__]
+        docs = list(col.find({"class_id": str(class_id)}))
+        return [ClassResourceDocument.parse_obj(doc) for doc in docs]
 
     def upsert_class_resources(
         self,
