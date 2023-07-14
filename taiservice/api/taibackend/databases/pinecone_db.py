@@ -75,14 +75,9 @@ class PineconeDB:
                 for async_result in async_results:
                     async_result.get()
         else:
-            with ThreadPoolExecutor(max_workers=self._number_threads) as executor:
-                results = []
+            for batch in batches:
                 operation = getattr(self.index, index_operation_name)
-                for batch in batches:
-                    results.append(executor.submit(operation, batch, async_req=True, namespace=str(documents.class_id)))
-                future: Future
-                for future in results:
-                    future.result()
+                operation(batch, namespace=str(documents.class_id))
 
     def upsert_vectors(self, documents: PineconeDocuments) -> None:
         """Upsert vectors into pinecone db."""

@@ -6,14 +6,14 @@ from loguru import logger
 
 # first imports are for local development, second imports are for deployment
 try:
-    from .taibackend import class_resources
+    from .routers import class_resources
     from .taibackend.backend import Backend
     from .runtime_settings import TaiApiSettings, BACKEND_ATTRIBUTE_NAME
     from .routers import (
         tai
     )
 except ImportError:
-    from taibackend import class_resources
+    from taiservice.api.routers import class_resources
     from taibackend.backend import Backend
     from runtime_settings import TaiApiSettings, BACKEND_ATTRIBUTE_NAME
     from routers import (
