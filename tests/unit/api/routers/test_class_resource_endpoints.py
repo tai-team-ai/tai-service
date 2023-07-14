@@ -23,8 +23,9 @@ def test_create_class_resource_endpoint():
     """Test that the search endpoint works."""
     example_schema = ClassResources.Config.schema_extra["example"]
     request_mock = MagicMock()
+    response_mock = MagicMock()
     try:
-        create_class_resource(ClassResources.parse_obj(example_schema), request_mock)
+        create_class_resource(ClassResources.parse_obj(example_schema), request_mock, response_mock)
     except ValidationError as e:
         pytest.fail(f"Endpoint {create_class_resource} failed with example schema: {example_schema}. Error: {str(e)}")
 

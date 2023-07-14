@@ -191,6 +191,7 @@ EXAMPLE_CLASS_RESOURCE_SNIPPET = {
     "resourceSnippet": "Molecules are made up of atoms.",
     "fullResourceUrl": "https://www.google.com",
     "previewImageUrl": "https://www.google.com",
+    "rawSnippetUrl": "https://www.google.com",
     "metadata": {
         "title": "Molecules",
         "description": "Molecules are made up of atoms.",
