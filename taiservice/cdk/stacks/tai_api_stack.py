@@ -75,7 +75,7 @@ class TaiApiStack(Stack):
         api_settings.frontend_data_transfer_bucket_name = (api_settings.frontend_data_transfer_bucket_name + config.stack_suffix)[:50]
         self._frontend_transfer_bucket: VersionedBucket = self._create_bucket(
             name=api_settings.frontend_data_transfer_bucket_name,
-            public_read_access=False,
+            public_read_access=True,
         )
         self._frontend_transfer_bucket.grant_read_access(self._python_lambda.role)
         add_tags(self, config.tags)
@@ -167,7 +167,13 @@ class TaiApiStack(Stack):
             run_as_webserver=True,
             custom_docker_commands=[
                 "RUN mkdir -p /var/task/nltk_data",  # Create directory for model
+                # punkt and and stopwords are used for pinecone SPLADE
+                # averaged_perceptron_tagger is used for langchain for HTML parsing
+                # the path is specified as lambda does NOT have access to the default path
                 f"RUN python -m nltk.downloader -d {self._settings.nltk_data} punkt stopwords averaged_perceptron_tagger",  # Download the model and save it to the directory
+                # poppler-utils is used for the python pdf to image package
+                # The others are used by weasy to grab images of html pages
+                # TODO: Replace with selenium to get images of html pages
                 "RUN apt-get update && apt-get install -y poppler-utils build-essential python3-dev python3-pip python3-setuptools python3-wheel python3-cffi libcairo2 libpango-1.0-0 libpangocairo-1.0-0 libgdk-pixbuf2.0-0 libffi-dev shared-mime-info",  # Install poppler-utils for pdf python packages
             ]
         )
