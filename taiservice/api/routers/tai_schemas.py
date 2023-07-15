@@ -263,9 +263,13 @@ class ChatSessionResponse(BaseChatSession):
 
 
 EXAMPLE_SEARCH_QUERY = {
-    "id": uuid4(),
     "classId": uuid4(),
     "query": "Python",
+    "filters": {
+        "resourceTypes": [
+            ClassResourceType.TEXTBOOK,
+        ],
+    },
 }
 EXAMPLE_SEARCH_ANSWER = copy.deepcopy(EXAMPLE_SEARCH_QUERY)
 EXAMPLE_SEARCH_ANSWER.update(
@@ -291,7 +295,7 @@ class SearchFilters(BasePydanticModel):
 class ResourceSearchQuery(BasePydanticModel):
     """Define the request model for the search endpoint."""
     id: UUID = Field(
-        ...,
+        default_factory=uuid4,
         description="The ID of the search.",
     )
     class_id: UUID = Field(

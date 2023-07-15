@@ -153,7 +153,7 @@ class TaiApiStack(Stack):
             runtime_environment=self._settings,
             requirements_file_path=API_DIR / "requirements.txt",
             files_to_copy_into_handler_dir=MODULES_TO_COPY_INTO_API_DIR,
-            timeout=Duration.minutes(4),
+            timeout=Duration.minutes(15),
             memory_size=10000,
             ephemeral_storage_size=StorageSize.gibibytes(3),
             vpc=self._vpc,
