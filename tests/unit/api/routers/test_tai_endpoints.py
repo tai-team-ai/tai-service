@@ -62,7 +62,7 @@ def test_chat_endpoint():
             message="Hello!",
             class_resource_snippets=[],
             render_chat=True,
-            tai_tutor=ApiTaiTutorName.ALEX,
+            tai_tutor=ApiTaiTutorName.FINN,
             technical_level=ApiTechnicalLevel.EXPLAIN_LIKE_IM_5,
         )
     )

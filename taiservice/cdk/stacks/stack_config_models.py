@@ -147,9 +147,11 @@ class StackConfigBaseModel(BaseModel):
         branch_name = re.sub(r"[^a-zA-Z0-9]", '-', branch_name)
         is_main = branch_name == "main" or branch_name == "master" or \
             branch_name == "production" or branch_name == "prod"
-        if is_main or not values["duplicate_stack_for_development"]:
-            return values
         deploy_settings: AWSDeploymentSettings = values["deployment_settings"]
+        if is_main or not values["duplicate_stack_for_development"]:
+            if deploy_settings.deployment_type == DeploymentType.DEV:
+                values["stack_suffix"] = deploy_settings.deployment_type.value
+            return values
         stack_suffix = f"-{branch_name[:6]}-{deploy_settings.deployment_type.value}"
         values["stack_suffix"] = stack_suffix
         values["stack_name"] = f"{values['stack_name']}{stack_suffix}"
