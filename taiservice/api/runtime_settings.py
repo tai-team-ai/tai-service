@@ -78,7 +78,7 @@ class TaiApiSettings(BaseSettings):
         description="The name of the model to use for the llm tutor.",
     )
     nltk_data: str = Field(
-        default="/tmp/nltk_data",
+        default="/var/task/nltk_data",
         description="The path to the nltk data.",
     )
     transformers_cache: str = Field(
@@ -98,6 +98,6 @@ class TaiApiSettings(BaseSettings):
         description="The path to the chrome driver.",
     )
     class_resource_processing_timeout: int = Field(
-        default=60,
+        default=240,
         description="The timeout for class resource processing.",
     )
