@@ -137,6 +137,7 @@ class Backend:
             document_db_config=self._doc_db_config,
             openai_config=openAI_config,
             cold_store_bucket_name=runtime_settings.cold_store_bucket_name,
+            chrome_driver_path=runtime_settings.chrome_driver_path,
         )
         self._indexer = Indexer(self._indexer_config)
 

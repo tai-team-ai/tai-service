@@ -1,3 +1,4 @@
+from pathlib import Path
 from pydantic import Field, BaseSettings
 
 # first imports are for local development, second imports are for deployment
@@ -77,7 +78,7 @@ class TaiApiSettings(BaseSettings):
         description="The name of the model to use for the llm tutor.",
     )
     nltk_data: str = Field(
-        default="/var/task/nltk_data",
+        default="/tmp/nltk_data",
         description="The path to the nltk data.",
     )
     transformers_cache: str = Field(
@@ -92,7 +93,7 @@ class TaiApiSettings(BaseSettings):
         ...,
         description="The name of the frontend transfer bucket.",
     )
-    chrome_driver_path: str = Field(
-        default="/var/task/chromedriver",
+    chrome_driver_path: Path = Field(
+        default=Path("/var/task/chromedriver"),
         description="The path to the chrome driver.",
     )

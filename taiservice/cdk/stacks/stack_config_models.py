@@ -152,7 +152,11 @@ class StackConfigBaseModel(BaseModel):
             if deploy_settings.deployment_type == DeploymentType.DEV:
                 values["stack_suffix"] = f"-{deploy_settings.deployment_type.value}"
             return values
-        stack_suffix = f"-{branch_name[:6]}-{deploy_settings.deployment_type.value}"
+        stack_suffix = f"-{branch_name[:10]}-{deploy_settings.deployment_type.value}"
+        # Remove any special characters from the stack suffix
+        stack_suffix = re.sub(r"[^a-zA-Z0-9-]", '-', stack_suffix)
+        # Remove any trailing dashes from the stack suffix
+        stack_suffix = re.sub(r"[-]+$", '', stack_suffix)
         values["stack_suffix"] = stack_suffix
         values["stack_name"] = f"{values['stack_name']}{stack_suffix}"
         values["stack_id"] = f"{values['stack_id']}{stack_suffix}"

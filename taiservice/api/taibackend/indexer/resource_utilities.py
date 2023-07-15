@@ -1,11 +1,12 @@
 """Define the module with code to screenshot class resources."""
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Union
 from pdf2image import convert_from_path
 from PyPDF2 import PdfReader, PdfWriter
 from loguru import logger
-from weasyprint import HTML as WeasyHTML
+from selenium import webdriver
+from pydantic import HttpUrl
 
 
 class ResourceUtility(ABC):
@@ -14,7 +15,7 @@ class ResourceUtility(ABC):
     @abstractmethod
     def create_screenshots(
         cls,
-        input_path: Path, 
+        data_pointer: Union[Path, HttpUrl],
         start_page: Optional[int] = None,
         last_page_to_include: Optional[int] = None
     ) -> Optional[list[Path]]:
@@ -65,12 +66,13 @@ class PDF(ResourceUtility):
     @classmethod
     def create_screenshots(
         cls,
-        input_path: Path,
+        data_pointer: Union[Path, HttpUrl],
         start_page: Optional[int] = None,
         last_page_to_include: Optional[int] = None
     ) -> Optional[list[Path]]:
         """Create screenshots for all pages in the resource."""
-        return cls._get_screenshot_from_pdf(input_path, start_page, last_page_to_include)
+        assert isinstance(data_pointer, Path)
+        return cls._get_screenshot_from_pdf(data_pointer, start_page, last_page_to_include)
 
     @classmethod
     def split_resource(cls, input_path: Path, last_page_to_include: Optional[int] = None) -> Optional[list[Path]]:
@@ -82,7 +84,7 @@ class GenericText(ResourceUtility):
     @classmethod
     def create_screenshots(
         cls,
-        input_path: Path, 
+        data_pointer: Union[Path, HttpUrl],
         start_page: Optional[int] = None,
         last_page_to_include: Optional[int] = None
     ) -> Optional[list[Path]]:
@@ -94,7 +96,7 @@ class Latex(ResourceUtility):
     @classmethod
     def create_screenshots(
         cls,
-        input_path: Path, 
+        data_pointer: Union[Path, HttpUrl],
         start_page: Optional[int] = None,
         last_page_to_include: Optional[int] = None
     ) -> Optional[list[Path]]:
@@ -106,7 +108,7 @@ class Markdown(ResourceUtility):
     @classmethod
     def create_screenshots(
         cls,
-        input_path: Path,
+        data_pointer: Union[Path, HttpUrl],
         start_page: Optional[int] = None,
         last_page_to_include: Optional[int] = None
     ) -> Optional[list[Path]]:
@@ -118,21 +120,32 @@ class HTML(ResourceUtility):
     @classmethod
     def create_screenshots(
         cls,
-        input_path: Path,
+        data_pointer: Union[Path, HttpUrl],
         start_page: Optional[int] = None,
         last_page_to_include: Optional[int] = None
     ) -> Optional[list[Path]]:
         """Create screenshots for all pages in the resource."""
-        pdf_path = input_path.parent / f"{input_path.stem}.pdf"
-        WeasyHTML(input_path).write_pdf(pdf_path)
-        return cls._get_screenshot_from_pdf(pdf_path, start_page, last_page_to_include)
+        options = webdriver.ChromeOptions()
+        options.headless = True
+        options.add_argument("--no-sandbox")
+        options.add_argument("--disable-dev-shm-usage")
+        driver = webdriver.Chrome(options=options)
+        if isinstance(data_pointer, Path):
+            data_pointer = f"file://{data_pointer.absolute()}"
+        driver.get(data_pointer)
+        output_path = data_pointer.parent / f"{data_pointer.stem}.png"
+        driver.get_screenshot_as_file(output_path)
+        driver.close()
+        return [output_path]
 
     @classmethod
     def split_resource(cls, input_path: Path, last_page_to_include: Optional[int] = None) -> Optional[list[Path]]:
-        """Split the resource into multiple resources."""
-        pdf_path = input_path.parent / f"{input_path.stem}.pdf"
-        WeasyHTML(input_path).write_pdf(pdf_path)
-        return cls._get_pdf_pages_from_pdf(pdf_path, last_page_to_include)
+        """
+        Split the resource into multiple resources.
+
+        This is not implemented for HTML files, as they are not paginated.
+        """
+        return [input_path]
 
 
 class RawURL(ResourceUtility):
