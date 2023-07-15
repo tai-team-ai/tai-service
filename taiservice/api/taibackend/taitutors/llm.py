@@ -132,17 +132,6 @@ class TaiLLM:
         )
         chat_session.append_chat_messages([tutor_response])
 
-    def _chat_session_from_user_query(self, query: str, class_id: UUID) -> TaiChatSession:
-        """Create a chat session from a string."""
-        session = TaiChatSession.from_message(
-            class_id=class_id,
-            message=StudentMessage(
-                content=query,
-                tai_tutor_name=TaiTutorName.ALEX,
-            )
-        )
-        return session
-
     def _append_synthetic_function_call_to_chat(
         self,
         chat_session: TaiChatSession,
