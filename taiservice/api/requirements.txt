@@ -1,7 +1,7 @@
 loguru<=0.7.0
 fastapi<=0.98.0
 mangum
-pydantic<=1.10.10
+pydantic<=1.10.11
 pinecone-client
 pymongo<=4.4
 boto3

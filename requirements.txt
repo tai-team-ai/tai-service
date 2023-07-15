@@ -16,17 +16,14 @@ openai
 pdf2image
 pinecone-client[grpc]
 pinecone-text
-pyautogui
 pydantic[dotenv]<=1.10.11
 pydantic<=1.10.11
 pygit2
 pymongo
 pymupdf
-pynput
 PyPDF2
 pytest
 pytest-cov
-PyVirtualDisplay
 requests
 selenium
 tiktoken
