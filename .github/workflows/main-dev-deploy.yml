@@ -17,9 +17,9 @@ jobs:
       uses: actions/cache@v2
       with:
         path: .venv
-        key: ${{ runner.os }}-pip-${{ hashFiles('.projenrc.py') }}
+        key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
         restore-keys: |
-          ${{ runner.os }}-pip-${{ hashFiles('.projenrc.py') }}
+          ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
 
     - name: Setup Python
       uses: actions/setup-python@v2
