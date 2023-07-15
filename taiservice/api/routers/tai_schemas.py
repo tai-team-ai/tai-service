@@ -17,9 +17,14 @@ except (ImportError, KeyError):
 
 class TaiTutorName(str, Enum):
     """Define the supported TAI tutors."""
-    
-    FIN = "fin"
-    ALEX = "alex"
+
+    MILO = "milo"
+    DECLAN = "declan"
+    FINN = "finn"
+    ADA = "ada"
+    REMY = "remy"
+    KAI = "kai"
+    VIOLET = "violet"
 
 
 class ChatRole(str, Enum):
@@ -176,7 +181,7 @@ EXAMPLE_CHAT_SESSION_REQUEST = {
         {
             "message": "I'm stuck on this problem.",
             "role": ChatRole.STUDENT,
-            "requestedTaiTutor": TaiTutorName.ALEX,
+            "requestedTaiTutor": TaiTutorName.ADA,
             "requestedTechnicalLevel": ResponseTechnicalLevel.EXPLAIN_LIKE_IM_IN_HIGH_SCHOOL,
             "renderChat": True,
         },
@@ -203,7 +208,7 @@ EXAMPLE_CHAT_SESSION_RESPONSE["chats"].append(
     {
         "message": "I can help you with that!",
         "role": ChatRole.TAI_TUTOR,
-        "taiTutor": TaiTutorName.ALEX,
+        "taiTutor": TaiTutorName.ADA,
         "technicalLevel": ResponseTechnicalLevel.EXPLAIN_LIKE_IM_IN_HIGH_SCHOOL,
         "classResourceSnippets": [
             copy.deepcopy(EXAMPLE_CLASS_RESOURCE_SNIPPET),

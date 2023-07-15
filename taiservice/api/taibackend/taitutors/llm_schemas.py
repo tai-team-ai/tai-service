@@ -25,8 +25,13 @@ except (KeyError, ImportError):
 class TaiTutorName(str, Enum):
     """Define the supported TAI tutors."""
 
-    FIN = "fin"
-    ALEX = "alex"
+    MILO = "Milo"
+    DECLAN = "Declan"
+    FINN = "Finn"
+    ADA = "Ada"
+    REMY = "Remy"
+    KAI = "Kai"
+    VIOLET = "Violet"
 
 class ChatRole(str, Enum):
     """Define the built-in MongoDB roles."""
@@ -42,6 +47,12 @@ class ResponseTechnicalLevel(str, Enum):
     EXPLAIN_LIKE_IM_IN_HIGH_SCHOOL = "likeHighSchool"
     EXPLAIN_LIKE_IM_IN_COLLEGE = "likeCollege"
     EXPLAIN_LIKE_IM_AN_EXPERT_IN_THE_FIELD = "likeExpertInTheField"
+
+
+BASE_SYSTEM_MESSAGE = dedent("""\
+
+""")
+
 
 class BaseMessage(langchainBaseMessage):
     """Define the base message for the TAI tutor."""
@@ -73,7 +84,7 @@ class SearchQuery(BaseMessage, HumanMessage):
 class TutorAndStudentBaseMessage(BaseMessage):
     """Define the base message for the TAI tutor and student."""
     tai_tutor_name: TaiTutorName = Field(
-        default=TaiTutorName.FIN,
+        default=TaiTutorName.FINN,
         description="The name of the TAI tutor that generated this message.",
     )
     technical_level: ResponseTechnicalLevel = Field(
@@ -134,6 +145,15 @@ class SystemMessage(langchainSystemMessage, BaseMessage):
         description="System messages are never rendered. Therefore this field is always false.",
     )
 
+    @staticmethod
+    def from_prompt(prompt: str) -> "SystemMessage":
+        """Create a system message from a prompt."""
+        return SystemMessage(
+            text=prompt,
+            role=ChatRole.TAI_TUTOR,
+            render_chat=False,
+        )
+
 class FunctionMessage(langchainFunctionMessage, BaseMessage):
     """Define the model for the function chat message."""
 
@@ -176,10 +196,10 @@ class TaiChatSession(BasePydanticModel):
         return None
 
     @property
-    def last_human_message(self) -> Optional[HumanMessage]:
+    def last_student_message(self) -> Optional[StudentMessage]:
         """Return the last student message in the chat session."""
         for message in reversed(self.messages):
-            if isinstance(message, HumanMessage):
+            if isinstance(message, StudentMessage):
                 return message
         return None
 
@@ -193,7 +213,10 @@ class TaiChatSession(BasePydanticModel):
 
     def insert_system_prompt(self, prompt: str) -> None:
         """Insert a system prompt to the beginning of the chat session."""
-        self.messages.insert(0, SystemMessage(content=prompt))
+        if self.messages and isinstance(self.messages[0], SystemMessage):
+            self.messages[0].content = prompt
+        else:
+            self.messages.insert(0, SystemMessage(content=prompt))
 
     @staticmethod
     def from_message(message: BaseMessage, class_id: UUID) -> "TaiChatSession":
@@ -237,9 +260,101 @@ SUMMARIZER_SYSTEM_PROMPT = dedent(
     job is to summarize the documents. If you are not provided a list of documents, you should 
     not respond with anything."""
 )
-SUMMARIZER_USER_PROMPT = dedent(
-    """Student search query: {search_query}
-    Returned search result documents:
-    {documents}
-    Snippet (Summary of the search results):"""
-)
+SUMMARIZER_USER_PROMPT = dedent("""\
+Student search query: {search_query}
+Returned search result documents:
+{documents}
+Snippet (Summary of the search results):
+""")
+
+BASE_SYSTEM_MESSAGE = dedent("""\
+You are a friendly tutor named {name} that works for T.A.I. As {name}, {persona}. \
+You are to be a good listener and ask how you can help the student and be there for them. \
+You MUST get to know them as a human being and understand their needs in order to be successful. \
+To do this, you need to ask questions to understand the student as best as possible. \
+If a student asks for help, you should NOT give the student answers or solve the problem for them. \
+Instead, you should help them understand the material and guide them to the answer step by step. \
+Each step you send should be in it's own message and not all in the same message. \
+For example, if the student asks for help, you could ask them what they have tried so far and suggest what they should try next. \
+You should progressively give more information to the student until they understand the material and not give them all in one message. \
+The student has requested that you use responses with a technical level of a {technical_level} to help the understand the material. \
+Remember, you should explain things in a way that a {technical_level} would understand. \
+Most importantly, you are not to give the student answers even if they ask for them, however, you can give them hints.\
+""")
+
+MILO = {
+    "name": TaiTutorName.MILO.value,
+    "persona": "you are are less formal in how you talk and are technically savvy. You never resist the urge to incorporate real-world examples into your explanations.",
+}
+DECLAN = {
+    "name": TaiTutorName.DECLAN.value,
+    "persona": "you have a balanced conversational style and are really creative. You love thinking outside the box and are always looking for new ways to explain things.",
+}
+FINN = {
+    "name": TaiTutorName.FINN.value,
+    "persona": "you are informal and are very empathetic. You looove to weave narratives into your explanations and are always looking for ways to make things more relatable.",
+}
+ADA = {
+    "name": TaiTutorName.ADA.value,
+    "persona": "you slightly informal, but highly creative. You love to ask questions that might seem random, but are actually very insightful to help connect dots for the student.",
+}
+REMY = {
+    "name": TaiTutorName.REMY.value,
+    "persona": "you are very informal and highly creative. You love artsy things and are always looking for ways to make things more relatable.",
+}
+KAI = {
+    "name": TaiTutorName.KAI.value,
+    "persona": "you are formal, but still bring some creativity. You excel at diving deep on technical topics and are always looking to nerd out with the student.",
+}
+VIOLET = {
+    "name": TaiTutorName.VIOLET.value,
+    "persona": "you are formal and very technical. You are very good at explaining technical topics and are always looking to nerd out with the student.",
+}
+RESPONSE_TECHNICAL_LEVEL_MAPPING = {
+    ResponseTechnicalLevel.EXPLAIN_LIKE_IM_5: "5 year old",
+    ResponseTechnicalLevel.EXPLAIN_LIKE_IM_IN_HIGH_SCHOOL: "high school student",
+    ResponseTechnicalLevel.EXPLAIN_LIKE_IM_IN_COLLEGE: "college student",
+    ResponseTechnicalLevel.EXPLAIN_LIKE_IM_AN_EXPERT_IN_THE_FIELD: "expert in the field",
+}
+
+class TaiProfile(BasePydanticModel):
+    """Define the model for the TAI profile."""
+    name: TaiTutorName = Field(
+        ...,
+        description="The name of the tutor.",
+    )
+    persona: str = Field(
+        ...,
+        description="The persona of the tutor.",
+    )
+
+    @staticmethod
+    def get_profile(name: TaiTutorName) -> "TaiProfile":
+        """Get the profile for the given name."""
+        if name == TaiTutorName.MILO:
+            return TaiProfile(**MILO)
+        elif name == TaiTutorName.DECLAN:
+            return TaiProfile(**DECLAN)
+        elif name == TaiTutorName.FINN:
+            return TaiProfile(**FINN)
+        elif name == TaiTutorName.ADA:
+            return TaiProfile(**ADA)
+        elif name == TaiTutorName.REMY:
+            return TaiProfile(**REMY)
+        elif name == TaiTutorName.KAI:
+            return TaiProfile(**KAI)
+        elif name == TaiTutorName.VIOLET:
+            return TaiProfile(**VIOLET)
+        else:
+            raise ValueError(f"Invalid tutor name {name}.")
+
+    @staticmethod
+    def get_system_prompt(name: TaiTutorName, technical_level: ResponseTechnicalLevel) -> str:
+        """Get the system prompt for the given name."""
+        tai_profile = TaiProfile.get_profile(name)
+        technical_level_str = RESPONSE_TECHNICAL_LEVEL_MAPPING[technical_level]
+        format_string = ValidatedFormatString(
+            format_string=BASE_SYSTEM_MESSAGE,
+            kwargs={**tai_profile.dict(), "technical_level": technical_level_str},
+        )
+        return format_string.format()

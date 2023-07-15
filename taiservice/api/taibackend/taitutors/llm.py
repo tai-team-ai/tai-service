@@ -25,6 +25,7 @@ try:
         SUMMARIZER_SYSTEM_PROMPT,
         SUMMARIZER_USER_PROMPT,
         ValidatedFormatString,
+        TaiProfile,
     )
 except (KeyError, ImportError):
     from taibackend.shared_schemas import BaseOpenAIConfig
@@ -40,6 +41,7 @@ except (KeyError, ImportError):
         SUMMARIZER_SYSTEM_PROMPT,
         SUMMARIZER_USER_PROMPT,
         ValidatedFormatString,
+        TaiProfile,
     )
 
 
@@ -89,7 +91,7 @@ class TaiLLM:
             self._append_synthetic_function_call_to_chat(
                 chat_session,
                 function_to_call=get_relevant_class_resource_chunks,
-                function_kwargs={'student_message': chat_session.last_human_message.content},
+                function_kwargs={'student_message': chat_session.last_student_message.content},
                 relevant_chunks=relevant_chunks,
             )
             chain = create_openai_fn_chain(
@@ -118,11 +120,14 @@ class TaiLLM:
 
     def _append_model_response(self, chat_session: TaiChatSession) -> None:
         """Get the response from the LLMs."""
+        student_msg = chat_session.last_student_message
+        prompt = TaiProfile.get_system_prompt(name=student_msg.tai_tutor_name, technical_level=student_msg.technical_level)
+        chat_session.insert_system_prompt(prompt)
         chat_message = self._chat_model(messages=chat_session.messages)
         tutor_response = TaiTutorMessage(
             content=chat_message.content,
             render_chat=True,
-            **chat_session.last_human_message.dict(exclude={"role", "render_chat", "content"}),
+            **chat_session.last_student_message.dict(exclude={"role", "render_chat", "content"}),
         )
         chat_session.append_chat_messages([tutor_response])
 
@@ -145,7 +150,7 @@ class TaiLLM:
         relevant_chunks: list[ClassResourceChunkDocument] = None,
     ) -> None:
         """Append the context chat to the chat session."""
-        last_student_chat = chat_session.last_human_message
+        last_student_chat = chat_session.last_student_message
         tutor_chat = TaiTutorMessage(
             render_chat=False,
             content="",
