@@ -130,12 +130,13 @@ class HTML(ResourceUtility):
         options.headless = True
         options.add_argument("--no-sandbox")
         options.add_argument("--disable-dev-shm-usage")
+        options.add_argument("--window-size=768,1024")
         driver = webdriver.Chrome(options=options)
+        output_path = data_pointer.parent / f"{data_pointer.stem}.png"
         if isinstance(data_pointer, Path):
             data_pointer = f"file://{data_pointer.absolute()}"
         driver.get(data_pointer)
         sleep(5)
-        output_path = data_pointer.parent / f"{data_pointer.stem}.png"
         driver.get_screenshot_as_file(output_path)
         driver.close()
         return [output_path]

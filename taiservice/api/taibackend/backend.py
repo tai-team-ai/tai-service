@@ -1,5 +1,6 @@
 """Define the class resources backend."""
 import json
+from datetime import datetime
 from uuid import UUID, uuid4
 from typing import Union, Any, Optional
 from loguru import logger
@@ -244,7 +245,9 @@ class Backend:
         doc_pairs: list[tuple[Indexer, ClassResourceDocument]] = []
         for input_doc in input_docs:
             ingested_doc = self._indexer.ingest_document(input_doc)
-            if self._is_duplicate_class_resource(ingested_doc):
+            if self._is_stuck_processing(ingested_doc): # if it's stuck, we should continue as the operations are idempotent
+                pass
+            elif self._is_duplicate_class_resource(ingested_doc):
                 raise DuplicateClassResourceError(f"Duplicate class resource: {ingested_doc.id} in class {ingested_doc.class_id}")
             doc = ClassResourceDocument.from_ingested_doc(ingested_doc)
             self._coerce_and_update_status(doc, ClassResourceProcessingStatus.PENDING)
@@ -257,6 +260,19 @@ class Backend:
             except Exception as e: # pylint: disable=broad-except
                 logger.critical(f"Failed to create class resources: {e}")
                 self._coerce_and_update_status(class_resource, ClassResourceProcessingStatus.FAILED)
+
+    def _is_stuck_processing(self, doc: IngestedDocument) -> bool:
+        """Check if the class resource is stuck uploading."""
+        class_resource_docs = self._doc_db.get_class_resources_for_class(doc.class_id)
+        docs = {class_resource_doc.id: class_resource_doc for class_resource_doc in class_resource_docs}
+        class_resource = docs[doc.id]
+        stable = class_resource.status == ClassResourceProcessingStatus.COMPLETED \
+            or class_resource.status == ClassResourceProcessingStatus.FAILED
+        if not stable:
+            elapsed_time = (datetime.now() - class_resource.modified_timestamp).total_seconds()
+            if elapsed_time > self._runtime_settings.class_resource_processing_timeout:
+                return True
+        return False
 
     def _is_duplicate_class_resource(self, doc: IngestedDocument) -> bool:
         """Check if the document can be created."""

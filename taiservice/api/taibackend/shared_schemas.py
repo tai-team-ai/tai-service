@@ -147,15 +147,16 @@ class BaseClassResourceDocument(BasePydanticModel):
         description="The timestamp when the class resource was last modified.",
     )
 
-    @validator("modified_timestamp", pre=True)
-    def set_modified_timestamp(cls, _: datetime) -> datetime:
-        """Set the modified timestamp."""
-        return datetime.utcnow()
-
     @property
     def id_as_str(self) -> str:
         """Return the string representation of the id."""
         return str(self.id)
+
+    def dict(self, *args, **kwargs) -> dict:
+        """Convert all objects to strs."""
+        results = super().dict(*args, **kwargs)
+        results["modified_timestamp"] = datetime.utcnow()
+        return results
 
 
 class StatefulClassResourceDocument(BaseClassResourceDocument):

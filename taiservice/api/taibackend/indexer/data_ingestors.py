@@ -111,21 +111,23 @@ class Ingestor(ABC):
         return f"{ingested_doc.class_id}/{ingested_doc.id_as_str}/"
 
     @staticmethod
-    def _screenshot_resource(doc: IngestedDocument, first_page_only: bool = True) -> list[Path]:
+    def _screenshot_resource(
+        data_pointer: Union[HttpUrl, Path],
+        input_format: InputFormat,
+        first_page_only: bool = True,
+    ) -> list[Path]:
         screenshot_strategy_mapping: dict[InputFormat, ResourceUtility] = {
             InputFormat.HTML: HTML,
             InputFormat.PDF: PDF,
         }
-        try:
-            resource_utility = screenshot_strategy_mapping[doc.input_format]
-            last_page_to_screenshot = 1 if first_page_only else None
-            return resource_utility.create_screenshots(doc.data_pointer, last_page_to_include=last_page_to_screenshot)
-        except Exception as e: # pylint: disable=broad-except
-            logger.warning(f"Failed to create screenshots: {e}")
+        resource_utility = screenshot_strategy_mapping[input_format]
+        last_page_to_screenshot = 1 if first_page_only else None
+        return resource_utility.create_screenshots(data_pointer, last_page_to_include=last_page_to_screenshot)
 
     @staticmethod
-    def _upload_to_cold_store(file_paths: list[Path], object_keys: list[str], bucket_name: str) -> Optional[list[HttpUrl]]:
+    def _upload_to_cold_store(file_paths: list[Path], object_keys: list[str], bucket_name: str) -> Union[list[HttpUrl], HttpUrl]:
         """Put the ingested document to s3."""
+        is_length_one = len(file_paths) == 1
         try:
             s3 = boto3.resource("s3")
             bucket = s3.Bucket(bucket_name)
@@ -133,7 +135,7 @@ class Ingestor(ABC):
             for filepath, object_key in zip(file_paths, object_keys):
                 bucket.upload_file(str(filepath.resolve()), object_key)
                 urls.append(f'''https://{bucket_name}.s3.amazonaws.com/{urllib.parse.quote(object_key, safe="~()*!.'")}''')
-            return urls
+            return urls[0] if is_length_one else urls
         except Exception as e: # pylint: disable=broad-except
             logger.critical(f"Failed to upload to s3: {e}")
             raise RuntimeError(f"Failed to upload to s3: {e}") from e
@@ -169,7 +171,7 @@ class Ingestor(ABC):
         object_prefix = cls._get_object_prefix(ingested_doc)
         screenshot_urls, split_resource_urls = [], []
         def screenshot_pdf() -> list[Path]:
-            screenshot_paths = cls._screenshot_resource(ingested_doc, first_page_only=False)
+            screenshot_paths = cls._screenshot_resource(ingested_doc.data_pointer, ingested_doc.input_format, first_page_only=False)
             screenshot_object_keys = [f"{object_prefix}{i + 1}/{path.name}" for i, path in enumerate(screenshot_paths)]
             return cls._upload_to_cold_store(screenshot_paths, screenshot_object_keys, bucket_name)
         def split_pdf() -> list[Path]:
@@ -192,25 +194,29 @@ class Ingestor(ABC):
     ) -> None:
         """Put the ingested document to s3."""
         object_prefix = cls._get_object_prefix(ingested_doc)
+        is_webpage_html = ingested_doc.input_format == InputFormat.HTML \
+            or input_doc.input_data_ingest_strategy == InputDataIngestStrategy.URL_DOWNLOAD
         def screenshot_resource() -> None:
-            screenshot_path = Ingestor._screenshot_resource(ingested_doc)[0]
+            if is_webpage_html:
+                data_pointer = input_doc.full_resource_url
+            else:
+                data_pointer = ingested_doc.data_pointer
+            screenshot_path = Ingestor._screenshot_resource(data_pointer, ingested_doc.input_format)[0]
             screenshot_object_key = f"{object_prefix}{screenshot_path.name}"
             ingested_doc.preview_image_url = cls._upload_to_cold_store(
                 [screenshot_path],
                 [screenshot_object_key],
                 bucket_name
-            )[0]
-        def split_resource() -> None:
-            is_not_webpage_html = ingested_doc.input_format != InputFormat.HTML \
-                or input_doc.input_data_ingest_strategy == InputDataIngestStrategy.S3_FILE_DOWNLOAD
-            if is_not_webpage_html:
+            )
+        def upload_raw_resource_to_cold_store() -> None:
+            if not is_webpage_html:
                 ingested_doc.full_resource_url = cls._upload_to_cold_store(
                     [ingested_doc.data_pointer],
                     [f"{object_prefix}{ingested_doc.data_pointer.name}"],
                     bucket_name
-                )[0]
+                )
         cls.run_screenshot_op(screenshot_resource)
-        cls.run_split_resource_op(split_resource)
+        cls.run_split_resource_op(upload_raw_resource_to_cold_store)
 
     @staticmethod
     def _get_file_type(path: Path) -> InputFormat:

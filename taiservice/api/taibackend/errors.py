@@ -6,4 +6,6 @@ class DuplicateClassResourceError(Exception):
     def __init__(self, message: str) -> None:
         """Initialize the error."""
         super().__init__(message)
-        self.message = message + "\n Either the document has the same hash as another class resource or the id already exists in the class."
+        self.message = message + "\n Either the document has the same hash as another class resource, "\
+            "the id already exists in the class, or the resource is in a transient state (e.g. processing). "\
+            "Please try again in a few minutes."
