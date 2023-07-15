@@ -27,12 +27,8 @@ project:Project = AwsCdkPythonApp(
         "requests",
         "pymongo",
         "pygit2",
-        "pinecone-client[grpc]",
-        "pydantic[dotenv]<=1.10.11",
         "fastapi<=0.98.0",
-        "mangum",
-    ],
-    dev_deps=[
+        "pydantic[dotenv]<=1.10.11",
         "aws-lambda-powertools",
         "aws-lambda-typing",
         "boto3-stubs[secretsmanager]",

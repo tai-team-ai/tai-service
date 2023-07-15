@@ -150,7 +150,7 @@ class StackConfigBaseModel(BaseModel):
         deploy_settings: AWSDeploymentSettings = values["deployment_settings"]
         if is_main or not values["duplicate_stack_for_development"]:
             if deploy_settings.deployment_type == DeploymentType.DEV:
-                values["stack_suffix"] = deploy_settings.deployment_type.value
+                values["stack_suffix"] = f"-{deploy_settings.deployment_type.value}"
             return values
         stack_suffix = f"-{branch_name[:6]}-{deploy_settings.deployment_type.value}"
         values["stack_suffix"] = stack_suffix
