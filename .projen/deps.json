@@ -1,100 +1,8 @@
 {
   "dependencies": [
     {
-      "name": "aws-lambda-powertools",
-      "type": "devenv"
-    },
-    {
-      "name": "aws-lambda-typing",
-      "type": "devenv"
-    },
-    {
-      "name": "beautifulsoup4",
-      "type": "devenv"
-    },
-    {
-      "name": "boto3-stubs[essential]",
-      "type": "devenv"
-    },
-    {
-      "name": "boto3-stubs[secretsmanager]",
-      "type": "devenv"
-    },
-    {
-      "name": "filetype",
-      "type": "devenv"
-    },
-    {
-      "name": "ipykernel",
-      "type": "devenv"
-    },
-    {
-      "name": "langchain==0.0.229",
-      "type": "devenv"
-    },
-    {
-      "name": "openai",
-      "type": "devenv"
-    },
-    {
-      "name": "pdf2image",
-      "type": "devenv"
-    },
-    {
-      "name": "pinecone-client[grpc]",
-      "type": "devenv"
-    },
-    {
-      "name": "pinecone-text",
-      "type": "devenv"
-    },
-    {
       "name": "projen",
       "version": "0.71.72",
-      "type": "devenv"
-    },
-    {
-      "name": "pymongo",
-      "type": "devenv"
-    },
-    {
-      "name": "pymupdf",
-      "type": "devenv"
-    },
-    {
-      "name": "PyPDF2",
-      "type": "devenv"
-    },
-    {
-      "name": "pytest",
-      "type": "devenv"
-    },
-    {
-      "name": "pytest-cov",
-      "type": "devenv"
-    },
-    {
-      "name": "tiktoken",
-      "type": "devenv"
-    },
-    {
-      "name": "torch -f https://download.pytorch.org/whl/cpu",
-      "type": "devenv"
-    },
-    {
-      "name": "transformers",
-      "type": "devenv"
-    },
-    {
-      "name": "unstructured",
-      "type": "devenv"
-    },
-    {
-      "name": "uvicorn",
-      "type": "devenv"
-    },
-    {
-      "name": "weasyprint==52.5",
       "type": "devenv"
     },
     {
@@ -103,7 +11,27 @@
       "type": "runtime"
     },
     {
+      "name": "aws-lambda-powertools",
+      "type": "runtime"
+    },
+    {
+      "name": "aws-lambda-typing",
+      "type": "runtime"
+    },
+    {
+      "name": "beautifulsoup4",
+      "type": "runtime"
+    },
+    {
       "name": "boto3",
+      "type": "runtime"
+    },
+    {
+      "name": "boto3-stubs[essential]",
+      "type": "runtime"
+    },
+    {
+      "name": "boto3-stubs[secretsmanager]",
       "type": "runtime"
     },
     {
@@ -116,15 +44,35 @@
       "type": "runtime"
     },
     {
+      "name": "filetype",
+      "type": "runtime"
+    },
+    {
+      "name": "ipykernel",
+      "type": "runtime"
+    },
+    {
+      "name": "langchain==0.0.229",
+      "type": "runtime"
+    },
+    {
       "name": "loguru",
       "type": "runtime"
     },
     {
-      "name": "mangum",
+      "name": "openai",
+      "type": "runtime"
+    },
+    {
+      "name": "pdf2image",
       "type": "runtime"
     },
     {
       "name": "pinecone-client[grpc]",
+      "type": "runtime"
+    },
+    {
+      "name": "pinecone-text",
       "type": "runtime"
     },
     {
@@ -144,7 +92,47 @@
       "type": "runtime"
     },
     {
+      "name": "pymupdf",
+      "type": "runtime"
+    },
+    {
+      "name": "PyPDF2",
+      "type": "runtime"
+    },
+    {
+      "name": "pytest",
+      "type": "runtime"
+    },
+    {
+      "name": "pytest-cov",
+      "type": "runtime"
+    },
+    {
       "name": "requests",
+      "type": "runtime"
+    },
+    {
+      "name": "tiktoken",
+      "type": "runtime"
+    },
+    {
+      "name": "torch -f https://download.pytorch.org/whl/cpu",
+      "type": "runtime"
+    },
+    {
+      "name": "transformers",
+      "type": "runtime"
+    },
+    {
+      "name": "unstructured",
+      "type": "runtime"
+    },
+    {
+      "name": "uvicorn",
+      "type": "runtime"
+    },
+    {
+      "name": "weasyprint==52.5",
       "type": "runtime"
     },
     {
