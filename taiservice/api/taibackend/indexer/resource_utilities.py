@@ -1,4 +1,5 @@
 """Define the module with code to screenshot class resources."""
+from time import sleep
 from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Optional, Union
@@ -133,6 +134,7 @@ class HTML(ResourceUtility):
         if isinstance(data_pointer, Path):
             data_pointer = f"file://{data_pointer.absolute()}"
         driver.get(data_pointer)
+        sleep(5)
         output_path = data_pointer.parent / f"{data_pointer.stem}.png"
         driver.get_screenshot_as_file(output_path)
         driver.close()

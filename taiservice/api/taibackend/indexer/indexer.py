@@ -257,8 +257,7 @@ class Indexer:
             vector_docs.append(doc)
         return vector_docs
 
-    @staticmethod
-    def ingest_document(document: InputDocument) -> IngestedDocument:
+    def ingest_document(self, document: InputDocument) -> IngestedDocument:
         """Ingest a document."""
         mapping: dict[InputDataIngestStrategy, Ingestor] = {
             InputDataIngestStrategy.S3_FILE_DOWNLOAD: S3ObjectIngestor,
@@ -268,4 +267,4 @@ class Indexer:
             ingestor = mapping[document.input_data_ingest_strategy]
         except KeyError as e: # pylint: disable=broad-except
             raise NotImplementedError(f"Unsupported input data ingest strategy: {document.input_data_ingest_strategy}") from e
-        return ingestor.ingest_data(document)
+        return ingestor.ingest_data(document, self._cold_store_bucket_name)

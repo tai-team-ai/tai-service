@@ -1,10 +1,11 @@
 """Define data ingestors used by the indexer."""
-from typing import Optional, Union
+from typing import Callable, Optional, Union
 from abc import ABC, abstractmethod
 from enum import Enum
 from pathlib import Path
 import traceback
 import urllib.request
+import urllib.parse
 import filetype
 from bs4 import BeautifulSoup
 import tiktoken
@@ -97,11 +98,17 @@ class Ingestor(ABC):
             input_doc=input_data,
             ingested_doc=doc,
         )
+        return doc
 
     @staticmethod
     @abstractmethod
     def _ingest_data(input_data: InputDocument) -> IngestedDocument:
         """This should be implemented for each strategy."""
+
+    @staticmethod
+    def _get_object_prefix(ingested_doc: IngestedDocument) -> str:
+        """Get the object prefix."""
+        return f"{ingested_doc.class_id}/{ingested_doc.id_as_str}/"
 
     @staticmethod
     def _screenshot_resource(doc: IngestedDocument, first_page_only: bool = True) -> list[Path]:
@@ -125,12 +132,31 @@ class Ingestor(ABC):
             urls = []
             for filepath, object_key in zip(file_paths, object_keys):
                 bucket.upload_file(str(filepath.resolve()), object_key)
-                obj = s3.Object(bucket_name, object_key)
-                urls.append(obj.meta.client.meta.endpoint_url + "/" + obj.bucket_name + "/" + obj.key)
+                urls.append(f'''https://{bucket_name}.s3.amazonaws.com/{urllib.parse.quote(object_key, safe="~()*!.'")}''')
             return urls
         except Exception as e: # pylint: disable=broad-except
             logger.critical(f"Failed to upload to s3: {e}")
             raise RuntimeError(f"Failed to upload to s3: {e}") from e
+
+    @staticmethod
+    def run_screenshot_op(func: Callable, *args, **kwargs) -> list[Path]:
+        """Run the screenshot operation."""
+        try:
+            return func(*args, **kwargs)
+        except Exception as e: # pylint: disable=broad-except
+            logger.warning(f"Failed to create screenshots: {e}")
+            logger.warning(traceback.format_exc())
+            logger.warning("Skipping screenshot upload")
+            return []
+
+    @staticmethod
+    def run_split_resource_op(func: Callable, *args, **kwargs) -> list[Path]:
+        """Run the split resource operation."""
+        try:
+            return func(*args, **kwargs)
+        except Exception as e:
+            logger.critical(traceback.format_exc())
+            raise RuntimeError(f"Failed to split resource: {e}") from e
 
     @classmethod
     def upload_chunks_to_cold_store(
@@ -138,26 +164,24 @@ class Ingestor(ABC):
         bucket_name: str,
         ingested_doc: IngestedDocument,
         chunks: list[ClassResourceChunkDocument],
-    ) -> Optional[list[HttpUrl]]:
+    ) -> None:
         """Put the ingested document to s3."""
-        try:
-            object_prefix = f"/{ingested_doc.class_id}/{ingested_doc.id_as_str}/"
-            urls = []
-            if ingested_doc.input_format == InputFormat.PDF:
-                split_resource_paths = PDF.split_resource(input_path=ingested_doc.data_pointer)
-                split_objects_keys = [f"{object_prefix}{i +  1}/{path.name}" for i, path in enumerate(split_resource_paths)]
-                screenshot_paths = cls._screenshot_resource(ingested_doc, first_page_only=False)
-                screenshot_object_keys = [f"{object_prefix}{i + 1}/{path.name}" for i, path in enumerate(screenshot_paths)]
-                split_resource_urls = cls._upload_to_cold_store(split_resource_paths, split_objects_keys, bucket_name)
-                screenshot_urls = cls._upload_to_cold_store(screenshot_paths, screenshot_object_keys, bucket_name)
-                urls = split_resource_urls + screenshot_urls
-                for chunk in chunks:
-                    chunk.raw_chunk_url = split_resource_urls[chunk.metadata.page_number - 1]
-                    chunk.preview_image_url = screenshot_urls[chunk.metadata.page_number - 1]
-            return urls
-        except Exception as e: # pylint: disable=broad-except
-            logger.critical(f"Failed to upload to s3: {e}")
-            raise RuntimeError(f"Failed to upload to s3: {e}") from e
+        object_prefix = cls._get_object_prefix(ingested_doc)
+        screenshot_urls, split_resource_urls = [], []
+        def screenshot_pdf() -> list[Path]:
+            screenshot_paths = cls._screenshot_resource(ingested_doc, first_page_only=False)
+            screenshot_object_keys = [f"{object_prefix}{i + 1}/{path.name}" for i, path in enumerate(screenshot_paths)]
+            return cls._upload_to_cold_store(screenshot_paths, screenshot_object_keys, bucket_name)
+        def split_pdf() -> list[Path]:
+            split_resource_paths = PDF.split_resource(input_path=ingested_doc.data_pointer)
+            split_objects_keys = [f"{object_prefix}{i +  1}/{path.name}" for i, path in enumerate(split_resource_paths)]
+            return cls._upload_to_cold_store(split_resource_paths, split_objects_keys, bucket_name)
+        if ingested_doc.input_format == InputFormat.PDF:
+            screenshot_urls = cls.run_screenshot_op(screenshot_pdf)
+            split_resource_urls = cls.run_screenshot_op(split_pdf)
+        for chunk in chunks:
+            chunk.raw_chunk_url = split_resource_urls[chunk.metadata.page_number - 1] if split_resource_urls else None
+            chunk.preview_image_url = screenshot_urls[chunk.metadata.page_number - 1] if screenshot_urls else None
 
     @classmethod
     def _upload_resource_to_cold_store_and_update_ingested_doc(
@@ -165,13 +189,18 @@ class Ingestor(ABC):
         bucket_name: str,
         input_doc: InputDocument,
         ingested_doc: IngestedDocument,
-    ) -> Optional[HttpUrl]:
+    ) -> None:
         """Put the ingested document to s3."""
-        try:
-            object_prefix = f"/{ingested_doc.class_id}/{ingested_doc.id_as_str}/"
+        object_prefix = cls._get_object_prefix(ingested_doc)
+        def screenshot_resource() -> None:
             screenshot_path = Ingestor._screenshot_resource(ingested_doc)[0]
             screenshot_object_key = f"{object_prefix}{screenshot_path.name}"
-            ingested_doc.preview_image_url = cls._upload_to_cold_store([screenshot_path], [screenshot_object_key], bucket_name)[0]
+            ingested_doc.preview_image_url = cls._upload_to_cold_store(
+                [screenshot_path],
+                [screenshot_object_key],
+                bucket_name
+            )[0]
+        def split_resource() -> None:
             is_not_webpage_html = ingested_doc.input_format != InputFormat.HTML \
                 or input_doc.input_data_ingest_strategy == InputDataIngestStrategy.S3_FILE_DOWNLOAD
             if is_not_webpage_html:
@@ -180,9 +209,8 @@ class Ingestor(ABC):
                     [f"{object_prefix}{ingested_doc.data_pointer.name}"],
                     bucket_name
                 )[0]
-        except Exception as e:
-            logger.critical(traceback.format_exc())
-            raise RuntimeError(f"Failed to upload to s3: {e}") from e
+        cls.run_screenshot_op(screenshot_resource)
+        cls.run_split_resource_op(split_resource)
 
     @staticmethod
     def _get_file_type(path: Path) -> InputFormat:
@@ -253,12 +281,10 @@ class URLIngestor(Ingestor):
         tmp_path.parent.mkdir(parents=True, exist_ok=True)
         urllib.request.urlretrieve(remote_file_url, tmp_path)
         file_type = cls._get_file_type(tmp_path)
-        if file_type == InputFormat.HTML:
-            tmp_path = remote_file_url
         document = IngestedDocument(
             data_pointer=tmp_path,
             input_format=file_type,
-            loading_strategy=LOADING_STRATEGY_MAPPING[cls._get_file_type(tmp_path)],
+            loading_strategy=LOADING_STRATEGY_MAPPING[file_type],
             **input_data.dict(),
         )
         return document

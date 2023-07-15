@@ -243,7 +243,7 @@ class Backend:
         input_docs = self.to_backend_input_docs(class_resources)
         doc_pairs: list[tuple[Indexer, ClassResourceDocument]] = []
         for input_doc in input_docs:
-            ingested_doc = Indexer.ingest_document(input_doc)
+            ingested_doc = self._indexer.ingest_document(input_doc)
             if self._is_duplicate_class_resource(ingested_doc):
                 raise DuplicateClassResourceError(f"Duplicate class resource: {ingested_doc.id} in class {ingested_doc.class_id}")
             doc = ClassResourceDocument.from_ingested_doc(ingested_doc)
