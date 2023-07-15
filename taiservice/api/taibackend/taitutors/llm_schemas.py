@@ -203,6 +203,22 @@ class TaiChatSession(BasePydanticModel):
                 return message
         return None
 
+    @property
+    def last_search_query_message(self) -> Optional[SearchQuery]:
+        """Return the last search query message in the chat session."""
+        for message in reversed(self.messages):
+            if isinstance(message, SearchQuery):
+                return message
+        return None
+
+    @property
+    def last_human_message(self) -> Optional[HumanMessage]:
+        """Return the last human message in the chat session."""
+        for message in reversed(self.messages):
+            if isinstance(message, HumanMessage):
+                return message
+        return None
+
     def append_chat_messages(self, new_messages: Union[list[BaseMessage], BaseMessage]) -> None:
         """Append a chat message to the chat session."""
         if isinstance(new_messages, BaseMessage):

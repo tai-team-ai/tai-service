@@ -15,6 +15,7 @@ try:
         TaiChatSession as BEChatSession,
         FunctionMessage as BEFunctionMessage,
         SystemMessage as BESystemMessage,
+        TaiProfile as BETaiProfile,
     )
     from ..runtime_settings import TaiApiSettings
     from ..routers.class_resources_schema import (
@@ -62,6 +63,7 @@ except (KeyError, ImportError):
         TaiChatSession as BEChatSession,
         FunctionMessage as BEFunctionMessage,
         SystemMessage as BESystemMessage,
+        TaiProfile as BETaiProfile,
     )
     from taibackend.databases.document_db_schemas import (
         ClassResourceDocument,
@@ -140,11 +142,15 @@ class Backend:
 
     def get_tai_response(self, chat_session: APIChatSession, stream: bool=False) -> APIChatSession:
         """Get and add the tai tutor response to the chat session."""
-        session = self.to_backend_chat_session(chat_session)
-        chunks = self.get_relevant_class_resources(session.last_chat_message.content, session.class_id)
+        chat_session:BEChatSession = self.to_backend_chat_session(chat_session)
+        chunks = self.get_relevant_class_resources(chat_session.last_chat_message.content, chat_session.class_id)
         tai_llm = self._get_tai_llm(stream)
-        tai_llm.add_tai_tutor_chat_response(session, chunks)
-        return self.to_api_chat_session(session)
+        student_msg = chat_session.last_student_message
+        prompt = BETaiProfile.get_system_prompt(name=student_msg.tai_tutor_name, technical_level=student_msg.technical_level)
+        chat_session.insert_system_prompt(prompt)
+        tai_llm.add_tai_tutor_chat_response(chat_session, chunks)
+        chat_session.remove_system_prompt()
+        return self.to_api_chat_session(chat_session)
 
     def search(self, query: ResourceSearchQuery) -> ResourceSearchAnswer:
         """Search for class resources."""
@@ -254,9 +260,12 @@ class Backend:
     def _is_duplicate_class_resource(self, doc: IngestedDocument) -> bool:
         """Check if the document can be created."""
         class_resource_docs = self._doc_db.get_class_resources_for_class(doc.class_id)
-        doc_ids = set([class_resource_doc.id for class_resource_doc in class_resource_docs])
-        doc_hashes = ([class_resource_doc.hashed_document_contents for class_resource_doc in class_resource_docs])
-        return doc.id in doc_ids or doc.hashed_document_contents in doc_hashes
+        docs = {class_resource_doc.id: class_resource_doc for class_resource_doc in class_resource_docs}
+        doc_hashes = set([class_resource_doc.hashed_document_contents for class_resource_doc in class_resource_docs])
+        # find the doc and check the status, if failed, then we can overwrite
+        if doc.id in docs and docs[doc.id].status == ClassResourceProcessingStatus.FAILED:
+            return False
+        return doc.id in docs or doc.hashed_document_contents in doc_hashes
 
     def _chunks_from_class_resource(self, class_resources: ClassResourceDocument) -> list[ClassResourceChunkDocument]:
         """Get the chunks from the class resources."""

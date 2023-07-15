@@ -92,3 +92,7 @@ class TaiApiSettings(BaseSettings):
         ...,
         description="The name of the frontend transfer bucket.",
     )
+    chrome_driver_path: str = Field(
+        default="/var/task/chromedriver",
+        description="The path to the chrome driver.",
+    )

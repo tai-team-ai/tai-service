@@ -17,15 +17,12 @@ try:
     from .llm_schemas import (
         TaiChatSession,
         TaiTutorMessage,
-        TaiTutorName,
-        StudentMessage,
         SearchQuery,
         FunctionMessage,
         AIResponseCallingFunction,
         SUMMARIZER_SYSTEM_PROMPT,
         SUMMARIZER_USER_PROMPT,
         ValidatedFormatString,
-        TaiProfile,
     )
 except (KeyError, ImportError):
     from taibackend.shared_schemas import BaseOpenAIConfig
@@ -33,15 +30,12 @@ except (KeyError, ImportError):
     from taibackend.taitutors.llm_schemas import (
         TaiChatSession,
         TaiTutorMessage,
-        TaiTutorName,
-        StudentMessage,
         SearchQuery,
         FunctionMessage,
         AIResponseCallingFunction,
         SUMMARIZER_SYSTEM_PROMPT,
         SUMMARIZER_USER_PROMPT,
         ValidatedFormatString,
-        TaiProfile,
     )
 
 
@@ -120,15 +114,11 @@ class TaiLLM:
 
     def _append_model_response(self, chat_session: TaiChatSession) -> None:
         """Get the response from the LLMs."""
-        student_msg = chat_session.last_student_message
-        prompt = TaiProfile.get_system_prompt(name=student_msg.tai_tutor_name, technical_level=student_msg.technical_level)
-        chat_session.insert_system_prompt(prompt)
         chat_message = self._chat_model(messages=chat_session.messages)
-        chat_session.remove_system_prompt()
         tutor_response = TaiTutorMessage(
             content=chat_message.content,
             render_chat=True,
-            **chat_session.last_student_message.dict(exclude={"role", "render_chat", "content"}),
+            **chat_session.last_human_message.dict(exclude={"role", "render_chat", "content"}),
         )
         chat_session.append_chat_messages([tutor_response])
 
