@@ -18,5 +18,5 @@ pinecone-text
 torch -f https://download.pytorch.org/whl/cpu
 transformers
 PyPDF2
-weasyprint==52.5
 unstructured
+selenium

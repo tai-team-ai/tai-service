@@ -388,7 +388,7 @@ class PythonLambda(BaseLambda):
             shutil.copy(config.requirements_file_path, build_context)
             runtime: _lambda.Runtime = self._function_props_dict["runtime"]
             image_obj: DockerImage = runtime.bundling_image
-            install_cmd = f"pip install -r {config.requirements_file_path.name} -t /asset-output/python"
+            install_cmd = f"pip install --no-cache-dir --upgrade pip && pip install --no-cache-dir -r {config.requirements_file_path.name} -t /asset-output/python"
             bundling_options = BundlingOptions(
                 image=image_obj,
                 command=["bash", "-c", install_cmd],
@@ -482,7 +482,7 @@ class DockerLambda(BaseLambda):
     def _create_layer_with_requirements_file(self) -> None:
         config = self._config
         shutil.copy(config.requirements_file_path, self._build_context_folder)
-        install_cmd = f"pip install --no-cache-dir pip && pip install -r {config.requirements_file_path.name}"
+        install_cmd = f"pip install --no-cache-dir --upgrade pip && pip install --no-cache-dir -r {config.requirements_file_path.name}"
         contents = [
             self._working_dir_docker_cmd,
             f"COPY {config.requirements_file_path.name} .",

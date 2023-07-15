@@ -53,8 +53,8 @@ project:Project = AwsCdkPythonApp(
         "pymupdf",
         "pdf2image",
         "PyPDF2",
-        "weasyprint==52.5",
         "unstructured",
+        "selenium",
     ],
 )
 
@@ -125,8 +125,9 @@ RUNTIME_ENV_VARS = {
     "DOC_DB_CLASS_RESOURCE_CHUNK_COLLECTION_NAME": "class_resource_chunk",
     "OPENAI_API_KEY_SECRET_NAME": "dev/tai_service/openai/api_key",
     "AWS_DEFAULT_REGION": "us-east-1",
-    "COLD_STORE_BUCKET_NAME": "tai-service-class-resource-cold-store-[branch-name]",
+    "COLD_STORE_BUCKET_NAME": "tai-service-class-resource-cold-store-dev",
     "FRONTEND_DATA_TRANSFER_BUCKET_NAME": "frontend-data-transfer-[branch-name]",
+    "NLTK_DATA": "/tmp/nltk_data",
 }
 make_file.add_rule(
     targets=["build-and-run-docker"],
@@ -143,7 +144,12 @@ make_file.add_rule(
         'curl localhost:8000/',
     ],
 )
-
+make_file.add_rule(
+    targets=["docker-clean-all-force"],
+    recipe=[
+        "docker system prune --all --force",
+    ],
+)
 vscode = VsCode(project)
 vscode_launch_config: VsCodeLaunchConfig = VsCodeLaunchConfig(vscode)
 vscode_launch_config.add_configuration(

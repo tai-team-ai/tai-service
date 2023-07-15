@@ -76,6 +76,10 @@
       "type": "runtime"
     },
     {
+      "name": "pyautogui",
+      "type": "runtime"
+    },
+    {
       "name": "pydantic[dotenv]<=1.10.11",
       "type": "runtime"
     },
@@ -96,6 +100,10 @@
       "type": "runtime"
     },
     {
+      "name": "pynput",
+      "type": "runtime"
+    },
+    {
       "name": "PyPDF2",
       "type": "runtime"
     },
@@ -108,7 +116,15 @@
       "type": "runtime"
     },
     {
+      "name": "PyVirtualDisplay",
+      "type": "runtime"
+    },
+    {
       "name": "requests",
+      "type": "runtime"
+    },
+    {
+      "name": "selenium",
       "type": "runtime"
     },
     {
@@ -129,10 +145,6 @@
     },
     {
       "name": "uvicorn",
-      "type": "runtime"
-    },
-    {
-      "name": "weasyprint==52.5",
       "type": "runtime"
     },
     {

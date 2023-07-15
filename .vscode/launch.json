@@ -24,8 +24,9 @@
         "DOC_DB_CLASS_RESOURCE_CHUNK_COLLECTION_NAME": "class_resource_chunk",
         "OPENAI_API_KEY_SECRET_NAME": "dev/tai_service/openai/api_key",
         "AWS_DEFAULT_REGION": "us-east-1",
-        "COLD_STORE_BUCKET_NAME": "tai-service-class-resource-cold-store-[branch-name]",
-        "FRONTEND_DATA_TRANSFER_BUCKET_NAME": "frontend-data-transfer-[branch-name]"
+        "COLD_STORE_BUCKET_NAME": "tai-service-class-resource-cold-store-dev",
+        "FRONTEND_DATA_TRANSFER_BUCKET_NAME": "frontend-data-transfer-[branch-name]",
+        "NLTK_DATA": "/tmp/nltk_data"
       },
       "program": "${workspaceFolder}/.venv/bin/uvicorn"
     }

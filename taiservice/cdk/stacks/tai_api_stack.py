@@ -65,14 +65,14 @@ class TaiApiStack(Stack):
         self._settings = api_settings
         self._vpc = get_vpc(self, vpc)
         self._removal_policy = config.removal_policy
-        api_settings.cold_store_bucket_name = (api_settings.cold_store_bucket_name + config.stack_suffix)[:50]
+        api_settings.cold_store_bucket_name = (api_settings.cold_store_bucket_name + config.stack_suffix)[:63]
         self._cold_store_bucket: VersionedBucket = self._create_bucket(
             name=api_settings.cold_store_bucket_name,
             public_read_access=True,
         )
         self._python_lambda: DockerLambda = self._create_lambda_function(security_group_allowing_db_connections)
         self._cold_store_bucket.grant_write_access(self._python_lambda.role)
-        api_settings.frontend_data_transfer_bucket_name = (api_settings.frontend_data_transfer_bucket_name + config.stack_suffix)[:50]
+        api_settings.frontend_data_transfer_bucket_name = (api_settings.frontend_data_transfer_bucket_name + config.stack_suffix)[:63]
         self._frontend_transfer_bucket: VersionedBucket = self._create_bucket(
             name=api_settings.frontend_data_transfer_bucket_name,
             public_read_access=True,
@@ -166,15 +166,19 @@ class TaiApiStack(Stack):
             ),
             run_as_webserver=True,
             custom_docker_commands=[
-                "RUN mkdir -p /var/task/nltk_data",  # Create directory for model
+                f"RUN mkdir -p {self._settings.nltk_data}",  # Create directory for model
                 # punkt and and stopwords are used for pinecone SPLADE
                 # averaged_perceptron_tagger is used for langchain for HTML parsing
                 # the path is specified as lambda does NOT have access to the default path
                 f"RUN python -m nltk.downloader -d {self._settings.nltk_data} punkt stopwords averaged_perceptron_tagger",  # Download the model and save it to the directory
                 # poppler-utils is used for the python pdf to image package
-                # The others are used by weasy to grab images of html pages
-                # TODO: Replace with selenium to get images of html pages
-                "RUN apt-get update && apt-get install -y poppler-utils build-essential python3-dev python3-pip python3-setuptools python3-wheel python3-cffi libcairo2 libpango-1.0-0 libpangocairo-1.0-0 libgdk-pixbuf2.0-0 libffi-dev shared-mime-info",  # Install poppler-utils for pdf python packages
+                "RUN apt-get update && apt-get install -y poppler-utils wget unzip",
+                # install chrome driver for selenium use
+                f"RUN wget -O {self._settings.chrome_driver_path}.zip https://chromedriver.storage.googleapis.com/90.0.4430.24/chromedriver_linux64.zip",
+                # unzip to the self._settings.chrome_driver_path directory
+                f"RUN unzip {self._settings.chrome_driver_path}.zip -d {self._settings.chrome_driver_path}",
+                # install extra dependencies for chrome driver
+                "RUN apt-get install -y libglib2.0-0 libnss3 libgconf-2-4 libfontconfig1 chromium",
             ]
         )
         return lambda_config
