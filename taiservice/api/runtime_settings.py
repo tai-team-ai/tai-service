@@ -78,7 +78,7 @@ class TaiApiSettings(BaseSettings):
         description="The name of the model to use for the llm tutor.",
     )
     nltk_data: str = Field(
-        default="/tmp/nltk_data",
+        default="/var/task/nltk_data",
         description="The path to the nltk data.",
     )
     transformers_cache: str = Field(
