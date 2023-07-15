@@ -124,6 +124,7 @@ class TaiLLM:
         prompt = TaiProfile.get_system_prompt(name=student_msg.tai_tutor_name, technical_level=student_msg.technical_level)
         chat_session.insert_system_prompt(prompt)
         chat_message = self._chat_model(messages=chat_session.messages)
+        chat_session.remove_system_prompt()
         tutor_response = TaiTutorMessage(
             content=chat_message.content,
             render_chat=True,

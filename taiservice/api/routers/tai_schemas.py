@@ -18,13 +18,13 @@ except (ImportError, KeyError):
 class TaiTutorName(str, Enum):
     """Define the supported TAI tutors."""
 
-    MILO = "milo"
-    DECLAN = "declan"
-    FINN = "finn"
-    ADA = "ada"
-    REMY = "remy"
-    KAI = "kai"
-    VIOLET = "violet"
+    MILO = "Milo"
+    DECLAN = "Declan"
+    FINN = "Finn"
+    ADA = "Ada"
+    REMY = "Remy"
+    KAI = "Kai"
+    VIOLET = "Violet"
 
 
 class ChatRole(str, Enum):

@@ -218,6 +218,11 @@ class TaiChatSession(BasePydanticModel):
         else:
             self.messages.insert(0, SystemMessage(content=prompt))
 
+    def remove_system_prompt(self) -> None:
+        """Remove the system prompt from the beginning of the chat session."""
+        if self.messages and isinstance(self.messages[0], SystemMessage):
+            self.messages.pop(0)
+
     @staticmethod
     def from_message(message: BaseMessage, class_id: UUID) -> "TaiChatSession":
         """Create a new chat session from a message."""

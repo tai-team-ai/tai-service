@@ -1,7 +1,7 @@
 """Define the class resources backend."""
 import json
 from uuid import UUID, uuid4
-from typing import Union, Any
+from typing import Union, Any, Optional
 from loguru import logger
 import boto3
 from botocore.exceptions import ClientError
@@ -14,6 +14,7 @@ try:
         BaseMessage as BEBaseMessage,
         TaiChatSession as BEChatSession,
         FunctionMessage as BEFunctionMessage,
+        SystemMessage as BESystemMessage,
     )
     from ..runtime_settings import TaiApiSettings
     from ..routers.class_resources_schema import (
@@ -60,6 +61,7 @@ except (KeyError, ImportError):
         BaseMessage as BEBaseMessage,
         TaiChatSession as BEChatSession,
         FunctionMessage as BEFunctionMessage,
+        SystemMessage as BESystemMessage,
     )
     from taibackend.databases.document_db_schemas import (
         ClassResourceDocument,
@@ -412,7 +414,9 @@ class Backend:
         """Convert the database chat session to an API chat session."""
         converted_chats = []
         for chat in chat_session.messages:
-            converted_chats.append(cls.to_api_chat_message(chat))
+            chat = cls.to_api_chat_message(chat)
+            if chat:
+                converted_chats.append(chat)
         chat_session = APIChatSession(
             id=chat_session.id,
             class_id=chat_session.class_id,
@@ -421,7 +425,7 @@ class Backend:
         return chat_session
 
     @classmethod
-    def to_api_chat_message(cls, chat_message: BEBaseMessage) -> APIChat:
+    def to_api_chat_message(cls, chat_message: BEBaseMessage) -> Optional[APIChat]:
         """Convert the database chat message to an API chat message."""
         msg = APIChat(
             message=chat_message.content,
@@ -451,5 +455,7 @@ class Backend:
                 render_chat=chat_message.render_chat,
                 **msg.dict(exclude={"render_chat"}),
             )
+        elif isinstance(chat_message, BESystemMessage):
+            return
         else:
             raise RuntimeError(f"Unknown chat message type: {chat_message}")
