@@ -1,4 +1,4 @@
 pinecone-client[grpc]
-pydantic
+pydantic<=1.10.11
 loguru
 urllib3<2
