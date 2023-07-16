@@ -74,7 +74,7 @@ class TaiApiSettings(BaseSettings):
         description="The batch size for OpenAI requests.",
     )
     model_name: ModelName = Field(
-        default=ModelName.GPT_TURBO,
+        default=ModelName.GPT_TURBO_LARGE_CONTEXT,
         description="The name of the model to use for the llm tutor.",
     )
     nltk_data: str = Field(
