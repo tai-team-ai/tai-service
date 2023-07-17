@@ -180,7 +180,7 @@ class Ingestor(ABC):
             return cls._upload_to_cold_store(split_resource_paths, split_objects_keys, bucket_name)
         if ingested_doc.input_format == InputFormat.PDF:
             screenshot_urls = cls.run_screenshot_op(screenshot_pdf)
-            split_resource_urls = cls.run_screenshot_op(split_pdf)
+            split_resource_urls = cls.run_split_resource_op(split_pdf)
         for chunk in chunks:
             chunk.raw_chunk_url = split_resource_urls[chunk.metadata.page_number - 1] if split_resource_urls else None
             chunk.preview_image_url = screenshot_urls[chunk.metadata.page_number - 1] if screenshot_urls else None
@@ -195,7 +195,7 @@ class Ingestor(ABC):
         """Put the ingested document to s3."""
         object_prefix = cls._get_object_prefix(ingested_doc)
         is_webpage_html = ingested_doc.input_format == InputFormat.HTML \
-            or input_doc.input_data_ingest_strategy == InputDataIngestStrategy.URL_DOWNLOAD
+            and input_doc.input_data_ingest_strategy == InputDataIngestStrategy.URL_DOWNLOAD
         def screenshot_resource() -> None:
             if is_webpage_html:
                 data_pointer = input_doc.full_resource_url

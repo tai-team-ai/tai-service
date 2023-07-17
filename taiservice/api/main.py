@@ -1,6 +1,9 @@
 """Define the main entry point for the tai service API."""
+from http.client import HTTPException
+import traceback
 from fastapi import APIRouter, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from loguru import logger
 
 
@@ -56,6 +59,13 @@ def create_app() -> FastAPI:
         logger.info(f"Request: {request}")
         response = await call_next(request)
         return response
+
+    async def error_handler(_, exc):
+        logger.error(f"Error occurred: {exc}")
+        logger.critical(traceback.format_exc())
+        return JSONResponse(status_code=500, content={"message": "Internal Server Error"})
+
+    app.exception_handler(HTTPException)(error_handler)
 
     for router in ROUTERS:
         app.include_router(router)

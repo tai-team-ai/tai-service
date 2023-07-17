@@ -72,7 +72,7 @@ class PDF(ResourceUtility):
         last_page_to_include: Optional[int] = None
     ) -> Optional[list[Path]]:
         """Create screenshots for all pages in the resource."""
-        assert isinstance(data_pointer, Path)
+        assert isinstance(data_pointer, Path), f"Data pointer must be a path, not {type(data_pointer)}"
         return cls._get_screenshot_from_pdf(data_pointer, start_page, last_page_to_include)
 
     @classmethod
