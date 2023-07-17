@@ -283,7 +283,7 @@ class URLIngestor(Ingestor):
         path = remote_file_url.path
         if path[-1] == "/":
             path = path[:-1]
-        tmp_path = Path(f"/var/tmp/{path}")
+        tmp_path = Path(f"/tmp/{path}")
         tmp_path.parent.mkdir(parents=True, exist_ok=True)
         urllib.request.urlretrieve(remote_file_url, tmp_path)
         file_type = cls._get_file_type(tmp_path)
