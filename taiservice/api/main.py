@@ -1,7 +1,7 @@
 """Define the main entry point for the tai service API."""
 from http.client import HTTPException
 import traceback
-from fastapi import APIRouter, FastAPI
+from fastapi import APIRouter, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from loguru import logger
@@ -45,6 +45,7 @@ def create_app() -> FastAPI:
     setattr(app.state, BACKEND_ATTRIBUTE_NAME, backend)
     # add exception handlers
     # configure CORS
+    # TODO make this environment specific for dev and prod (also use the same values in the stack config for the api)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=["*"],
@@ -54,10 +55,14 @@ def create_app() -> FastAPI:
     )
     # add a logger to the middleware to log all requests
     @app.middleware("http")
-    async def log_requests(request, call_next):
-        """Log all requests."""
+    async def middleware(request: Request, call_next):
         logger.info(f"Request: {request}")
         response = await call_next(request)
+
+        # Check and remove 'access-control-allow-origin' if exists to avoid conflict with AWS adding it's own
+        if "access-control-allow-origin" in response.headers:
+            del response.headers["access-control-allow-origin"]
+
         return response
 
     async def error_handler(_, exc):

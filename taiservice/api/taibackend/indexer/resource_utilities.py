@@ -37,7 +37,7 @@ class ResourceUtility(ABC):
         for i in range(last_page_to_include):
             pdf_writer = PdfWriter()
             pdf_writer.add_page(input_pdf.pages[i])
-            output_filename = f"{path.stem}_page_{i}.pdf"
+            output_filename = f"{str(path.resolve())}_page_{i}.pdf"
             with open(output_filename, "wb") as out:
                 pdf_writer.write(out)
             pages.append(Path(output_filename))
