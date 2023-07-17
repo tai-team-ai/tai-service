@@ -265,7 +265,9 @@ class Backend:
         """Check if the class resource is stuck uploading."""
         class_resource_docs = self._doc_db.get_class_resources_for_class(doc.class_id)
         docs = {class_resource_doc.id: class_resource_doc for class_resource_doc in class_resource_docs}
-        class_resource = docs[doc.id]
+        class_resource = docs.get(doc.id)
+        if not class_resource:
+            return False
         stable = class_resource.status == ClassResourceProcessingStatus.COMPLETED \
             or class_resource.status == ClassResourceProcessingStatus.FAILED
         if not stable:
