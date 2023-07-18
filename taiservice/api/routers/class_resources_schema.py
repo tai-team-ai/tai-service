@@ -36,7 +36,7 @@ class Metadata(BasePydanticModel):
         description="The title of the class resource. This can be the file name or url if no title is provided.",
     )
     description: Optional[str] = Field(
-        default=None,
+        ...,
         description="The description of the class resource.",
     )
     tags: list = Field(
@@ -74,7 +74,7 @@ class BaseClassResource(BasePydanticModel):
         description="The URL of the preview image of the class resource.",
     )
     metadata: Metadata = Field(
-        default_factory=Metadata,
+        ...,
         description="The metadata of the class resource.",
     )
 

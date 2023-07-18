@@ -4,7 +4,7 @@ from uuid import UUID
 from uuid import uuid4
 from enum import Enum
 from typing import Any, Optional
-from pydantic import BaseModel, Field, Extra, HttpUrl, validator, constr
+from pydantic import BaseModel, Field, Extra, HttpUrl, constr
 
 
 HASH_FIELD_OBJECT = Field(
