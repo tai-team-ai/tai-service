@@ -189,15 +189,18 @@ class Backend:
         chunk_docs = self._doc_db.get_class_resources(uuids, ClassResourceChunkDocument)
         return [doc for doc in chunk_docs if isinstance(doc, ClassResourceChunkDocument)]
 
-    def get_class_resources(self, ids: list[UUID]) -> list[ClassResource]:
+    def get_class_resources(self, ids: list[UUID], from_class_ids: bool=False) -> list[ClassResource]:
         """Get the class resources."""
-        docs = self._doc_db.get_class_resources(ids, ClassResourceDocument)
+        docs = self._doc_db.get_class_resources(ids, ClassResourceDocument, from_class_ids=from_class_ids)
+        for doc in docs:
+            if self._is_stuck_processing(doc.id):
+                self._coerce_and_update_status(doc, ClassResourceProcessingStatus.FAILED)
         return self.to_api_resources(docs)
 
     def delete_class_resources(self, ids: list[UUID]) -> None:
         """Delete the class resources."""
         try:
-            docs = self._doc_db.get_class_resources(ids)
+            docs = self._doc_db.get_class_resources(ids, ClassResourceDocument)
             for doc in docs:
                 if isinstance(doc, ClassResourceDocument) or isinstance(doc, ClassResourceChunkDocument):
                     if isinstance(doc, ClassResourceDocument):
@@ -261,25 +264,24 @@ class Backend:
                 logger.critical(f"Failed to create class resources: {e}")
                 self._coerce_and_update_status(class_resource, ClassResourceProcessingStatus.FAILED)
 
-    def _is_stuck_processing(self, doc: IngestedDocument) -> bool:
+    def _is_stuck_processing(self, doc_id: UUID) -> bool:
         """Check if the class resource is stuck uploading."""
-        class_resource_docs = self._doc_db.get_class_resources_for_class(doc.class_id)
-        docs = {class_resource_doc.id: class_resource_doc for class_resource_doc in class_resource_docs}
-        class_resource = docs.get(doc.id)
-        if not class_resource:
+        class_resource_doc = self._doc_db.get_class_resources(doc_id, ClassResourceDocument)
+        assert isinstance(class_resource_doc, ClassResourceDocument), "Class resource document not found"
+        if not class_resource_doc:
             return False
-        stable = class_resource.status == ClassResourceProcessingStatus.COMPLETED \
-            or class_resource.status == ClassResourceProcessingStatus.FAILED
+        stable = class_resource_doc.status == ClassResourceProcessingStatus.COMPLETED \
+            or class_resource_doc.status == ClassResourceProcessingStatus.FAILED
         if not stable:
-            elapsed_time = (datetime.now() - class_resource.modified_timestamp).total_seconds()
+            elapsed_time = (datetime.now() - class_resource_doc.modified_timestamp).total_seconds()
             if elapsed_time > self._runtime_settings.class_resource_processing_timeout:
                 return True
         return False
 
     def _is_duplicate_class_resource(self, doc: IngestedDocument) -> bool:
         """Check if the document can be created."""
-        class_resource_docs = self._doc_db.get_class_resources_for_class(doc.class_id)
-        docs = {class_resource_doc.id: class_resource_doc for class_resource_doc in class_resource_docs}
+        class_resource_docs = self._doc_db.get_class_resources(doc.class_id, ClassResourceDocument, from_class_ids=True)
+        docs = {doc.id: doc for doc in class_resource_docs}
         doc_hashes = set([class_resource_doc.hashed_document_contents for class_resource_doc in class_resource_docs])
         # find the doc and check the status, if failed, then we can overwrite
         if doc.id in docs and docs[doc.id].status == ClassResourceProcessingStatus.FAILED:
