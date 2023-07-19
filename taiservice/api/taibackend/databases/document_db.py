@@ -91,12 +91,16 @@ class DocumentDB:
 
     def get_class_resources(self, ids: Union[list[UUID], UUID], DocClass: BaseClassResourceDocument, from_class_ids: bool=False) -> list[BaseClassResourceDocument]:
         """Return the full class resources."""
-        ids = [ids] if isinstance(ids, UUID) else ids
+        input_was_list = isinstance(ids, list)
+        ids = ids if input_was_list else [ids]
         collection = self._document_type_to_collection[DocClass.__name__]
         ids = [str(id) for id in ids]
         field_name = "class_id" if from_class_ids else "_id"
         documents = list(collection.find({field_name: {"$in": ids}}))
-        return [DocClass.parse_obj(document) for document in documents]
+        documents = [DocClass.parse_obj(document) for document in documents]
+        if input_was_list:
+            return documents
+        return documents[0]
 
     def upsert_class_resources(
         self,

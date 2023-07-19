@@ -192,6 +192,9 @@ class Backend:
     def get_class_resources(self, ids: list[UUID], from_class_ids: bool=False) -> list[ClassResource]:
         """Get the class resources."""
         docs = self._doc_db.get_class_resources(ids, ClassResourceDocument, from_class_ids=from_class_ids)
+        for doc in docs:
+            if self._is_stuck_processing(doc.id):
+                self._coerce_and_update_status(doc, ClassResourceProcessingStatus.FAILED)
         return self.to_api_resources(docs)
 
     def delete_class_resources(self, ids: list[UUID]) -> None:
