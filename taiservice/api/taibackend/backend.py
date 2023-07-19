@@ -144,7 +144,7 @@ class Backend:
 
     def get_tai_response(self, chat_session: APIChatSession, stream: bool=False) -> APIChatSession:
         """Get and add the tai tutor response to the chat session."""
-        chat_session:BEChatSession = self.to_backend_chat_session(chat_session)
+        chat_session: BEChatSession = self.to_backend_chat_session(chat_session)
         chunks = self.get_relevant_class_resources(chat_session.last_chat_message.content, chat_session.class_id)
         tai_llm = self._get_tai_llm(stream)
         student_msg = chat_session.last_student_message
@@ -152,6 +152,7 @@ class Backend:
         chat_session.insert_system_prompt(prompt)
         tai_llm.add_tai_tutor_chat_response(chat_session, chunks)
         chat_session.remove_system_prompt()
+        logger.info(chat_session.dict())
         return self.to_api_chat_session(chat_session)
 
     def search(self, query: ResourceSearchQuery) -> ResourceSearchAnswer:
@@ -266,13 +267,14 @@ class Backend:
 
     def _is_stuck_processing(self, doc_id: UUID) -> bool:
         """Check if the class resource is stuck uploading."""
-        class_resource_doc: ClassResourceDocument = self._doc_db.get_class_resources(doc_id, ClassResourceDocument)
-        if not class_resource_doc:
+        class_resource_docs: list[ClassResourceDocument] = self._doc_db.get_class_resources(doc_id, ClassResourceDocument)
+        doc = class_resource_docs[0] if class_resource_docs else None
+        if not doc:
             return False
-        stable = class_resource_doc.status == ClassResourceProcessingStatus.COMPLETED \
-            or class_resource_doc.status == ClassResourceProcessingStatus.FAILED
+        stable = doc.status == ClassResourceProcessingStatus.COMPLETED \
+            or doc.status == ClassResourceProcessingStatus.FAILED
         if not stable:
-            elapsed_time = (datetime.now() - class_resource_doc.modified_timestamp).total_seconds()
+            elapsed_time = (datetime.now() - doc.modified_timestamp).total_seconds()
             if elapsed_time > self._runtime_settings.class_resource_processing_timeout:
                 return True
         return False

@@ -89,18 +89,18 @@ class DocumentDB:
         """Return the supported document models."""
         return self._doc_models
 
-    def get_class_resources(self, ids: Union[list[UUID], UUID], DocClass: BaseClassResourceDocument, from_class_ids: bool=False) -> list[BaseClassResourceDocument]:
+    def get_class_resources(self,
+        ids: Union[list[UUID], UUID],
+        DocClass: BaseClassResourceDocument,
+        from_class_ids: bool=False,
+    ) -> list[BaseClassResourceDocument]:
         """Return the full class resources."""
-        input_was_list = isinstance(ids, list)
-        ids = ids if input_was_list else [ids]
+        ids = [ids] if isinstance(ids, UUID) else ids
         collection = self._document_type_to_collection[DocClass.__name__]
         ids = [str(id) for id in ids]
         field_name = "class_id" if from_class_ids else "_id"
         documents = list(collection.find({field_name: {"$in": ids}}))
-        documents = [DocClass.parse_obj(document) for document in documents]
-        if input_was_list:
-            return documents
-        return documents[0] if documents else []
+        return [DocClass.parse_obj(document) for document in documents]
 
     def upsert_class_resources(
         self,

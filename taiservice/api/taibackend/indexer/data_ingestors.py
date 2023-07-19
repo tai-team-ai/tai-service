@@ -182,8 +182,8 @@ class Ingestor(ABC):
             screenshot_urls = cls.run_screenshot_op(screenshot_pdf)
             split_resource_urls = cls.run_split_resource_op(split_pdf)
         for chunk in chunks:
-            chunk.raw_chunk_url = split_resource_urls[chunk.metadata.page_number - 1] if split_resource_urls else None
-            chunk.preview_image_url = screenshot_urls[chunk.metadata.page_number - 1] if screenshot_urls else None
+            chunk.raw_chunk_url = split_resource_urls[chunk.metadata.page_number] if split_resource_urls else None
+            chunk.preview_image_url = screenshot_urls[chunk.metadata.page_number] if screenshot_urls else None
 
     @classmethod
     def _upload_resource_to_cold_store_and_update_ingested_doc(

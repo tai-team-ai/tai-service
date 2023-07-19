@@ -95,7 +95,7 @@ class TaiLLM:
             )
             llm_kwargs = chain.llm_kwargs
             llm_kwargs['function_call'] = "none"
-        self._append_model_response(chat_session)
+        self._append_model_response(chat_session, chunks=relevant_chunks)
 
     def create_search_result_summary_snippet(self, search_query: str, chunks: list[ClassResourceChunkDocument]) -> str:
         """Create a snippet of the search result summary."""
@@ -112,12 +112,13 @@ class TaiLLM:
         self.add_tai_tutor_chat_response(session)
         return session.last_chat_message.content
 
-    def _append_model_response(self, chat_session: TaiChatSession) -> None:
+    def _append_model_response(self, chat_session: TaiChatSession, chunks: list[ClassResourceChunkDocument] = None) -> None:
         """Get the response from the LLMs."""
         chat_message = self._chat_model(messages=chat_session.messages)
         tutor_response = TaiTutorMessage(
             content=chat_message.content,
             render_chat=True,
+            class_resource_chunks=chunks if chunks else [],
             **chat_session.last_human_message.dict(exclude={"role", "render_chat", "content"}),
         )
         chat_session.append_chat_messages([tutor_response])
