@@ -1,6 +1,6 @@
 """Define the pinecone database."""
 import traceback
-from typing import Any, Callable, Optional
+from typing import Any, Callable, Optional, Union
 from uuid import UUID
 from pydantic import BaseModel, Field, ValidationError
 from pymongo import MongoClient
@@ -89,19 +89,14 @@ class DocumentDB:
         """Return the supported document models."""
         return self._doc_models
 
-    def get_class_resources(self, ids: list[UUID], DocClass: BaseClassResourceDocument, from_class_ids: bool=False) -> list[BaseClassResourceDocument]:
+    def get_class_resources(self, ids: Union[list[UUID], UUID], DocClass: BaseClassResourceDocument, from_class_ids: bool=False) -> list[BaseClassResourceDocument]:
         """Return the full class resources."""
+        ids = [ids] if isinstance(ids, UUID) else ids
         collection = self._document_type_to_collection[DocClass.__name__]
         ids = [str(id) for id in ids]
         field_name = "class_id" if from_class_ids else "_id"
         documents = list(collection.find({field_name: {"$in": ids}}))
         return [DocClass.parse_obj(document) for document in documents]
-
-    def get_class_resources_for_class(self, class_id: UUID) -> list[ClassResourceDocument]:
-        """Return the full class resources for a class."""
-        col = self._document_type_to_collection[ClassResourceDocument.__name__]
-        docs = list(col.find({"class_id": str(class_id)}))
-        return [ClassResourceDocument.parse_obj(doc) for doc in docs]
 
     def upsert_class_resources(
         self,
