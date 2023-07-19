@@ -104,7 +104,7 @@ class PineconeDB:
         )
         docs = PineconeDocuments(class_id=document.metadata.class_id, documents=[])
         matches = results.to_dict()['matches']
-        threshold = 0.65 * alpha + 11 * (1 - alpha)
+        threshold = 0.65 * alpha + 10 * (1 - alpha)
         for result in matches:
             doc = PineconeDocument(**result)
             if doc.score > threshold:

@@ -2,12 +2,11 @@
 import os
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-from typing import Literal, Optional
+from typing import Optional
 from uuid import UUID, uuid4
 import traceback
-import boto3
 from loguru import logger
-from pydantic import BaseModel, Field, HttpUrl
+from pydantic import BaseModel, Field
 from langchain.embeddings import OpenAIEmbeddings
 from langchain import document_loaders
 from langchain.document_loaders.base import BaseLoader
@@ -130,16 +129,26 @@ class Indexer:
         """Index a document."""
         try:
             self._s3_prefix = f"{ingested_document.class_id}/{ingested_document.id}/"
+            logger.info(f"Loading and splitting document: {ingested_document.id}")
             chunk_documents = self._load_and_split_document(ingested_document)
+            logger.info(f"Finished loading and splitting document: {ingested_document.id}")
             class_resource_document.class_resource_chunk_ids = [chunk_doc.id for chunk_doc in chunk_documents]
+            logger.info(f"Uploading chunks to cold store: {ingested_document.id}")
             Ingestor.upload_chunks_to_cold_store(
                 bucket_name=self._cold_store_bucket_name,
                 ingested_doc=ingested_document,
                 chunks=chunk_documents,
             )
+            logger.info(f"Finished uploading chunks to cold store: {ingested_document.id}")
+            logger.info(f"Embedding chunks: {ingested_document.id}")
             vector_documents = self.embed_documents(chunk_documents, class_resource_document.class_id)
+            logger.info(f"Finished embedding chunks: {ingested_document.id}")
+            logger.info(f"Loading chunks to db: {ingested_document.id}")
             self._load_class_resources_to_db(class_resource_document, chunk_documents)
+            logger.info(f"Finished loading chunks to db: {ingested_document.id}")
+            logger.info(f"Loading vectors to vector store: {ingested_document.id}")
             self._load_vectors_to_vector_store(vector_documents)
+            logger.info(f"Finished loading vectors to vector store: {ingested_document.id}")
         except Exception as e:
             logger.error(traceback.format_exc())
             raise RuntimeError("Failed to index resource.") from e

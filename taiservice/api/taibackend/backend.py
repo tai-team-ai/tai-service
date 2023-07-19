@@ -266,8 +266,7 @@ class Backend:
 
     def _is_stuck_processing(self, doc_id: UUID) -> bool:
         """Check if the class resource is stuck uploading."""
-        class_resource_doc = self._doc_db.get_class_resources(doc_id, ClassResourceDocument)
-        assert isinstance(class_resource_doc, ClassResourceDocument), "Class resource document not found"
+        class_resource_doc: ClassResourceDocument = self._doc_db.get_class_resources(doc_id, ClassResourceDocument)
         if not class_resource_doc:
             return False
         stable = class_resource_doc.status == ClassResourceProcessingStatus.COMPLETED \

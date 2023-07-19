@@ -100,7 +100,7 @@ class DocumentDB:
         documents = [DocClass.parse_obj(document) for document in documents]
         if input_was_list:
             return documents
-        return documents[0]
+        return documents[0] if documents else []
 
     def upsert_class_resources(
         self,
