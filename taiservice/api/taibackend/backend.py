@@ -189,9 +189,9 @@ class Backend:
         chunk_docs = self._doc_db.get_class_resources(uuids, ClassResourceChunkDocument)
         return [doc for doc in chunk_docs if isinstance(doc, ClassResourceChunkDocument)]
 
-    def get_class_resources(self, ids: list[UUID]) -> list[ClassResource]:
+    def get_class_resources(self, ids: list[UUID], from_class_ids: bool=False) -> list[ClassResource]:
         """Get the class resources."""
-        docs = self._doc_db.get_class_resources(ids, ClassResourceDocument)
+        docs = self._doc_db.get_class_resources(ids, ClassResourceDocument, from_class_ids=from_class_ids)
         return self.to_api_resources(docs)
 
     def delete_class_resources(self, ids: list[UUID]) -> None:

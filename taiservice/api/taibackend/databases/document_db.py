@@ -89,11 +89,12 @@ class DocumentDB:
         """Return the supported document models."""
         return self._doc_models
 
-    def get_class_resources(self, ids: list[UUID], DocClass: BaseClassResourceDocument) -> list[BaseClassResourceDocument]:
+    def get_class_resources(self, ids: list[UUID], DocClass: BaseClassResourceDocument, from_class_ids: bool=False) -> list[BaseClassResourceDocument]:
         """Return the full class resources."""
         collection = self._document_type_to_collection[DocClass.__name__]
         ids = [str(id) for id in ids]
-        documents = list(collection.find({"_id": {"$in": ids}}))
+        field_name = "class_id" if from_class_ids else "_id"
+        documents = list(collection.find({field_name: {"$in": ids}}))
         return [DocClass.parse_obj(document) for document in documents]
 
     def get_class_resources_for_class(self, class_id: UUID) -> list[ClassResourceDocument]:
