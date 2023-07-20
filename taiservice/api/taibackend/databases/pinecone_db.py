@@ -5,6 +5,7 @@ from enum import Enum
 import os
 from typing import List
 from uuid import UUID
+from loguru import logger
 from pydantic import BaseModel, Field
 import pinecone
 from pinecone_text.hybrid import hybrid_convex_scale
@@ -105,8 +106,10 @@ class PineconeDB:
         docs = PineconeDocuments(class_id=document.metadata.class_id, documents=[])
         matches = results.to_dict()['matches']
         threshold = 0.65 * alpha + 10 * (1 - alpha)
+        logger.info(f"Found {len(matches)} matches")
         for result in matches:
             doc = PineconeDocument(**result)
+            logger.info(f"Score: {doc.score}")
             if doc.score > threshold:
                 docs.documents.append(doc)
         # sort the documents by score

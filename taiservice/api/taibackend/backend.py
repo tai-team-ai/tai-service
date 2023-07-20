@@ -172,6 +172,7 @@ class Backend:
 
     def get_relevant_class_resources(self, query: str, class_id: UUID) -> list[ClassResourceChunkDocument]:
         """Get the most relevant class resources."""
+        logger.info(f"Getting relevant class resources for query: {query}")
         chunk_doc = ClassResourceChunkDocument(
             class_id=class_id,
             chunk=query,
@@ -188,6 +189,7 @@ class Backend:
         similar_docs = self._pinecone_db.get_similar_documents(document=pinecone_docs.documents[0], alpha=0.7)
         uuids = [doc.metadata.chunk_id for doc in similar_docs.documents]
         chunk_docs = self._doc_db.get_class_resources(uuids, ClassResourceChunkDocument)
+        logger.info(f"Got similar docs: {chunk_docs}")
         return [doc for doc in chunk_docs if isinstance(doc, ClassResourceChunkDocument)]
 
     def get_class_resources(self, ids: list[UUID], from_class_ids: bool=False) -> list[ClassResource]:
@@ -366,7 +368,11 @@ class Backend:
                     class_id=doc.class_id,
                     **base_doc.metadata.dict(),
                 )
-                output_doc = ClassResourceChunkDocument(chunk=doc.resource_snippet, **base_doc.dict())
+                output_doc = ClassResourceChunkDocument(
+                    chunk=doc.resource_snippet,
+                    raw_chunk_url=doc.raw_snippet_url,
+                    **base_doc.dict()
+                )
             else:
                 raise RuntimeError(f"Unknown document type: {doc}")
             output_documents.append(output_doc)

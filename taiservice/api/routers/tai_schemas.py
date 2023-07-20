@@ -219,7 +219,7 @@ EXAMPLE_CHAT_SESSION_RESPONSE["chats"].append(
 
 class ChatSessionRequest(BaseChatSession):
     """Define the request model for the chat endpoint."""
-    chats: list[Union[StudentChat, TaiTutorChat]] = Field(
+    chats: list[Union[StudentChat, TaiTutorChat, FunctionChat]] = Field(
         ...,
         description="The chat session message history.",
     )
