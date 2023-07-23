@@ -1,56 +1,54 @@
 """Define schemas for common resources."""
+import copy
 from uuid import UUID
 from datetime import date
-from pydantic import Field
+from pydantic import Field, conint
 # first imports are for local development, second imports are for deployment
 try:
-    from .base_schema import BasePydanticModel
+    from .base_schema import BasePydanticModel, EXAMPLE_UUID
+    from .tai_schemas import ClassResourceSnippet, EXAMPLE_CLASS_RESOURCE_SNIPPET
 except ImportError:
-    from routers.base_schema import BasePydanticModel
+    from routers.base_schema import BasePydanticModel, EXAMPLE_UUID
+    from routers.tai_schemas import ClassResourceSnippet, EXAMPLE_CLASS_RESOURCE_SNIPPET
 
 
-# Common Questions
-{
-    "classId": "550e8400-e29b-41d4-a716-446655440000",
+EXAMPLE_BASE_FREQUENTLY_ACCESSED_OBJECTS = {
+    "classId": EXAMPLE_UUID,
     "dateRange": {
         "startDate": "2021-01-01",
         "endDate": "2021-01-31",
     },
+}
+EXAMPLE_MOST_FREQUENTLY_ASKED_QUESTION = copy.deepcopy(EXAMPLE_BASE_FREQUENTLY_ACCESSED_OBJECTS)
+EXAMPLE_MOST_FREQUENTLY_ASKED_QUESTION.update({
     "commonQuestions": [
         {
             "question": "What is the difference between a vector and a scalar?",
             "rank": 1,
-            "appearancesDuringPeriod": 0,
+            "appearancesDuringPeriod": 3,
         },
         {
             "question": "What is the difference between a vector and a scalar?",
             "rank": 2,
-            "appearancesDuringPeriod": 0,
+            "appearancesDuringPeriod": 1,
         },
     ],
-}
-
-# Common Resources
-{
-    "classId": "550e8400-e29b-41d4-a716-446655440000",
-    "dateRange": {
-        "startDate": "2021-01-01",
-        "endDate": "2021-01-31",
-    },
+})
+EXAMPLE_MOST_FREQUENTLY_ACCESSED_RESOURCE = copy.deepcopy(EXAMPLE_BASE_FREQUENTLY_ACCESSED_OBJECTS)
+EXAMPLE_MOST_FREQUENTLY_ACCESSED_RESOURCE.update({
     "commonResources": [
         {
-            "resource": "https://www.khanacademy.org/math/linear-algebra/vectors-and-spaces/vectors/v/vector-introduction-linear-algebra",
+            "resource": EXAMPLE_CLASS_RESOURCE_SNIPPET,
             "rank": 1,
-            "appearancesDuringPeriod": 0,
+            "appearancesDuringPeriod": 2,
         },
         {
-            "resource": "https://www.khanacademy.org/math/linear-algebra/vectors-and-spaces/vectors/v/vector-introduction-linear-algebra",
+            "resource": EXAMPLE_CLASS_RESOURCE_SNIPPET,
             "rank": 2,
-            "appearancesDuringPeriod": 0,
+            "appearancesDuringPeriod": 1,
         },
     ],
-}
-
+})
 
 class DateRange(BasePydanticModel):
     """Define a schema for a date range."""
@@ -78,11 +76,11 @@ class BaseFrequentlyAccessedObjects(BasePydanticModel):
 
 class BaseFrequentlyAccessedObject(BasePydanticModel):
     """Define a base schema for ranked common resources."""
-    rank: int = Field(
+    rank: conint(ge=1) = Field(
         ...,
         description="The rank of the object when ranked by appearances during the date range.",
     )
-    appearancesDuringPeriod: int = Field(
+    appearancesDuringPeriod: conint(ge=1) = Field(
         ...,
         description="The number of times the object appeared during the date range.",
     )
@@ -96,6 +94,14 @@ class CommonQuestion(BaseFrequentlyAccessedObject):
     )
 
 
+class CommonResource(BaseFrequentlyAccessedObject):
+    """Define a schema for a common resource."""
+    resource: ClassResourceSnippet = Field(
+        ...,
+        description="The resource that was most common during the date range.",
+    )
+
+
 class CommonQuestions(BaseFrequentlyAccessedObjects):
     """Define a schema for common questions."""
     commonQuestions: list[CommonQuestion] = Field(
@@ -103,13 +109,11 @@ class CommonQuestions(BaseFrequentlyAccessedObjects):
         description="The list of the most frequently asked questions during the date range.",
     )
 
-
-class CommonResource(BaseFrequentlyAccessedObject):
-    """Define a schema for a common resource."""
-    resource: str = Field(
-        ...,
-        description="The resource that was most common during the date range.",
-    )
+    class Config:
+        """Configure schema settings."""
+        schema_extra = {
+            "example": EXAMPLE_MOST_FREQUENTLY_ASKED_QUESTION,
+        }
 
 
 class CommonResources(BaseFrequentlyAccessedObjects):
@@ -118,3 +122,9 @@ class CommonResources(BaseFrequentlyAccessedObjects):
         ...,
         description="The list of the most frequently accessed resources during the date range.",
     )
+
+    class Config:
+        """Configure schema settings."""
+        schema_extra = {
+            "example": EXAMPLE_MOST_FREQUENTLY_ACCESSED_RESOURCE,
+        }
