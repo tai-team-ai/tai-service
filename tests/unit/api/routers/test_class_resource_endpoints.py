@@ -8,7 +8,7 @@ from taiservice.api.routers.class_resources import (
     ClassResources,
     create_class_resource,
 )
-from taiservice.api.routers import class_resources_schema as class_resources_schema
+from taiservice.api.routers import class_resources_schema
 
 
 def test_class_resource_example_schemas():
