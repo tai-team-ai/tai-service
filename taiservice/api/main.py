@@ -9,16 +9,18 @@ from loguru import logger
 
 # first imports are for local development, second imports are for deployment
 try:
-    from .routers import class_resources
     from .routers import (
-        tai
+        tai,
+        class_resources,
+        common_resources,
     )
     from .taibackend.backend import Backend
     from .runtime_settings import TaiApiSettings, BACKEND_ATTRIBUTE_NAME
 except ImportError:
-    from routers import class_resources
     from routers import (
-        tai
+        tai,
+        class_resources,
+        common_resources,
     )
     from taibackend.backend import Backend
     from runtime_settings import TaiApiSettings, BACKEND_ATTRIBUTE_NAME
@@ -31,6 +33,7 @@ ROUTER.get("/health-check")(lambda: {"status": "ok"})
 ROUTERS = [
     class_resources.ROUTER,
     tai.ROUTER,
+    common_resources.ROUTER,
     ROUTER,
 ]
 
