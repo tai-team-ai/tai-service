@@ -1,10 +1,13 @@
 """Define shared schemas for database models."""
-from datetime import datetime
+from datetime import (
+    datetime,
+    date as date_type,
+)
 from uuid import UUID
 from uuid import uuid4
 from enum import Enum
 from typing import Any, Optional
-from pydantic import BaseModel, Field, Extra, HttpUrl, constr
+from pydantic import BaseModel, Field, Extra, HttpUrl, conint, constr
 
 
 HASH_FIELD_OBJECT = Field(
@@ -59,6 +62,18 @@ class BasePydanticModel(BaseModel):
 
         use_enum_values = True
         allow_population_by_field_name = True
+
+
+class UsageMetric(BasePydanticModel):
+    """Define the usage log model for tracking usage of resources."""
+    date: date_type = Field(
+        ...,
+        description="The date of the usage metric.",
+    )
+    usage_count: conint(ge=0) = Field(
+        ...,
+        description="The usage count of the resource. This tracks the number of times the resource was used on the date.",
+    )
 
 
 class Metadata(BasePydanticModel):
@@ -145,6 +160,10 @@ class BaseClassResourceDocument(BasePydanticModel):
     modified_timestamp: datetime = Field(
         default_factory=datetime.utcnow,
         description="The timestamp when the class resource was last modified.",
+    )
+    usage_log: Optional[list[UsageMetric]] = Field(
+        default=None,
+        description="The usage log of the class resource. This allows us to track the usage of the resource.",
     )
 
     @property
