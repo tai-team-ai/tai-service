@@ -31,5 +31,5 @@ def test_that_mismatched_loading_strategy_raises_error():
                 tags=[],
                 total_page_count=0,
             ),
-            loading_strategy=LoadingStrategy.UnstructuredHTMLLoader,
+            loading_strategy=LoadingStrategy.UnstructuredMarkdownLoader,
         )

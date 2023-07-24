@@ -1,5 +1,6 @@
 """Define the indexer module."""
 import os
+import re
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Optional
@@ -181,6 +182,15 @@ class Indexer:
         if failed_docs:
             raise RuntimeError(f"{len(failed_docs)} documents failed to load to db: {failed_docs}")
 
+    def collapse_spaces_in_document(self, document: Document) -> Document:
+        """Collapse spaces in document."""
+        max_chars_in_a_row = 3
+        characters_to_collapse = ["\n", "\t", " "]
+        for character in characters_to_collapse:
+            pattern = f'{character}{{{max_chars_in_a_row},}}'
+            document.page_content = re.sub(pattern, character * max_chars_in_a_row, document.page_content)
+        return document
+
     def _load_and_split_document(self, document: IngestedDocument) -> list[ClassResourceChunkDocument]:
         """Split and load a document."""
         split_docs: list[Document] = []
@@ -193,7 +203,10 @@ class Indexer:
             except Exception: # pylint: disable=broad-except
                 logger.warning(f"Failed to resolve path: {data_pointer}")
             loader: BaseLoader = Loader(data_pointer)
-            splitter: TextSplitter = get_splitter_text_splitter(document.input_format)
+            input_format = document.input_format
+            if isinstance(loader, document_loaders.BSHTMLLoader) and document.input_format == InputFormat.HTML:
+                input_format = InputFormat.GENERIC_TEXT # the beautiful soup loader converts html to text so we need to change the input format
+            splitter: TextSplitter = get_splitter_text_splitter(input_format)
             split_docs = loader.load_and_split(splitter)
         except Exception as e: # pylint: disable=broad-except
             logger.critical(traceback.format_exc())

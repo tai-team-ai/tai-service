@@ -36,7 +36,7 @@ EXAMPLE_MOST_FREQUENTLY_ASKED_QUESTION.update({
 })
 EXAMPLE_MOST_FREQUENTLY_ACCESSED_RESOURCE = copy.deepcopy(EXAMPLE_BASE_FREQUENTLY_ACCESSED_OBJECTS)
 EXAMPLE_MOST_FREQUENTLY_ACCESSED_RESOURCE.update({
-    "commonResources": [
+    "resources": [
         {
             "resource": EXAMPLE_CLASS_RESOURCE_SNIPPET,
             "rank": 1,
@@ -52,11 +52,11 @@ EXAMPLE_MOST_FREQUENTLY_ACCESSED_RESOURCE.update({
 
 class DateRange(BasePydanticModel):
     """Define a schema for a date range."""
-    startDate: date = Field(
+    start_date: date = Field(
         ...,
         description="The start date of the date range.",
     )
-    endDate: date = Field(
+    end_date: date = Field(
         ...,
         description="The end date of the date range.",
     )
@@ -64,11 +64,11 @@ class DateRange(BasePydanticModel):
 
 class BaseFrequentlyAccessedObjects(BasePydanticModel):
     """Define a base schema for common resources."""
-    classId: UUID = Field(
+    class_id: UUID = Field(
         ...,
         description="The ID that the common resource belongs to.",
     )
-    dateRange: DateRange = Field(
+    date_range: DateRange = Field(
         ...,
         description="The date range over which the appearances of the common resource are counted.",
     )
@@ -80,7 +80,7 @@ class BaseFrequentlyAccessedObject(BasePydanticModel):
         ...,
         description="The rank of the object when ranked by appearances during the date range.",
     )
-    appearancesDuringPeriod: conint(ge=1) = Field(
+    appearances_during_period: conint(ge=1) = Field(
         ...,
         description="The number of times the object appeared during the date range.",
     )
@@ -94,7 +94,7 @@ class CommonQuestion(BaseFrequentlyAccessedObject):
     )
 
 
-class CommonResource(BaseFrequentlyAccessedObject):
+class FrequentlyAccessedResource(BaseFrequentlyAccessedObject):
     """Define a schema for a common resource."""
     resource: ClassResourceSnippet = Field(
         ...,
@@ -104,7 +104,7 @@ class CommonResource(BaseFrequentlyAccessedObject):
 
 class CommonQuestions(BaseFrequentlyAccessedObjects):
     """Define a schema for common questions."""
-    commonQuestions: list[CommonQuestion] = Field(
+    common_questions: list[CommonQuestion] = Field(
         ...,
         description="The list of the most frequently asked questions during the date range.",
     )
@@ -116,9 +116,9 @@ class CommonQuestions(BaseFrequentlyAccessedObjects):
         }
 
 
-class CommonResources(BaseFrequentlyAccessedObjects):
+class FrequentlyAccessedResources(BaseFrequentlyAccessedObjects):
     """Define a schema for common resources."""
-    commonResources: list[CommonResource] = Field(
+    resources: list[FrequentlyAccessedResource] = Field(
         ...,
         description="The list of the most frequently accessed resources during the date range.",
     )
