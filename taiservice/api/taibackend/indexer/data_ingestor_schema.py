@@ -52,7 +52,7 @@ class LoadingStrategy(str, Enum):
     """Define the loading strategies."""
     PyMuPDFLoader = "PyMuPDFLoader"
     UnstructuredMarkdownLoader = "UnstructuredMarkdownLoader"
-    UnstructuredHTMLLoader = "UnstructuredHTMLLoader"
+    BSHTMLLoader = "BSHTMLLoader"
 
 class SplitterStrategy(str, Enum):
     """Define the splitter strategies."""
@@ -73,7 +73,7 @@ LOADING_STRATEGY_MAPPING = {
     InputFormat.GENERIC_TEXT: LoadingStrategy.UnstructuredMarkdownLoader,
     InputFormat.LATEX: LoadingStrategy.UnstructuredMarkdownLoader,
     InputFormat.MARKDOWN: LoadingStrategy.UnstructuredMarkdownLoader,
-    InputFormat.HTML: LoadingStrategy.UnstructuredHTMLLoader,
+    InputFormat.HTML: LoadingStrategy.BSHTMLLoader,
 }
 
 SPLITTER_STRATEGY_MAPPING = {

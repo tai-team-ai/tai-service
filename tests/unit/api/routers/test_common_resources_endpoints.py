@@ -3,7 +3,7 @@ from unittest.mock import MagicMock
 import pytest
 from pydantic import ValidationError
 from taiservice.api.routers.common_resources_schema import (
-    CommonResources,
+    FrequentlyAccessedResources,
     CommonQuestions,
 )
 from taiservice.api.routers.common_resources import (
@@ -14,15 +14,15 @@ from taiservice.api.routers.common_resources import (
 
 def test_common_resources_example_schemas():
     """Test that the example schemas for the CommonResources model are valid."""
-    example_schema = CommonResources.Config.schema_extra["example"]
+    example_schema = FrequentlyAccessedResources.Config.schema_extra["example"]
     try:
-        CommonResources.parse_obj(example_schema)
+        FrequentlyAccessedResources.parse_obj(example_schema)
     except ValidationError as e:
         pytest.fail(f"Failed to validate example schema: {example_schema}. Error: {str(e)}")
 
 def test_get_common_resources_endpoint():
     """Test that the get common resources endpoint works."""
-    example_schema = CommonResources.Config.schema_extra["example"]
+    example_schema = FrequentlyAccessedResources.Config.schema_extra["example"]
     request_mock = MagicMock()
     try:
         get_common_resources(request_mock)

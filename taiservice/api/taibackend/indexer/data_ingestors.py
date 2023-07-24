@@ -1,6 +1,7 @@
 """Define data ingestors used by the indexer."""
-from typing import Callable, Optional, Union
+from typing import Callable, Optional, Union, Any
 from abc import ABC, abstractmethod
+from uuid import uuid4
 from enum import Enum
 from pathlib import Path
 import traceback
@@ -68,7 +69,7 @@ def get_splitter_text_splitter(input_format: InputFormat) -> TextSplitter:
     if strategy_instructions is None:
         raise ValueError("The input format is not supported.")
     if strategy_instructions in Language:
-        return RecursiveCharacterTextSplitter(**kwargs)
+        return RecursiveCharacterTextSplitter.from_language(language=strategy_instructions, **kwargs)
     splitter: TextSplitter = getattr(text_splitter, strategy_instructions)(**kwargs)
     return splitter
 
@@ -141,7 +142,7 @@ class Ingestor(ABC):
             raise RuntimeError(f"Failed to upload to s3: {e}") from e
 
     @staticmethod
-    def run_screenshot_op(func: Callable, *args, **kwargs) -> list[Path]:
+    def run_screenshot_op(func: Callable, *args, **kwargs) -> Any:
         """Run the screenshot operation."""
         try:
             return func(*args, **kwargs)
@@ -170,20 +171,27 @@ class Ingestor(ABC):
         """Put the ingested document to s3."""
         object_prefix = cls._get_object_prefix(ingested_doc)
         screenshot_urls, split_resource_urls = [], []
-        def screenshot_pdf() -> list[Path]:
+        def screenshot_resource() -> Union[list[HttpUrl], HttpUrl]:
             screenshot_paths = cls._screenshot_resource(ingested_doc.data_pointer, ingested_doc.input_format, first_page_only=False)
             screenshot_object_keys = [f"{object_prefix}{i + 1}/{path.name}" for i, path in enumerate(screenshot_paths)]
             return cls._upload_to_cold_store(screenshot_paths, screenshot_object_keys, bucket_name)
-        def split_pdf() -> list[Path]:
+        def split_pdf() -> Union[list[HttpUrl], HttpUrl]:
             split_resource_paths = PDF.split_resource(input_path=ingested_doc.data_pointer)
             split_objects_keys = [f"{object_prefix}{i +  1}/{path.name}" for i, path in enumerate(split_resource_paths)]
             return cls._upload_to_cold_store(split_resource_paths, split_objects_keys, bucket_name)
+        screenshot_urls = cls.run_screenshot_op(screenshot_resource)
+        if isinstance(screenshot_urls, str):
+            screenshot_urls = [screenshot_urls]
         if ingested_doc.input_format == InputFormat.PDF:
-            screenshot_urls = cls.run_screenshot_op(screenshot_pdf)
             split_resource_urls = cls.run_split_resource_op(split_pdf)
+            if isinstance(split_resource_urls, str):
+                split_resource_urls = [split_resource_urls]
+            for chunk in chunks:
+                chunk.raw_chunk_url = split_resource_urls[chunk.metadata.page_number] if split_resource_urls else None
+                chunk.preview_image_url = screenshot_urls[chunk.metadata.page_number] if screenshot_urls else None
         for chunk in chunks:
-            chunk.raw_chunk_url = split_resource_urls[chunk.metadata.page_number] if split_resource_urls else None
-            chunk.preview_image_url = screenshot_urls[chunk.metadata.page_number] if screenshot_urls else None
+            chunk.raw_chunk_url = ingested_doc.full_resource_url
+            chunk.preview_image_url = screenshot_urls if screenshot_urls else None
 
     @classmethod
     def _upload_resource_to_cold_store_and_update_ingested_doc(
@@ -283,7 +291,7 @@ class URLIngestor(Ingestor):
         path = remote_file_url.path
         if path[-1] == "/":
             path = path[:-1]
-        tmp_path = Path(f"/tmp/{path}")
+        tmp_path = Path(f"/tmp/{path}") / str(uuid4())
         tmp_path.parent.mkdir(parents=True, exist_ok=True)
         urllib.request.urlretrieve(remote_file_url, tmp_path)
         file_type = cls._get_file_type(tmp_path)

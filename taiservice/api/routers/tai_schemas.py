@@ -191,8 +191,8 @@ EXAMPLE_CHAT_SESSION_REQUEST = {
 
 EXAMPLE_CHAT_SESSION_RESPONSE = copy.deepcopy(EXAMPLE_CHAT_SESSION_REQUEST)
 EXAMPLE_CLASS_RESOURCE_SNIPPET = {
-    "id": uuid4(),
-    "classId": uuid4(),
+    "id": EXAMPLE_UUID,
+    "classId": EXAMPLE_UUID,
     "resourceSnippet": "Molecules are made up of atoms.",
     "fullResourceUrl": "https://www.google.com",
     "previewImageUrl": "https://www.google.com",
@@ -263,7 +263,7 @@ class ChatSessionResponse(BaseChatSession):
 
 
 EXAMPLE_SEARCH_QUERY = {
-    "classId": uuid4(),
+    "classId": EXAMPLE_UUID,
     "query": "Python",
     "filters": {
         "resourceTypes": [

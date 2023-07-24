@@ -161,8 +161,8 @@ class BaseClassResourceDocument(BasePydanticModel):
         default_factory=datetime.utcnow,
         description="The timestamp when the class resource was last modified.",
     )
-    usage_log: Optional[list[UsageMetric]] = Field(
-        default=None,
+    usage_log: list[UsageMetric] = Field(
+        default_factory=list,
         description="The usage log of the class resource. This allows us to track the usage of the resource.",
     )
 
