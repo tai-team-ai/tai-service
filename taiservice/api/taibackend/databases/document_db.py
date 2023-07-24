@@ -1,4 +1,5 @@
 """Define the pinecone database."""
+from datetime import datetime
 import traceback
 from typing import Any, Callable, Optional, Union
 from uuid import UUID
@@ -96,10 +97,12 @@ class DocumentDB:
     ) -> list[BaseClassResourceDocument]:
         """Return the full class resources."""
         ids = [ids] if isinstance(ids, UUID) else ids
-        collection = self._document_type_to_collection[DocClass.__name__]
+        class_name = DocClass.__name__
+        collection = self._document_type_to_collection[class_name]
         ids = [str(id) for id in ids]
         field_name = "class_id" if from_class_ids else "_id"
         documents = list(collection.find({field_name: {"$in": ids}}))
+        self._upsert_metrics_for_docs(documents) # this let's us track usage DON'T REMOVE
         return [DocClass.parse_obj(document) for document in documents]
 
     def upsert_class_resources(
@@ -142,6 +145,48 @@ class DocumentDB:
             self._execute_operation(delete_document, document, failed_documents=failed_documents)
         return failed_documents
 
+    def upsert_documents(self, documents: list[BaseClassResourceDocument]) -> None:
+        """Upsert the chunks of the class resource."""
+        for document in documents:
+            self.upsert_document(document)
+
+    def upsert_document(self, document: BaseClassResourceDocument) -> None:
+        """Upsert the chunks of the class resource."""
+        collection = self._document_type_to_collection[document.__class__.__name__]
+        collection.update_one(
+            {"_id": document.id_as_str},
+            {"$set": document.dict(serialize_dates=False, exclude={"id"})},
+            upsert=True,
+        )
+
+    def run_aggregate_query(self, query: list[dict[str, Any]], DocClass: BaseClassResourceDocument) -> Any:
+        """Run an aggregate query and return the results."""
+        class_name = DocClass.__name__
+        collection = self._document_type_to_collection[class_name]
+        return collection.aggregate(query)
+
+    def _upsert_metrics_for_docs(self, docs: list[BaseClassResourceDocument]) -> None:
+        """Upsert the metrics of the class resource."""
+        for doc in docs:
+            collection = self._document_type_to_collection[doc.__class__.__name__]
+            date_now = datetime.now().date()
+            collection.find_one_and_update(
+                {"_id": doc.id_as_str},
+                {
+                    '$addToSet': {
+                        'usage_log': {
+                            '$cond': [
+                                {'$in': [date_now, '$usage_log.date']},
+                                {},
+                                {'date': date_now, 'usage_count': 1}
+                            ]
+                        }
+                    },
+                    '$inc': {'usage_log.$[elem].usage_count': 1}
+                },
+            )
+            doc = collection.find_one({"_id": doc.id_as_str}) # updates the document in memory
+
     def _execute_operation(
         self,
         operation: Callable,
@@ -168,17 +213,3 @@ class DocumentDB:
         """Delete the chunks of the class resource."""
         collection = self._document_type_to_collection[doc.__class__.__name__]
         collection.delete_one({"_id": doc.id_as_str})
-
-    def upsert_documents(self, documents: list[BaseClassResourceDocument]) -> None:
-        """Upsert the chunks of the class resource."""
-        for document in documents:
-            self.upsert_document(document)
-
-    def upsert_document(self, document: BaseClassResourceDocument) -> None:
-        """Upsert the chunks of the class resource."""
-        collection = self._document_type_to_collection[document.__class__.__name__]
-        collection.update_one(
-            {"_id": document.id_as_str},
-            {"$set": document.dict(serialize_dates=False, exclude={"id"})},
-            upsert=True,
-        )
