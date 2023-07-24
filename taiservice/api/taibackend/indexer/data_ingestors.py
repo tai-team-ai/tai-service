@@ -189,9 +189,10 @@ class Ingestor(ABC):
             for chunk in chunks:
                 chunk.raw_chunk_url = split_resource_urls[chunk.metadata.page_number] if split_resource_urls else None
                 chunk.preview_image_url = screenshot_urls[chunk.metadata.page_number] if screenshot_urls else None
-        for chunk in chunks:
-            chunk.raw_chunk_url = ingested_doc.full_resource_url
-            chunk.preview_image_url = screenshot_urls if screenshot_urls else None
+        else:
+            for chunk in chunks:
+                chunk.raw_chunk_url = ingested_doc.full_resource_url
+                chunk.preview_image_url = screenshot_urls if screenshot_urls else None
 
     @classmethod
     def _upload_resource_to_cold_store_and_update_ingested_doc(
@@ -291,7 +292,8 @@ class URLIngestor(Ingestor):
         path = remote_file_url.path
         if path[-1] == "/":
             path = path[:-1]
-        tmp_path = Path(f"/tmp/{path}") / str(uuid4())
+        final_part = path.split("/")[-1]
+        tmp_path = Path("/tmp") / str(uuid4()) / final_part
         tmp_path.parent.mkdir(parents=True, exist_ok=True)
         urllib.request.urlretrieve(remote_file_url, tmp_path)
         file_type = cls._get_file_type(tmp_path)

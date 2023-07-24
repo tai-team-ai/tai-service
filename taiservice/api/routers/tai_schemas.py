@@ -179,7 +179,7 @@ EXAMPLE_CHAT_SESSION_REQUEST = {
     "classId": EXAMPLE_UUID,
     "chats": [
         {
-            "message": "I'm stuck on this problem.",
+            "message": "I'm stuck on this problem about dummy pdfs.",
             "role": ChatRole.STUDENT,
             "requestedTaiTutor": TaiTutorName.ADA,
             "requestedTechnicalLevel": ResponseTechnicalLevel.EXPLAIN_LIKE_IM_IN_HIGH_SCHOOL,
@@ -264,7 +264,7 @@ class ChatSessionResponse(BaseChatSession):
 
 EXAMPLE_SEARCH_QUERY = {
     "classId": EXAMPLE_UUID,
-    "query": "Python",
+    "query": "dummy pdf",
     "filters": {
         "resourceTypes": [
             ClassResourceType.TEXTBOOK,

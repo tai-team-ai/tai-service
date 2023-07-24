@@ -204,7 +204,7 @@ class Indexer:
                 logger.warning(f"Failed to resolve path: {data_pointer}")
             loader: BaseLoader = Loader(data_pointer)
             input_format = document.input_format
-            if isinstance(loader, document_loaders.BSHTMLLoader) and document.input_format == InputFormat.HTML:
+            if isinstance(loader, document_loaders.BSHTMLLoader):
                 input_format = InputFormat.GENERIC_TEXT # the beautiful soup loader converts html to text so we need to change the input format
             splitter: TextSplitter = get_splitter_text_splitter(input_format)
             split_docs = loader.load_and_split(splitter)

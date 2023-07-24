@@ -3,7 +3,7 @@ from enum import Enum
 from typing import Optional
 from uuid import UUID
 from uuid import uuid4
-from pydantic import Field, validator
+from pydantic import Field, HttpUrl, validator
 # first imports are for local development, second imports are for deployment
 try:
     from ..shared_schemas import (
@@ -96,7 +96,7 @@ class ClassResourceChunkDocument(BaseClassResourceDocument):
         ...,
         description="The text chunk of the class resource.",
     )
-    raw_chunk_url: Optional[str] = Field(
+    raw_chunk_url: Optional[HttpUrl] = Field(
         default=None,
         description="The URL of the raw chunk.",
     )
