@@ -152,5 +152,3 @@ class IngestedDocument(StatefulClassResourceDocument):
         if values.get("input_format") is not None:
             assert loading_strategy == LOADING_STRATEGY_MAPPING[values.get("input_format")], "The loading strategy must match the input format."
         return loading_strategy
-
-

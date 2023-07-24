@@ -36,7 +36,7 @@ EXAMPLE_MOST_FREQUENTLY_ASKED_QUESTION.update({
 })
 EXAMPLE_MOST_FREQUENTLY_ACCESSED_RESOURCE = copy.deepcopy(EXAMPLE_BASE_FREQUENTLY_ACCESSED_OBJECTS)
 EXAMPLE_MOST_FREQUENTLY_ACCESSED_RESOURCE.update({
-    "commonResources": [
+    "resources": [
         {
             "resource": EXAMPLE_CLASS_RESOURCE_SNIPPET,
             "rank": 1,
