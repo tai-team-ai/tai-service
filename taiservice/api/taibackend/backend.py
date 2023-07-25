@@ -493,7 +493,9 @@ class Backend:
             api_key=self._openai_api_key,
             request_timeout=self._runtime_settings.openAI_request_timeout,
             stream_response=stream,
-            model_name=self._runtime_settings.model_name,
+            basic_model_name=self._runtime_settings.basic_model_name,
+            large_context_model_name=self._runtime_settings.large_context_model_name,
+            advanced_model_name=self._runtime_settings.advanced_model_name,
         )
         return TaiLLM(config)
 

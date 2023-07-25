@@ -196,7 +196,7 @@ class BaseOpenAIConfig(BaseModel):
         description="The API key of the OpenAI API.",
     )
     request_timeout: int = Field(
-        ...,
-        le=30,
+        default=30,
+        le=60,
         description="The timeout for requests to the OpenAI API.",
     )

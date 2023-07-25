@@ -1,8 +1,8 @@
 """Define the llms interface used for the TAI chat backend."""
+import copy
 from enum import Enum
 import json
-from typing import Optional
-from uuid import UUID
+from typing import Any, Dict, Optional
 from uuid import uuid4
 from langchain.chat_models import ChatOpenAI
 from langchain import PromptTemplate
@@ -12,7 +12,11 @@ from pydantic import Field
 # first imports are for local development, second imports are for deployment
 try:
     from ..shared_schemas import BaseOpenAIConfig
-    from .llm_functions import get_relevant_class_resource_chunks
+    from .llm_functions import (
+        get_relevant_class_resource_chunks,
+        save_student_conversation_topics,
+        save_student_questions,
+    )
     from ..databases.document_db_schemas import ClassResourceChunkDocument
     from .llm_schemas import (
         TaiChatSession,
@@ -22,11 +26,18 @@ try:
         AIResponseCallingFunction,
         SUMMARIZER_SYSTEM_PROMPT,
         SUMMARIZER_USER_PROMPT,
+        STUDENT_COMMON_QUESTIONS_SYSTEM_PROMPT,
+        STUDENT_COMMON_DISCUSSION_TOPICS_SYSTEM_PROMPT,
+        FINAL_STAGE_STUDENT_TOPIC_SUMMARY_SYSTEM_PROMPT,
         ValidatedFormatString,
     )
 except (KeyError, ImportError):
     from taibackend.shared_schemas import BaseOpenAIConfig
-    from taibackend.taitutors.llm_functions import get_relevant_class_resource_chunks
+    from taibackend.taitutors.llm_functions import (
+        get_relevant_class_resource_chunks,
+        save_student_conversation_topics,
+        save_student_questions,
+    )
     from taibackend.taitutors.llm_schemas import (
         TaiChatSession,
         TaiTutorMessage,
@@ -35,6 +46,9 @@ except (KeyError, ImportError):
         AIResponseCallingFunction,
         SUMMARIZER_SYSTEM_PROMPT,
         SUMMARIZER_USER_PROMPT,
+        STUDENT_COMMON_QUESTIONS_SYSTEM_PROMPT,
+        STUDENT_COMMON_DISCUSSION_TOPICS_SYSTEM_PROMPT,
+        FINAL_STAGE_STUDENT_TOPIC_SUMMARY_SYSTEM_PROMPT,
         ValidatedFormatString,
     )
 
@@ -48,9 +62,17 @@ class ModelName(str, Enum):
 
 class ChatOpenAIConfig(BaseOpenAIConfig):
     """Define the config for the chat openai model."""
-    model_name: ModelName = Field(
+    basic_model_name: ModelName = Field(
         default=ModelName.GPT_TURBO,
-        description="The name of the model to use.",
+        description="The name of the model to use for the llm tutor for basic queries.",
+    )
+    large_context_model_name: ModelName = Field(
+        default=ModelName.GPT_TURBO_LARGE_CONTEXT,
+        description="The name of the model to use for the llm tutor for large context queries.",
+    )
+    advanced_model_name: ModelName = Field(
+        default=ModelName.GPT_4,
+        description="The name of the model to use for the llm tutor for advanced queries.",
     )
     stream_response: bool = Field(
         default=False,
@@ -67,17 +89,33 @@ class TaiLLM:
     def __init__(self, config: ChatOpenAIConfig):
         """Initialize the LLMs interface."""
         self._config = config
-        self._chat_model: BaseChatModel = ChatOpenAI(
-            openai_api_key=config.api_key,
+        base_config = {
+            "openai_api_key": config.api_key,
+            "streaming": config.stream_response,
+        }
+        self._basic_chat_model: BaseChatModel = ChatOpenAI(
+            model=config.basic_model_name,
             request_timeout=config.request_timeout,
-            model=config.model_name,
-            streaming=config.stream_response,
+            **base_config,
+        )
+        self._large_context_chat_model: BaseChatModel = ChatOpenAI(
+            model=config.large_context_model_name,
+            request_timeout=config.request_timeout + 15,
+            **base_config,
+        )
+        self._advanced_chat_model: BaseChatModel = ChatOpenAI(
+            model=config.advanced_model_name,
+            request_timeout=config.request_timeout + 30,
+            **base_config,
         )
 
     def add_tai_tutor_chat_response(
         self,
         chat_session: TaiChatSession,
         relevant_chunks: Optional[list[ClassResourceChunkDocument]] = None,
+        function_to_call: Optional[callable] = None,
+        functions: Optional[list[callable]] = None,
+        ModelToUse: Optional[BaseChatModel] = None,
     ) -> None:
         """Get the response from the LLMs."""
         llm_kwargs ={}
@@ -88,14 +126,18 @@ class TaiLLM:
                 function_kwargs={'student_message': chat_session.last_student_message.content},
                 relevant_chunks=relevant_chunks,
             )
+        if function_to_call or relevant_chunks:
+            assert functions, "Must provide functions if function_to_call or relevant_chunks are provided."
             chain = create_openai_fn_chain(
-                functions=[get_relevant_class_resource_chunks],
-                llm=self._chat_model,
+                functions=[function_to_call],
+                llm=self._large_context_chat_model,
                 prompt=PromptTemplate(input_variables=[], template=""),
             )
             llm_kwargs = chain.llm_kwargs
-            llm_kwargs['function_call'] = "none"
-        self._append_model_response(chat_session, chunks=relevant_chunks)
+        # function_to_call = {'name': function_to_call.__name__} if function_to_call else "none"
+        # llm_kwargs['function_call'] = function_to_call
+        # langchain does the above line for us, but it's left here for reference
+        self._append_model_response(chat_session, chunks=relevant_chunks, ModelToUse=ModelToUse, **llm_kwargs)
 
     def create_search_result_summary_snippet(self, search_query: str, chunks: list[ClassResourceChunkDocument]) -> str:
         """Create a snippet of the search result summary."""
@@ -112,13 +154,67 @@ class TaiLLM:
         self.add_tai_tutor_chat_response(session)
         return session.last_chat_message.content
 
-    def _append_model_response(self, chat_session: TaiChatSession, chunks: list[ClassResourceChunkDocument] = None) -> None:
+    def summarize_student_messages(self, messages: list[str], as_questions: bool = False) -> list[str]:
+        """Summarize the student messages."""
+        def get_summaries(messages: list[str], system_prompt: str, function: callable, ModelToUse: BaseChatModel = None) -> list[str]:
+            session: TaiChatSession = TaiChatSession.from_message(
+                SearchQuery(content="\n".join(messages)),
+                class_id=uuid4(),
+            )
+            session.insert_system_prompt(system_prompt)
+            self.add_tai_tutor_chat_response(
+                session,
+                function_to_call=function,
+                functions=[function],
+                ModelToUse=ModelToUse,
+            )
+            last_chat: TaiTutorMessage = session.last_chat_message
+            args = last_chat.function_call.arguments
+            # there should only be one argument, so we can just return the first one
+            return list(args.values())[0]
+        if as_questions:
+            function = save_student_questions
+            system_prompt = STUDENT_COMMON_QUESTIONS_SYSTEM_PROMPT
+        else:
+            function = save_student_conversation_topics
+            system_prompt = STUDENT_COMMON_DISCUSSION_TOPICS_SYSTEM_PROMPT
+        summaries = get_summaries(
+            messages,
+            system_prompt,
+            function,
+            ModelToUse=self._large_context_chat_model
+        )
+        if not as_questions:
+            summaries = get_summaries(
+                "\n".join(summaries),
+                FINAL_STAGE_STUDENT_TOPIC_SUMMARY_SYSTEM_PROMPT,
+                function,
+                ModelToUse=self._advanced_chat_model
+            )
+        return summaries
+
+    def _append_model_response(
+        self,
+        chat_session: TaiChatSession,
+        chunks: list[ClassResourceChunkDocument] = None,
+        ModelToUse: Optional[BaseChatModel] = None,
+        **kwargs: Dict[str, Any],
+    ) -> None:
         """Get the response from the LLMs."""
-        chat_message = self._chat_model(messages=chat_session.messages)
+        if not ModelToUse:
+            ModelToUse = self._basic_chat_model
+        chat_message = ModelToUse(messages=chat_session.messages, **kwargs)
+        function_call: dict = chat_message.additional_kwargs.get("function_call")
+        if function_call:
+            function_call = AIResponseCallingFunction(
+                name=function_call.get("name"),
+                arguments=json.loads(function_call.get("arguments")),
+            )
         tutor_response = TaiTutorMessage(
             content=chat_message.content,
             render_chat=True,
             class_resource_chunks=chunks if chunks else [],
+            function_call=function_call,
             **chat_session.last_human_message.dict(exclude={"role", "render_chat", "content"}),
         )
         chat_session.append_chat_messages([tutor_response])

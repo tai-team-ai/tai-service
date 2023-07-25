@@ -65,17 +65,25 @@ class TaiApiSettings(BaseSettings):
         ...,
         description="The name of the secret containing the OpenAI API key.",
     )
-    openAI_request_timeout: int = Field(
-        default=20,
+    base_openAI_request_timeout: int = Field(
+        default=30,
         description="The timeout for OpenAI requests.",
     )
     openAI_batch_size: int = Field(
         default=50,
         description="The batch size for OpenAI requests.",
     )
-    model_name: ModelName = Field(
+    basic_model_name: ModelName = Field(
+        default=ModelName.GPT_TURBO,
+        description="The name of the model to use for the llm tutor for basic queries.",
+    )
+    large_context_model_name: ModelName = Field(
         default=ModelName.GPT_TURBO_LARGE_CONTEXT,
-        description="The name of the model to use for the llm tutor.",
+        description="The name of the model to use for the llm tutor for large context queries.",
+    )
+    advanced_model_name: ModelName = Field(
+        default=ModelName.GPT_4,
+        description="The name of the model to use for the llm tutor for advanced queries.",
     )
     nltk_data: str = Field(
         default="/var/task/nltk_data",
