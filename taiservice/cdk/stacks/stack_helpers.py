@@ -1,11 +1,20 @@
 """Define helpers for CDK stacks."""
+from enum import Enum
 from aws_cdk import (
     Tags,
-    aws_ec2 as ec2,
 )
 import boto3
 from constructs import Construct
 from taiservice.cdk.stacks.stack_config_models import AWSDeploymentSettings
+
+
+class Permissions(str, Enum):
+    """Define permissions for AWS resources."""
+
+    READ = "read"
+    WRITE = "write"
+    READ_WRITE = "read_write"
+
 
 def add_tags(scope: Construct, tags: dict):
     """Add tags to a CDK stack.

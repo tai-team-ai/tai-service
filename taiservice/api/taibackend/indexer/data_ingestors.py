@@ -109,7 +109,9 @@ class Ingestor(ABC):
     @staticmethod
     def _get_object_prefix(ingested_doc: IngestedDocument) -> str:
         """Get the object prefix."""
-        return f"{ingested_doc.class_id}/{ingested_doc.id_as_str}/"
+        class_id = f"class_id={ingested_doc.class_id}"
+        resource_id = f"resource_id={ingested_doc.id_as_str}"
+        return f"{class_id}/{resource_id}/"
 
     @staticmethod
     def _screenshot_resource(

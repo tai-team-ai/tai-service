@@ -1,20 +1,24 @@
 """Define metrics utilities and classes for retrieving and aggregating metrics for the TAIService API."""
-
-from datetime import date, timedelta
 from typing import Optional
 from uuid import UUID
 from pydantic import Field, conint
 # first imports are for local development, second imports are for deployment
 try:
-    from .shared_schemas import BaseOpenAIConfig, BasePydanticModel
+    from .shared_schemas import BasePydanticModel, DateRange
     from .databases.document_db_schemas import ClassResourceChunkDocument
+    from .databases.archiver import Archive
+    from .databases.archive_schemas import HumanMessageRecord
     from .databases.document_db import DocumentDB
     from .databases.pinecone_db import PineconeDB
+    from .taitutors.llm import TaiLLM, ChatOpenAIConfig
 except ImportError:
-    from shared_schemas import BaseOpenAIConfig, BasePydanticModel
+    from shared_schemas import BasePydanticModel, DateRange
     from databases.document_db_schemas import ClassResourceChunkDocument
+    from databases.archiver import Archive
+    from databases.archive_schemas import HumanMessageRecord
     from databases.document_db import DocumentDB
     from databases.pinecone_db import PineconeDB
+    from taitutors.llm import TaiLLM, ChatOpenAIConfig
 
 
 class MetricsConfig(BasePydanticModel):
@@ -27,7 +31,11 @@ class MetricsConfig(BasePydanticModel):
         ...,
         description="The instance of the pinecone db.",
     )
-    openai_config: BaseOpenAIConfig = Field(
+    archive: Archive = Field(
+        ...,
+        description="The instance of the archive.",
+    )
+    openai_config: ChatOpenAIConfig = Field(
         ...,
         description="The config for the OpenAI API.",
     )
@@ -37,18 +45,6 @@ class MetricsConfig(BasePydanticModel):
         arbitrary_types_allowed = True
 
 
-class DateRange(BasePydanticModel):
-    """Define a schema for a date range."""
-    start_date: date = Field(
-        default_factory=lambda: date.today() - timedelta(days=7),
-        description="The start date of the date range.",
-    )
-    end_date: date = Field(
-        default_factory=date.today,
-        description="The end date of the date range.",
-    )
-
-
 class BaseFrequentlyAccessedObjects(BasePydanticModel):
     """Define a base schema for common resources."""
     class_id: UUID = Field(
@@ -56,7 +52,7 @@ class BaseFrequentlyAccessedObjects(BasePydanticModel):
         description="The ID that the common resource belongs to.",
     )
     date_range: DateRange = Field(
-        ...,
+        default_factory=DateRange,
         description="The date range over which the appearances of the common resource are counted.",
     )
 
@@ -112,10 +108,52 @@ class Metrics:
         self._document_db = config.document_db_instance
         self._pinecone_db = config.pinecone_db_instance
         self._openai_config = config.openai_config
+        self._archive = config.archive
 
-    def get_most_frequently_asked_questions(self):
+    def _get_student_messages(self, class_id: UUID, date_range: Optional[DateRange] = None) -> list[str]:
+        """Get student records."""
+        if date_range is None:
+            date_range = DateRange()
+        records = self._archive.get_archived_messages(
+            class_id=class_id,
+            date_range=date_range,
+            RecordClass=HumanMessageRecord,
+        )
+        assert all(isinstance(rec, HumanMessageRecord) for rec in records)
+        rec: HumanMessageRecord
+        messages = []
+        for rec in records:
+            messages.append(rec.message)
+        return messages
+
+    def _rank_summaries(self, summary: list[str]) -> list[CommonQuestion]:
+        """Rank messages."""
+        ranked_messages = []
+        for rank, message in enumerate(summary, 1):
+            msg = CommonQuestion(
+                rank=rank,
+                appearances_during_period=1,
+                question=message,
+            )
+            ranked_messages.append(msg)
+        return ranked_messages
+
+    def get_most_frequently_asked_questions(self, class_id: UUID, date_range: Optional[DateRange] = None) -> Optional[CommonQuestions]:
         """Get the most frequently asked questions."""
-        pass
+        if date_range is None:
+            date_range = DateRange()
+        messages = self._get_student_messages(class_id, date_range)
+        if len(messages) <= 10:
+            return
+        llm = TaiLLM(self._openai_config)
+        messages = llm.summarize_student_messages(messages, as_questions=True)
+        common_questions = CommonQuestions(
+            class_id=class_id,
+            date_range=date_range,
+            common_questions=self._rank_summaries(messages)
+        )
+        return common_questions
+
 
     def get_most_frequently_accessed_resources(self, class_id: UUID, date_range: Optional[DateRange] = None) -> FrequentlyAccessedResources:
         """Get the most frequently accessed resources."""
@@ -131,9 +169,14 @@ class Metrics:
                 '$unwind': '$usage_log'
             },
             {
+                '$match': {
+                    'usage_log.timestamp': {'$gte': date_range.start_date, '$lte': date_range.end_date} ,
+                },
+            },
+            {
                 '$group': {
                     '_id': '$_id',
-                    'resource_count': {'$sum': '$usage_log.usage_count'},
+                    'resource_count': {'$sum': 1 },
                 }
             },
             {

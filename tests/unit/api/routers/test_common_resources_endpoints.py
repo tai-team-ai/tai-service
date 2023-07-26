@@ -43,6 +43,6 @@ def test_get_common_questions_endpoint():
     example_schema = CommonQuestions.Config.schema_extra["example"]
     request_mock = MagicMock()
     try:
-        get_common_questions(request_mock)
+        get_common_questions(request_mock, uuid4())
     except ValidationError as e:
         pytest.fail(f"Endpoint {get_common_questions} failed with example schema: {example_schema}. Error: {str(e)}")

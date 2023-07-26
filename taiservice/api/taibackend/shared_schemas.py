@@ -1,8 +1,5 @@
 """Define shared schemas for database models."""
-from datetime import (
-    datetime,
-    date as date_type,
-)
+from datetime import datetime, timedelta
 from uuid import UUID
 from uuid import uuid4
 from enum import Enum
@@ -25,6 +22,7 @@ class ClassResourceType(str, Enum):
     """Define the class resource types to use as a filter."""
     TEXTBOOK = "textbook"
     WEBSITE = "website"
+
 
 class BasePydanticModel(BaseModel):
     """
@@ -64,15 +62,23 @@ class BasePydanticModel(BaseModel):
         allow_population_by_field_name = True
 
 
+class DateRange(BasePydanticModel):
+    """Define a schema for a date range."""
+    start_date: datetime = Field(
+        default_factory=lambda: datetime.utcnow() + timedelta(days=7),
+        description="The start date of the date range.",
+    )
+    end_date: datetime = Field(
+        default_factory=datetime.utcnow,
+        description="The end date of the date range.",
+    )
+
+
 class UsageMetric(BasePydanticModel):
     """Define the usage log model for tracking usage of resources."""
-    date: date_type = Field(
+    timestamp: datetime = Field(
         ...,
         description="The date of the usage metric.",
-    )
-    usage_count: conint(ge=0) = Field(
-        ...,
-        description="The usage count of the resource. This tracks the number of times the resource was used on the date.",
     )
 
 
@@ -196,7 +202,7 @@ class BaseOpenAIConfig(BaseModel):
         description="The API key of the OpenAI API.",
     )
     request_timeout: int = Field(
-        ...,
-        le=30,
+        default=30,
+        le=60,
         description="The timeout for requests to the OpenAI API.",
     )
