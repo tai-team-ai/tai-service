@@ -1,7 +1,7 @@
 """Define schemas for common resources."""
 import copy
 from uuid import UUID
-from datetime import datetime
+from datetime import datetime, timedelta
 from pydantic import Field, conint
 # first imports are for local development, second imports are for deployment
 try:
@@ -15,8 +15,8 @@ except ImportError:
 EXAMPLE_BASE_FREQUENTLY_ACCESSED_OBJECTS = {
     "classId": EXAMPLE_UUID,
     "dateRange": {
-        "startDate": "2021-01-01",
-        "endDate": "2021-01-31",
+        "startDate": (datetime.utcnow() - timedelta(days=30)).strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
+        "endDate": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
     },
 }
 EXAMPLE_MOST_FREQUENTLY_ASKED_QUESTION = copy.deepcopy(EXAMPLE_BASE_FREQUENTLY_ACCESSED_OBJECTS)
