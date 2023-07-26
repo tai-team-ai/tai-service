@@ -68,7 +68,7 @@ frontend_server_config = StackConfigBaseModel(
     stack_name="tai-frontend-server",
     description="Stack for the frontend server of the T.A.I. service. This stack contains the " \
         "implementation of the required frontend resources.",
-    duplicate_stack_for_development=False,
+    duplicate_stack_for_development=True, # if we don't do this, you won't be able to delete the dev tai stack without destroying this one.
     **BASE_SETTINGS,
 )
 frontend_server: TaiFrontendServerStack = TaiFrontendServerStack(
