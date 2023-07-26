@@ -14,7 +14,7 @@ from aws_cdk import (
 )
 from ...api.runtime_settings import TaiApiSettings
 from .stack_config_models import StackConfigBaseModel
-from .stack_helpers  import add_tags
+from .stack_helpers  import add_tags, Permissions
 from ..constructs.python_lambda_construct import (
     DockerLambda,
     DockerLambdaConfigModel,
@@ -65,19 +65,30 @@ class TaiApiStack(Stack):
         self._settings = api_settings
         self._vpc = get_vpc(self, vpc)
         self._removal_policy = config.removal_policy
-        api_settings.cold_store_bucket_name = (api_settings.cold_store_bucket_name + config.stack_suffix)[:63]
-        self._cold_store_bucket: VersionedBucket = self._create_bucket(
-            name=api_settings.cold_store_bucket_name,
-            public_read_access=True,
-        )
+        self._stack_suffix = config.stack_suffix
         self._python_lambda: DockerLambda = self._create_lambda_function(security_group_allowing_db_connections)
-        self._cold_store_bucket.grant_write_access(self._python_lambda.role)
-        api_settings.frontend_data_transfer_bucket_name = (api_settings.frontend_data_transfer_bucket_name + config.stack_suffix)[:63]
+        lambda_role = self._python_lambda.role
+        self._cold_store_bucket: VersionedBucket = self._create_bucket(
+            bucket_name=api_settings.cold_store_bucket_name,
+            public_read_access=True,
+            role=lambda_role,
+            permissions=Permissions.READ_WRITE,
+        )
+        api_settings.cold_store_bucket_name = self._cold_store_bucket.bucket_name
+        self._message_archive_bucket: VersionedBucket = self._create_bucket(
+            name=api_settings.message_archive_bucket_name,
+            public_read_access=True,
+            role=lambda_role,
+            permissions=Permissions.READ_WRITE,
+        )
+        api_settings.message_archive_bucket_name = self._message_archive_bucket.bucket_name
         self._frontend_transfer_bucket: VersionedBucket = self._create_bucket(
             name=api_settings.frontend_data_transfer_bucket_name,
             public_read_access=True,
+            role=lambda_role,
+            permissions=Permissions.READ_WRITE,
         )
-        self._frontend_transfer_bucket.grant_read_access(self._python_lambda.role)
+        api_settings.frontend_data_transfer_bucket_name = self._frontend_transfer_bucket.bucket_name
         add_tags(self, config.tags)
         CfnOutput(
             self,
@@ -96,18 +107,31 @@ class TaiApiStack(Stack):
         """Return the frontend transfer bucket."""
         return self._frontend_transfer_bucket
 
-    def _create_bucket(self, name: str, public_read_access: bool) -> VersionedBucket:
+    def _create_bucket(
+        self,
+        bucket_name: str,
+        public_read_access: bool,
+        role: iam.Role,
+        permissions: Permissions,
+    ) -> VersionedBucket:
+        bucket_name = (bucket_name + self._stack_suffix)[:63]
         config = VersionedBucketConfigModel(
-            bucket_name=name,
+            bucket_name=bucket_name,
             public_read_access=public_read_access,
             removal_policy=self._removal_policy,
             delete_objects_on_bucket_removal=True if self._removal_policy == RemovalPolicy.DESTROY else False,
         )
-        bucket = VersionedBucket(
+        bucket: VersionedBucket = VersionedBucket(
             scope=self,
             construct_id=f"{config.bucket_name}-bucket",
             config=config,
         )
+        if permissions == Permissions.READ:
+            bucket.grant_read_access(role)
+        elif permissions == Permissions.READ_WRITE:
+            bucket.grant_read_write_access(role)
+        else:
+            raise ValueError(f"Invalid permissions: {permissions} for bucket {bucket_name}")
         return bucket
 
     def _create_lambda_function(self, security_group_allowing_db_connections: ec2.SecurityGroup) -> DockerLambda:
