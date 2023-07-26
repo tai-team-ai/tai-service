@@ -416,6 +416,7 @@ class Backend:
             )
         return api_questions
 
+    # TODO: Add a test to verify the archive method is called
     def get_tai_response(self, chat_session: APIChatSession, stream: bool=False) -> APIChatSession:
         """Get and add the tai tutor response to the chat session."""
         chat_session: BEChatSession = self.to_backend_chat_session(chat_session)
@@ -430,6 +431,7 @@ class Backend:
         logger.info(chat_session.dict())
         return self.to_api_chat_session(chat_session)
 
+    # TODO: Add a test to verify the archive method is called
     def search(self, query: ResourceSearchQuery) -> ResourceSearchAnswer:
         """Search for class resources."""
         student_message = BEStudentMessage(content=query.query)
