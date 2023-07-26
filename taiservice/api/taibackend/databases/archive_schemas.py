@@ -27,6 +27,10 @@ class BaseArchiveRecord(BasePydanticModel):
         timestamp = f"timestamp={self.timestamp.strftime('%Y-%m-%d-%H-%M-%S-%f')}"
         return f"{class_id}/{archive_record_type}/{timestamp}.json"
 
+    @classmethod
+    def get_archive_prefix(cls, class_id: UUID) -> str:
+        """Return the prefix of the archive record."""
+        return f"class_id={class_id}/{cls.__name__}"
 
 class StudentMessageRecord(BasePydanticModel):
     """Define the student message record for archiving student messages"""

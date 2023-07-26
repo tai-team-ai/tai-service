@@ -1,5 +1,5 @@
 """Define shared schemas for database models."""
-from datetime import datetime
+from datetime import datetime, timedelta
 from uuid import UUID
 from uuid import uuid4
 from enum import Enum
@@ -22,6 +22,7 @@ class ClassResourceType(str, Enum):
     """Define the class resource types to use as a filter."""
     TEXTBOOK = "textbook"
     WEBSITE = "website"
+
 
 class BasePydanticModel(BaseModel):
     """
@@ -59,6 +60,18 @@ class BasePydanticModel(BaseModel):
 
         use_enum_values = True
         allow_population_by_field_name = True
+
+
+class DateRange(BasePydanticModel):
+    """Define a schema for a date range."""
+    start_date: datetime = Field(
+        default_factory=datetime.utcnow,
+        description="The start date of the date range.",
+    )
+    end_date: datetime = Field(
+        default_factory=lambda: datetime.utcnow() + timedelta(days=7),
+        description="The end date of the date range.",
+    )
 
 
 class UsageMetric(BasePydanticModel):

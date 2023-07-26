@@ -13,12 +13,12 @@ try:
         Metrics,
         MetricsConfig,
         DateRange as BEDateRange,
-        FrequentlyAccessedResources as BEFrequentlyAccessedResources,
     )
     from ..routers.common_resources_schema import (
         FrequentlyAccessedResources as APIFrequentlyAccessedResources,
         FrequentlyAccessedResource as APIFrequentlyAccessedResource,
         CommonQuestions as APICommonQuestions,
+        CommonQuestion as APICommonQuestion,
         DateRange as APIDateRange,
     )
     from ..taibackend.taitutors.llm import TaiLLM, ChatOpenAIConfig
@@ -79,6 +79,7 @@ except (KeyError, ImportError):
         FrequentlyAccessedResources as APIFrequentlyAccessedResources,
         FrequentlyAccessedResource as APIFrequentlyAccessedResource,
         CommonQuestions as APICommonQuestions,
+        CommonQuestion as APICommonQuestion,
         DateRange as APIDateRange,
     )
     from taibackend.taitutors.llm import TaiLLM, ChatOpenAIConfig
@@ -369,12 +370,8 @@ class Backend:
         end_date: Optional[date] = None,
     ) -> APIFrequentlyAccessedResources:
         """Get the most frequently accessed class resources."""
-        if start_date is None:
-            start_date = date.today()
-        if end_date is None:
-            end_date = start_date - timedelta(days=7)
-        backend_date_range = BEDateRange(start_date=start_date, end_date=end_date)
-        frequent_resources = self._metrics.get_most_frequently_accessed_resources(class_id, backend_date_range)
+        date_range = self._get_date_range(start_date, end_date)
+        frequent_resources = self._metrics.get_most_frequently_accessed_resources(class_id, date_range)
         ranked_resources: list[APIFrequentlyAccessedResource] = []
         for ranked_resource in frequent_resources.resources:
             ranked_resources.append(
@@ -390,6 +387,31 @@ class Backend:
             resources=[resource.dict() for resource in ranked_resources],
         )
         return resources
+
+    def get_frequently_asked_questions(
+        self,
+        class_id: UUID,
+        start_date: Optional[date] = None,
+        end_date: Optional[date] = None,
+    ) -> APICommonQuestions:
+        """Get the most frequently asked questions."""
+        date_range = self._get_date_range(start_date, end_date)
+        frequent_questions = self._metrics.get_most_frequently_asked_questions(class_id, date_range)
+        ranked_questions: list[APICommonQuestion] = []
+        for ranked_question in frequent_questions.common_questions:
+            ranked_questions.append(
+                APICommonQuestion(
+                    appearances_during_period=ranked_question.appearances_during_period,
+                    rank=ranked_question.rank,
+                    question=ranked_question.question,
+                )
+            )
+        questions = APICommonQuestions(
+            class_id=frequent_questions.class_id,
+            date_range=APIDateRange(start_date=frequent_questions.date_range.start_date, end_date=frequent_questions.date_range.end_date),
+            common_questions=[question.dict() for question in ranked_questions],
+        )
+        return questions
 
     def get_tai_response(self, chat_session: APIChatSession, stream: bool=False) -> APIChatSession:
         """Get and add the tai tutor response to the chat session."""
@@ -489,6 +511,13 @@ class Backend:
             except Exception as e: # pylint: disable=broad-except
                 logger.critical(f"Failed to create class resources: {e}")
                 self._coerce_and_update_status(class_resource, ClassResourceProcessingStatus.FAILED)
+
+    def _get_date_range(self, start_date: Optional[date], end_date: Optional[date]) -> BEDateRange:
+        if start_date is None:
+            start_date = date.today()
+        if end_date is None:
+            end_date = start_date - timedelta(days=7)
+        return BEDateRange(start_date=start_date, end_date=end_date)
 
     def _get_tai_llm(self, stream: bool=False) -> TaiLLM:
         """Initialize the openai api."""

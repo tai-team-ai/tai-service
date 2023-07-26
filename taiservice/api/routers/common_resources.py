@@ -22,8 +22,8 @@ def get_frequently_accessed_resources(request: Request, class_id: str):
     return backend.get_frequently_accessed_class_resources(class_id)
 
 
-@ROUTER.get("/common_questions", response_model=CommonQuestions)
-def get_common_questions(request: Request):
+@ROUTER.get("/common_questions/{class_id}", response_model=CommonQuestions)
+def get_common_questions(request: Request, class_id: str):
     """Get all common questions."""
     backend: Backend = getattr(request.app.state, BACKEND_ATTRIBUTE_NAME)
-    return CommonQuestions.Config.schema_extra["example"]
+    return backend.get_frequently_asked_questions(class_id)
