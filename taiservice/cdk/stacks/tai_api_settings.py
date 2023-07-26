@@ -17,7 +17,6 @@ TAI_API_SETTINGS = DeploymentTaiApiSettings(
     doc_db_database_name=DOCUMENT_DB_SETTINGS.db_name,
     doc_db_class_resource_collection_name=DOCUMENT_DB_SETTINGS.collection_config[0].name,
     doc_db_class_resource_chunk_collection_name=DOCUMENT_DB_SETTINGS.collection_config[1].name,
-    student_message_archive_bucket_name="student-message-archive",
     pinecone_db_api_key_secret_name=PINECONE_DB_SETTINGS.api_key_secret_name,
     pinecone_db_environment=PINECONE_DB_SETTINGS.environment,
     pinecone_db_index_name=PINECONE_DB_SETTINGS.indexes[0].name,

@@ -282,15 +282,13 @@ class ValidatedFormatString(BasePydanticModel):
         return self.format_string.format(**self.kwargs)
 
 SUMMARIZER_SYSTEM_PROMPT = dedent(
-    """You are a summarizer. You will be given a search query and a list of documents. You're
-    job is to summarize the documents. If you are not provided a list of documents, you should 
-    not respond with anything."""
+    """You are a summarizer. You will be given a list of documents. You're
+    job is to summarize the documents in about 3-4 sentences."""
 )
 SUMMARIZER_USER_PROMPT = dedent("""\
-Student search query: {search_query}
-Returned search result documents:
+Documents:
 {documents}
-Snippet (Summary of the search results):
+Summary:
 """)
 
 STUDENT_COMMON_QUESTIONS_SYSTEM_PROMPT = dedent("""\

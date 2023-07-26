@@ -2,20 +2,19 @@
 from uuid import UUID
 import boto3
 from loguru import logger
+from langchain.schema import HumanMessage
 # first imports are for local development, second imports are for deployment
 try:
-    from .archive_schemas import BaseArchiveRecord, StudentMessageRecord
+    from .archive_schemas import BaseArchiveRecord, HumanMessageRecord
     from ..shared_schemas import DateRange
     from ..taitutors.llm_schemas import (
         BaseMessage,
-        StudentMessage,
     )
 except ImportError:
-    from taibackend.databases.archive_schemas import BaseArchiveRecord, StudentMessageRecord
+    from taibackend.databases.archive_schemas import BaseArchiveRecord, HumanMessageRecord
     from taibackend.shared_schemas import DateRange
     from taibackend.taitutors.llm_schemas import (
         BaseMessage,
-        StudentMessage,
     )
 
 
@@ -32,8 +31,8 @@ class Archive:
             class_id=class_id,
             timestamp=message.timestamp,
         )
-        if isinstance(message, StudentMessage):
-            archive_record = StudentMessageRecord(
+        if isinstance(message, HumanMessage):
+            archive_record = HumanMessageRecord(
                 message=message.content,
                 **base_record.dict(),
             )

@@ -1,26 +1,24 @@
 """Define metrics utilities and classes for retrieving and aggregating metrics for the TAIService API."""
-
-from datetime import date, timedelta
 from typing import Optional
 from uuid import UUID
 from pydantic import Field, conint
 # first imports are for local development, second imports are for deployment
 try:
-    from .shared_schemas import BaseOpenAIConfig, BasePydanticModel, DateRange
+    from .shared_schemas import BasePydanticModel, DateRange
     from .databases.document_db_schemas import ClassResourceChunkDocument
     from .databases.archiver import Archive
-    from .databases.archive_schemas import StudentMessageRecord
+    from .databases.archive_schemas import HumanMessageRecord
     from .databases.document_db import DocumentDB
     from .databases.pinecone_db import PineconeDB
-    from .taitutors.llm import TaiLLM
+    from .taitutors.llm import TaiLLM, ChatOpenAIConfig
 except ImportError:
-    from shared_schemas import BaseOpenAIConfig, BasePydanticModel, DateRange
+    from shared_schemas import BasePydanticModel, DateRange
     from databases.document_db_schemas import ClassResourceChunkDocument
     from databases.archiver import Archive
-    from databases.archive_schemas import StudentMessageRecord
+    from databases.archive_schemas import HumanMessageRecord
     from databases.document_db import DocumentDB
     from databases.pinecone_db import PineconeDB
-    from taitutors.llm import TaiLLM
+    from taitutors.llm import TaiLLM, ChatOpenAIConfig
 
 
 class MetricsConfig(BasePydanticModel):
@@ -37,7 +35,7 @@ class MetricsConfig(BasePydanticModel):
         ...,
         description="The instance of the archive.",
     )
-    openai_config: BaseOpenAIConfig = Field(
+    openai_config: ChatOpenAIConfig = Field(
         ...,
         description="The config for the OpenAI API.",
     )
@@ -119,10 +117,10 @@ class Metrics:
         records = self._archive.get_archived_messages(
             class_id=class_id,
             date_range=date_range,
-            RecordClass=StudentMessageRecord,
+            RecordClass=HumanMessageRecord,
         )
-        assert all(isinstance(rec, StudentMessageRecord) for rec in records)
-        rec: StudentMessageRecord
+        assert all(isinstance(rec, HumanMessageRecord) for rec in records)
+        rec: HumanMessageRecord
         messages = []
         for rec in records:
             messages.append(rec.message)
@@ -131,20 +129,22 @@ class Metrics:
     def _rank_summaries(self, summary: list[str]) -> list[CommonQuestion]:
         """Rank messages."""
         ranked_messages = []
-        for message in summary:
+        for rank, message in enumerate(summary, 1):
             msg = CommonQuestion(
-                rank=1,
+                rank=rank,
                 appearances_during_period=1,
                 question=message,
             )
             ranked_messages.append(msg)
         return ranked_messages
 
-    def get_most_frequently_asked_questions(self, class_id: UUID, date_range: Optional[DateRange] = None) -> CommonQuestions:
+    def get_most_frequently_asked_questions(self, class_id: UUID, date_range: Optional[DateRange] = None) -> Optional[CommonQuestions]:
         """Get the most frequently asked questions."""
         if date_range is None:
             date_range = DateRange()
         messages = self._get_student_messages(class_id, date_range)
+        if len(messages) <= 10:
+            return
         llm = TaiLLM(self._openai_config)
         messages = llm.summarize_student_messages(messages, as_questions=True)
         common_questions = CommonQuestions(

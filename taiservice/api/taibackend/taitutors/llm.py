@@ -1,13 +1,15 @@
 """Define the llms interface used for the TAI chat backend."""
-import copy
+import traceback
+from uuid import UUID
+from uuid import uuid4
 from enum import Enum
 import json
 from typing import Any, Dict, Optional
-from uuid import uuid4
 from langchain.chat_models import ChatOpenAI
 from langchain import PromptTemplate
 from langchain.chat_models.base import BaseChatModel
 from langchain.chains.openai_functions.base import create_openai_fn_chain
+from loguru import logger
 from pydantic import Field
 # first imports are for local development, second imports are for deployment
 try:
@@ -127,8 +129,6 @@ class TaiLLM:
         ModelToUse: Optional[BaseChatModel] = None,
     ) -> None:
         """Get the response from the LLMs."""
-        student_message = chat_session.last_student_message
-        self._archive.archive_message(student_message, chat_session.class_id)
         llm_kwargs ={}
         if relevant_chunks:
             self._append_synthetic_function_call_to_chat(
@@ -137,8 +137,8 @@ class TaiLLM:
                 function_kwargs={'student_message': chat_session.last_student_message.content},
                 relevant_chunks=relevant_chunks,
             )
-        if function_to_call or relevant_chunks:
-            assert functions, "Must provide functions if function_to_call or relevant_chunks are provided."
+        if function_to_call:
+            assert functions, "Must provide functions if function_to_call is provided."
             chain = create_openai_fn_chain(
                 functions=[function_to_call],
                 llm=self._large_context_chat_model,
@@ -150,17 +150,26 @@ class TaiLLM:
         # langchain does the above line for us, but it's left here for reference
         self._append_model_response(chat_session, chunks=relevant_chunks, ModelToUse=ModelToUse, **llm_kwargs)
 
-    def create_search_result_summary_snippet(self, search_query: str, chunks: list[ClassResourceChunkDocument]) -> str:
+    def create_search_result_summary_snippet(
+        self,
+        class_id: UUID,
+        search_query: str,
+        chunks: list[ClassResourceChunkDocument]
+    ) -> str:
         """Create a snippet of the search result summary."""
+        session: TaiChatSession = TaiChatSession.from_message(
+            SearchQuery(content=search_query),
+            class_id=class_id,
+        )
         documents = "\n".join([chunk.simplified_string for chunk in chunks])
         format_str = ValidatedFormatString(
             format_string=SUMMARIZER_USER_PROMPT,
-            kwargs={"search_query": search_query, "documents": documents},
+            kwargs={"documents": documents},
         )
-        session: TaiChatSession = TaiChatSession.from_message(
-            SearchQuery(content=format_str.format()),
-            class_id=uuid4(),
-        )
+        session.append_chat_messages([FunctionMessage(
+            content=format_str.format(),
+            name="get_search_results_for_query",
+        )])
         session.insert_system_prompt(SUMMARIZER_SYSTEM_PROMPT)
         self.add_tai_tutor_chat_response(session)
         return session.last_chat_message.content
@@ -244,7 +253,7 @@ class TaiLLM:
             content="",
             function_call=AIResponseCallingFunction(
                 name=function_to_call.__name__,
-                arguments=json.dumps(function_kwargs),
+                arguments=function_kwargs,
             ),
             tai_tutor_name=last_student_chat.tai_tutor_name,
         )

@@ -192,7 +192,7 @@ class DocumentDB:
         """Upsert the metrics of the class resource."""
         for doc in docs:
             collection = self._document_type_to_collection[DocClass.__name__]
-            metric = UsageMetric(timestamp=datetime.now())
+            metric = UsageMetric(timestamp=datetime.utcnow())
             collection.find_one_and_update(
                 {"_id": doc.id_as_str},
                 {"$push": {"usage_log": metric.dict(serialize_dates=False)} }

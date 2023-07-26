@@ -76,14 +76,14 @@ class TaiApiStack(Stack):
         )
         api_settings.cold_store_bucket_name = self._cold_store_bucket.bucket_name
         self._message_archive_bucket: VersionedBucket = self._create_bucket(
-            name=api_settings.message_archive_bucket_name,
-            public_read_access=True,
+            bucket_name=api_settings.message_archive_bucket_name,
+            public_read_access=False,
             role=lambda_role,
             permissions=Permissions.READ_WRITE,
         )
         api_settings.message_archive_bucket_name = self._message_archive_bucket.bucket_name
         self._frontend_transfer_bucket: VersionedBucket = self._create_bucket(
-            name=api_settings.frontend_data_transfer_bucket_name,
+            bucket_name=api_settings.frontend_data_transfer_bucket_name,
             public_read_access=True,
             role=lambda_role,
             permissions=Permissions.READ_WRITE,

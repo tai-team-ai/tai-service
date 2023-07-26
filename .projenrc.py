@@ -128,6 +128,7 @@ RUNTIME_ENV_VARS = {
     "COLD_STORE_BUCKET_NAME": "tai-service-class-resource-cold-store-dev",
     "FRONTEND_DATA_TRANSFER_BUCKET_NAME": "frontend-data-transfer-[branch-name]",
     "NLTK_DATA": "/tmp/nltk_data",
+    "MESSAGE_ARCHIVE_BUCKET_NAME": "llm-message-archive-add-common-dev",
 }
 make_file.add_rule(
     targets=["build-and-run-docker"],

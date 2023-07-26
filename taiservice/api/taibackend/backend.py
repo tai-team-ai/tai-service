@@ -1,5 +1,6 @@
 """Define the class resources backend."""
 import json
+import traceback
 from datetime import datetime, date, timedelta
 from uuid import UUID, uuid4
 from typing import Union, Any, Optional
@@ -157,7 +158,7 @@ class Backend:
         openAI_config = OpenAIConfig(
             api_key=self._openai_api_key,
             batch_size=runtime_settings.openAI_batch_size,
-            request_timeout=runtime_settings.openAI_request_timeout,
+            request_timeout=runtime_settings.base_openAI_request_timeout,
         )
         self._indexer_config = IndexerConfig(
             pinecone_db_config=self._pinecone_db_config,
@@ -167,14 +168,15 @@ class Backend:
             chrome_driver_path=runtime_settings.chrome_driver_path,
         )
         self._indexer = Indexer(self._indexer_config)
+        self._llm_message_archive = Archive(runtime_settings.message_archive_bucket_name)
         self._metrics = Metrics(
             MetricsConfig(
                 document_db_instance=self._doc_db,
-                openai_config=openAI_config,
+                openai_config=self._get_tai_llm_config(),
                 pinecone_db_instance=self._pinecone_db,
+                archive=self._llm_message_archive,
             )
         )
-        self._llm_message_archive = Archive(runtime_settings.message_archive_bucket_name)
 
     @staticmethod
     def to_api_resources(
@@ -370,7 +372,7 @@ class Backend:
         end_date: Optional[date] = None,
     ) -> APIFrequentlyAccessedResources:
         """Get the most frequently accessed class resources."""
-        date_range = self._get_date_range(start_date, end_date)
+        date_range = self._get_BE_date_range(start_date, end_date)
         frequent_resources = self._metrics.get_most_frequently_accessed_resources(class_id, date_range)
         ranked_resources: list[APIFrequentlyAccessedResource] = []
         for ranked_resource in frequent_resources.resources:
@@ -395,29 +397,31 @@ class Backend:
         end_date: Optional[date] = None,
     ) -> APICommonQuestions:
         """Get the most frequently asked questions."""
-        date_range = self._get_date_range(start_date, end_date)
+        date_range = self._get_BE_date_range(start_date, end_date)
         frequent_questions = self._metrics.get_most_frequently_asked_questions(class_id, date_range)
-        ranked_questions: list[APICommonQuestion] = []
+        api_questions = APICommonQuestions(
+            class_id=class_id,
+            date_range=APIDateRange(start_date=date_range.start_date, end_date=date_range.end_date),
+            common_questions=[],
+        )
+        if not frequent_questions:
+            return api_questions
         for ranked_question in frequent_questions.common_questions:
-            ranked_questions.append(
+            api_questions.common_questions.append(
                 APICommonQuestion(
                     appearances_during_period=ranked_question.appearances_during_period,
                     rank=ranked_question.rank,
                     question=ranked_question.question,
                 )
             )
-        questions = APICommonQuestions(
-            class_id=frequent_questions.class_id,
-            date_range=APIDateRange(start_date=frequent_questions.date_range.start_date, end_date=frequent_questions.date_range.end_date),
-            common_questions=[question.dict() for question in ranked_questions],
-        )
-        return questions
+        return api_questions
 
     def get_tai_response(self, chat_session: APIChatSession, stream: bool=False) -> APIChatSession:
         """Get and add the tai tutor response to the chat session."""
         chat_session: BEChatSession = self.to_backend_chat_session(chat_session)
+        self._archive_message(chat_session.last_human_message, chat_session.class_id)
         chunks = self.get_relevant_class_resources(chat_session.last_chat_message.content, chat_session.class_id)
-        tai_llm = self._get_tai_llm(stream)
+        tai_llm = TaiLLM(self._get_tai_llm_config(stream))
         student_msg = chat_session.last_student_message
         prompt = BETaiProfile.get_system_prompt(name=student_msg.tai_tutor_name, technical_level=student_msg.technical_level)
         chat_session.insert_system_prompt(prompt)
@@ -428,11 +432,13 @@ class Backend:
 
     def search(self, query: ResourceSearchQuery) -> ResourceSearchAnswer:
         """Search for class resources."""
+        student_message = BEStudentMessage(content=query.query)
+        self._archive_message(student_message, query.class_id)
         chunks = self.get_relevant_class_resources(query.query, query.class_id)
         snippet = ""
         if chunks:
-            tai_llm = self._get_tai_llm()
-            snippet = tai_llm.create_search_result_summary_snippet(query.query, chunks)
+            tai_llm = TaiLLM(self._get_tai_llm_config())
+            snippet = tai_llm.create_search_result_summary_snippet(query.class_id, query.query, chunks)
         search_answer = ResourceSearchAnswer(
             summary_snippet=snippet,
             suggested_resources=self.to_api_resources(chunks),
@@ -512,14 +518,22 @@ class Backend:
                 logger.critical(f"Failed to create class resources: {e}")
                 self._coerce_and_update_status(class_resource, ClassResourceProcessingStatus.FAILED)
 
-    def _get_date_range(self, start_date: Optional[date], end_date: Optional[date]) -> BEDateRange:
+    def _archive_message(self, message: BEBaseMessage, class_id: UUID) -> None:
+        """Archive the message."""
+        if message:
+            try:
+                self._llm_message_archive.archive_message(message, class_id)
+            except Exception: # pylint: disable=broad-except
+                logger.error(traceback.format_exc())
+
+    def _get_BE_date_range(self, start_date: Optional[date], end_date: Optional[date]) -> BEDateRange:
         if start_date is None:
-            start_date = date.today()
+            start_date = datetime.utcnow() - timedelta(days=7)
         if end_date is None:
-            end_date = start_date - timedelta(days=7)
+            end_date = datetime.utcnow()
         return BEDateRange(start_date=start_date, end_date=end_date)
 
-    def _get_tai_llm(self, stream: bool=False) -> TaiLLM:
+    def _get_tai_llm_config(self, stream: bool=False) -> TaiLLM:
         """Initialize the openai api."""
         config = ChatOpenAIConfig(
             api_key=self._openai_api_key,
@@ -530,7 +544,7 @@ class Backend:
             advanced_model_name=self._runtime_settings.advanced_model_name,
             message_archive=self._llm_message_archive,
         )
-        return TaiLLM(config)
+        return config
 
     def _coerce_status_to(self, class_resources: list[ClassResourceDocument], status: ClassResourceProcessingStatus) -> None:
         """Coerce the status of the class resources to the given status."""
@@ -557,7 +571,7 @@ class Backend:
         stable = doc.status == ClassResourceProcessingStatus.COMPLETED \
             or doc.status == ClassResourceProcessingStatus.FAILED
         if not stable:
-            elapsed_time = (datetime.now() - doc.modified_timestamp).total_seconds()
+            elapsed_time = (datetime.utcnow() - doc.modified_timestamp).total_seconds()
             if elapsed_time > self._runtime_settings.class_resource_processing_timeout:
                 return True
         return False

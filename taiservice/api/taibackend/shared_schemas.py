@@ -65,11 +65,11 @@ class BasePydanticModel(BaseModel):
 class DateRange(BasePydanticModel):
     """Define a schema for a date range."""
     start_date: datetime = Field(
-        default_factory=datetime.utcnow,
+        default_factory=lambda: datetime.utcnow() + timedelta(days=7),
         description="The start date of the date range.",
     )
     end_date: datetime = Field(
-        default_factory=lambda: datetime.utcnow() + timedelta(days=7),
+        default_factory=datetime.utcnow,
         description="The end date of the date range.",
     )
 

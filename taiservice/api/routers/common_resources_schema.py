@@ -1,7 +1,7 @@
 """Define schemas for common resources."""
 import copy
 from uuid import UUID
-from datetime import date
+from datetime import datetime
 from pydantic import Field, conint
 # first imports are for local development, second imports are for deployment
 try:
@@ -52,11 +52,11 @@ EXAMPLE_MOST_FREQUENTLY_ACCESSED_RESOURCE.update({
 
 class DateRange(BasePydanticModel):
     """Define a schema for a date range."""
-    start_date: date = Field(
+    start_date: datetime = Field(
         ...,
         description="The start date of the date range.",
     )
-    end_date: date = Field(
+    end_date: datetime = Field(
         ...,
         description="The end date of the date range.",
     )

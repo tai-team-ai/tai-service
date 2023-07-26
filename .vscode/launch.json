@@ -26,7 +26,8 @@
         "AWS_DEFAULT_REGION": "us-east-1",
         "COLD_STORE_BUCKET_NAME": "tai-service-class-resource-cold-store-dev",
         "FRONTEND_DATA_TRANSFER_BUCKET_NAME": "frontend-data-transfer-[branch-name]",
-        "NLTK_DATA": "/tmp/nltk_data"
+        "NLTK_DATA": "/tmp/nltk_data",
+        "MESSAGE_ARCHIVE_BUCKET_NAME": "llm-message-archive-add-common-dev"
       },
       "program": "${workspaceFolder}/.venv/bin/uvicorn"
     }
