@@ -1,8 +1,5 @@
 """Define shared schemas for database models."""
-from datetime import (
-    datetime,
-    date as date_type,
-)
+from datetime import datetime
 from uuid import UUID
 from uuid import uuid4
 from enum import Enum
@@ -66,13 +63,9 @@ class BasePydanticModel(BaseModel):
 
 class UsageMetric(BasePydanticModel):
     """Define the usage log model for tracking usage of resources."""
-    date: date_type = Field(
+    timestamp: datetime = Field(
         ...,
         description="The date of the usage metric.",
-    )
-    usage_count: conint(ge=0) = Field(
-        ...,
-        description="The usage count of the resource. This tracks the number of times the resource was used on the date.",
     )
 
 

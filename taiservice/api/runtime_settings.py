@@ -61,6 +61,10 @@ class TaiApiSettings(BaseSettings):
         ...,
         description="The name of the collection in the document db for class resource chunks.",
     )
+    message_archive_bucket_name: str = Field(
+        ...,
+        description="The name of the student message archive bucket to store all student messages.",
+    )
     openAI_api_key_secret_name: str = Field(
         ...,
         description="The name of the secret containing the OpenAI API key.",

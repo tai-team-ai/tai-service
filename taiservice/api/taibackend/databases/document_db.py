@@ -14,12 +14,14 @@ try:
         ClassResourceDocument,
         ClassResourceChunkDocument,
     )
+    from ..shared_schemas import UsageMetric
 except ImportError:
     from taibackend.databases.document_db_schemas import (
         BaseClassResourceDocument,
         ClassResourceDocument,
         ClassResourceChunkDocument,
     )
+    from taibackend.shared_schemas import UsageMetric
 
 class DocumentDBConfig(BaseModel):
     """Define the document database config."""
@@ -190,16 +192,12 @@ class DocumentDB:
         """Upsert the metrics of the class resource."""
         for doc in docs:
             collection = self._document_type_to_collection[DocClass.__name__]
-            date_now = str(datetime.now().date())
+            metric = UsageMetric(timestamp=datetime.now())
             collection.find_one_and_update(
-                {"_id": doc.id_as_str, "usage_log.date": {"$ne": date_now}},
-                {"$push": {"usage_log": {"date": date_now, "usage_count": 0}}}
+                {"_id": doc.id_as_str},
+                {"$push": {"usage_log": metric.dict(serialize_dates=False)} }
             )
-            collection.find_one_and_update(
-                {"_id": doc.id_as_str, "usage_log.date": date_now},
-                {"$inc": {"usage_log.$.usage_count": 1}}
-            )
-            doc = collection.find_one({"_id": doc.id_as_str}) # updates the document in memory
+            doc.usage_log.append(metric) # updates the document in memory
 
     def _execute_operation(
         self,

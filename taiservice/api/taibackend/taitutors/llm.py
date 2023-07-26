@@ -18,6 +18,7 @@ try:
         save_student_questions,
     )
     from ..databases.document_db_schemas import ClassResourceChunkDocument
+    from ..databases.archiver import Archive
     from .llm_schemas import (
         TaiChatSession,
         TaiTutorMessage,
@@ -38,6 +39,8 @@ except (KeyError, ImportError):
         save_student_conversation_topics,
         save_student_questions,
     )
+    from taibackend.databases.document_db_schemas import ClassResourceChunkDocument
+    from taibackend.databases.archiver import Archive
     from taibackend.taitutors.llm_schemas import (
         TaiChatSession,
         TaiTutorMessage,
@@ -78,10 +81,15 @@ class ChatOpenAIConfig(BaseOpenAIConfig):
         default=False,
         description="Whether or not to stream the response.",
     )
+    message_archive: Archive = Field(
+        ...,
+        description="The archive to use for archiving messages.",
+    )
 
     class Config:
         """Define the pydantic config."""
         use_enum_values = True
+        arbitrary_types_allowed = True
 
 
 class TaiLLM:
@@ -108,6 +116,7 @@ class TaiLLM:
             request_timeout=config.request_timeout + 30,
             **base_config,
         )
+        self._archive = config.message_archive
 
     def add_tai_tutor_chat_response(
         self,
@@ -118,6 +127,8 @@ class TaiLLM:
         ModelToUse: Optional[BaseChatModel] = None,
     ) -> None:
         """Get the response from the LLMs."""
+        student_message = chat_session.last_student_message
+        self._archive.archive_message(student_message, chat_session.class_id)
         llm_kwargs ={}
         if relevant_chunks:
             self._append_synthetic_function_call_to_chat(

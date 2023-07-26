@@ -8,6 +8,7 @@ import boto3
 from botocore.exceptions import ClientError
 try:
     from .errors import DuplicateClassResourceError
+    from .databases.archiver import Archive
     from .metrics import (
         Metrics,
         MetricsConfig,
@@ -67,6 +68,7 @@ try:
         IngestedDocument,
     )
 except (KeyError, ImportError):
+    from taibackend.databases.archiver import Archive
     from taibackend.metrics import (
         Metrics,
         MetricsConfig,
@@ -171,6 +173,7 @@ class Backend:
                 pinecone_db_instance=self._pinecone_db,
             )
         )
+        self._llm_message_archive = Archive(runtime_settings.message_archive_bucket_name)
 
     @staticmethod
     def to_api_resources(
@@ -491,11 +494,12 @@ class Backend:
         """Initialize the openai api."""
         config = ChatOpenAIConfig(
             api_key=self._openai_api_key,
-            request_timeout=self._runtime_settings.openAI_request_timeout,
+            request_timeout=self._runtime_settings.base_openAI_request_timeout,
             stream_response=stream,
             basic_model_name=self._runtime_settings.basic_model_name,
             large_context_model_name=self._runtime_settings.large_context_model_name,
             advanced_model_name=self._runtime_settings.advanced_model_name,
+            message_archive=self._llm_message_archive,
         )
         return TaiLLM(config)
 

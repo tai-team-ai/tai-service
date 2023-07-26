@@ -131,9 +131,14 @@ class Metrics:
                 '$unwind': '$usage_log'
             },
             {
+                '$match': {
+                    'usage_log.timestamp': {'$gte': date_range.start_date, '$lte': date_range.end_date} ,
+                },
+            },
+            {
                 '$group': {
                     '_id': '$_id',
-                    'resource_count': {'$sum': '$usage_log.usage_count'},
+                    'resource_count': {'$sum': 1 },
                 }
             },
             {

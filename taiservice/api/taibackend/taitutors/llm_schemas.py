@@ -1,5 +1,6 @@
 """Define the llm schemas for interfacing with LLMs."""
 import copy
+from datetime import datetime
 import re
 from textwrap import dedent
 from typing import Any, Optional, Union
@@ -64,6 +65,10 @@ class BaseMessage(langchainBaseMessage):
     render_chat: bool = Field(
         default=True,
         description="Whether or not to render the chat message. If false, the chat message will be hidden from the student.",
+    )
+    timestamp: datetime = Field(
+        default_factory=datetime.utcnow,
+        description="The timestamp of the message.",
     )
 
     @property
@@ -320,7 +325,7 @@ STUDENT_COMMON_DISCUSSION_TOPICS_SYSTEM_PROMPT = dedent("""\
     ten discussion topics! Here are the student messages:"""
 )
 FINAL_STAGE_STUDENT_TOPIC_SUMMARY_SYSTEM_PROMPT = dedent("""\
-    Please condense this list by grouping by topic:"""
+    Please condense this list by grouping by topic, using 'and' where necessary to combine:"""
 )
 
 BASE_SYSTEM_MESSAGE = dedent("""\
