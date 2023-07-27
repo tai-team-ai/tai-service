@@ -4,7 +4,7 @@ from uuid import UUID
 from uuid import uuid4
 from enum import Enum
 import json
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Union
 from langchain.chat_models import ChatOpenAI
 from langchain import PromptTemplate
 from langchain.chat_models.base import BaseChatModel
@@ -30,8 +30,10 @@ try:
         SUMMARIZER_SYSTEM_PROMPT,
         SUMMARIZER_USER_PROMPT,
         STUDENT_COMMON_QUESTIONS_SYSTEM_PROMPT,
+        HARD_CODED_CLASS_NAME,
         STUDENT_COMMON_DISCUSSION_TOPICS_SYSTEM_PROMPT,
         FINAL_STAGE_STUDENT_TOPIC_SUMMARY_SYSTEM_PROMPT,
+        STEERING_PROMPT,
         ValidatedFormatString,
     )
 except (KeyError, ImportError):
@@ -52,8 +54,10 @@ except (KeyError, ImportError):
         SUMMARIZER_SYSTEM_PROMPT,
         SUMMARIZER_USER_PROMPT,
         STUDENT_COMMON_QUESTIONS_SYSTEM_PROMPT,
+        HARD_CODED_CLASS_NAME,
         STUDENT_COMMON_DISCUSSION_TOPICS_SYSTEM_PROMPT,
         FINAL_STAGE_STUDENT_TOPIC_SUMMARY_SYSTEM_PROMPT,
+        STEERING_PROMPT,
         ValidatedFormatString,
     )
 
@@ -87,6 +91,10 @@ class ChatOpenAIConfig(BaseOpenAIConfig):
         ...,
         description="The archive to use for archiving messages.",
     )
+    class_name: str = Field(
+        default=HARD_CODED_CLASS_NAME,
+        description="The name of the class.",
+    )
 
     class Config:
         """Define the pydantic config."""
@@ -119,6 +127,7 @@ class TaiLLM:
             **base_config,
         )
         self._archive = config.message_archive
+        self._class_name = config.class_name
 
     def add_tai_tutor_chat_response(
         self,
@@ -137,6 +146,15 @@ class TaiLLM:
                 function_kwargs={'student_message': chat_session.last_student_message.content},
                 relevant_chunks=relevant_chunks,
             )
+        if relevant_chunks is not None and len(relevant_chunks) == 0:
+            format_str = ValidatedFormatString(
+                format_string=STEERING_PROMPT,
+                kwargs={"class_name": self._class_name},
+            )
+            chat_session.append_chat_messages([TaiTutorMessage(
+                content=format_str.format(),
+                render_chat=False,
+            )])
         if function_to_call:
             assert functions, "Must provide functions if function_to_call is provided."
             chain = create_openai_fn_chain(
@@ -262,9 +280,10 @@ class TaiLLM:
 
     def _function_msg_from_chunks(self, chunks: list[ClassResourceChunkDocument]) -> FunctionMessage:
         """Create a function message from the chunks."""
+        chunks = "\n".join([chunk.simplified_string for chunk in chunks])
         msg = FunctionMessage(
             name="find_relevant_chunks",
             render_chat=False,
-            content="\n".join([chunk.simplified_string for chunk in chunks]),
+            content=chunks,
         )
         return msg
