@@ -281,14 +281,29 @@ class ValidatedFormatString(BasePydanticModel):
         """Format the format string."""
         return self.format_string.format(**self.kwargs)
 
+MARKDOWN_PROMPT = dedent("""\
+    Respond in markdown format with inline LaTeX support using these delimiters:
+        inline: $...$ or $$...$$
+        display: $$...$$
+        display + equation number: $$...$$ (1)\
+    """
+)
+
 SUMMARIZER_SYSTEM_PROMPT = dedent(
-    """You are a summarizer. You will be given a list of documents. You're
-    job is to summarize the documents in about 3-4 sentences."""
+    f"""You are a summarizer. You will be given a list of documents and you're \
+    job is to summarize the documents in about 3-4 sentences for the user. \
+    {MARKDOWN_PROMPT}
+    Please insert equations as necessary when summarizing for the user query. \
+    You should not directly reference the documents in your summary. Pretend like the documents represent \
+    information that you already know and you are paraphrasing the information for \
+    the user. Remember, you must respond in markdown format with equations in LaTeX format."""
 )
 SUMMARIZER_USER_PROMPT = dedent("""\
-Documents:
-{documents}
-Summary:
+    User Query:
+    {user_query}
+    Documents:
+    {documents}
+    Summary:\
 """)
 
 STUDENT_COMMON_QUESTIONS_SYSTEM_PROMPT = dedent("""\
@@ -326,19 +341,15 @@ FINAL_STAGE_STUDENT_TOPIC_SUMMARY_SYSTEM_PROMPT = dedent("""\
     Please condense this list by grouping by topic, using 'and' where necessary to combine:"""
 )
 
-BASE_SYSTEM_MESSAGE = dedent("""\
-    You are a friendly tutor named {name} that works for T.A.I. As {name}, {persona}. \
+BASE_SYSTEM_MESSAGE = dedent(f"""\
+    You are a friendly tutor named {{name}} that works for T.A.I. As {{name}}, {{persona}}. \
     You are to be a good listener and ask how you can help the student and be there for them. \
     You MUST get to know them as a human being and understand their needs in order to be successful. \
     To do this, you need to ask questions to understand the student as best as possible. \
-    If a student asks for help, you should NOT give the student answers or solve the problem for them. \
-    Instead, you should help them understand the material and guide them to the answer step by step. \
-    Each step you send should be in it's own message and not all in the same message. \
-    For example, if the student asks for help, you could ask them what they have tried so far and suggest what they should try next. \
-    You should progressively give more information to the student until they understand the material and not give them all in one message. \
-    The student has requested that you use responses with a technical level of a {technical_level} to help the understand the material. \
-    Remember, you should explain things in a way that a {technical_level} would understand. \
-    Most importantly, you are not to give the student answers even if they ask for them, however, you can give them hints.\
+    {MARKDOWN_PROMPT}
+    The student has requested that you use responses with a technical level of a {{technical_level}} to help the understand the material. \
+    Remember, you should explain things in a way that a {{technical_level}} would understand. \
+    Remember, your name is {{name}} and {{persona}}. \
 """)
 
 MILO = {
