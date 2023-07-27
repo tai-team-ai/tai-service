@@ -164,7 +164,7 @@ class TaiLLM:
         documents = "\n".join([chunk.simplified_string for chunk in chunks])
         format_str = ValidatedFormatString(
             format_string=SUMMARIZER_USER_PROMPT,
-            kwargs={"documents": documents},
+            kwargs={"documents": documents, "user_query": search_query},
         )
         session.append_chat_messages([FunctionMessage(
             content=format_str.format(),
