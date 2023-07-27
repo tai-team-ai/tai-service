@@ -281,76 +281,93 @@ class ValidatedFormatString(BasePydanticModel):
         """Format the format string."""
         return self.format_string.format(**self.kwargs)
 
-MARKDOWN_PROMPT = dedent("""\
-    Respond in markdown format with inline LaTeX support using these delimiters:
-        inline: $...$ or $$...$$
-        display: $$...$$
-        display + equation number: $$...$$ (1)\
-    """
-)
 
-SUMMARIZER_SYSTEM_PROMPT = dedent(
-    f"""You are a summarizer. You will be given a list of documents and you're \
-    job is to summarize the documents in about 3-4 sentences for the user. \
-    {MARKDOWN_PROMPT}
-    Please insert equations as necessary when summarizing for the user query. \
-    You should not directly reference the documents in your summary. Pretend like the documents represent \
-    information that you already know and you are paraphrasing the information for \
-    the user. Remember, you must respond in markdown format with equations in LaTeX format."""
-)
-SUMMARIZER_USER_PROMPT = dedent("""\
-    User Query:
-    {user_query}
-    Documents:
-    {documents}
-    Summary:\
-""")
+HARD_CODED_CLASS_NAME = "MECH320, Statics Engineering"
 
-STUDENT_COMMON_QUESTIONS_SYSTEM_PROMPT = dedent("""\
-    You are a helpful assistant designed to help professors understand what \
-    their students are struggling with. You will be given a list of student \
-    interactions with a teaching assistant, and your job is to save a list \
-    of up to 10 most common questions ordered by most commonly asked. If there are no \
-    specific questions that students asked, you should try to create a list \
-    of questions that were implied by the student messages. For example, if \
-    a student says "I am struggling on homework 1", this implies that they \
-    are asking for help on homework 1: "Can you help me with homework 1?". \
-    You must respond with a list of 10 questions or less. To help the professor, \
-    please order the questions from most common to least common. Remember, \
-    you must only return a list of 10 questions so you must group similar \
-    questions together. You must not return more than ten questions! Here are \
-    the student messages:"""
-)
-STUDENT_COMMON_DISCUSSION_TOPICS_SYSTEM_PROMPT = dedent("""\
-    You are a helpful assistant designed to help professors understand what \
-    their students are struggling with. You will be given a list of student \
-    interactions with a teaching assistant, and your job is to create a list \
-    of up to 10 top discussed topics ordered by most commonly discussed. If there are no \
-    explicit discussion topics that students discussed, you should try to \
-    create a list of discussion topics that were implied by the student messages. \
-    You must respond with a list of 10 discussion topics or less. To help the \
-    professor, please order the discussion topics from most discussed by the \
-    students to least discussed. Please provide as much detail as possible \
-    for each discussion topic so that the professor can understand what the \
-    students were discussing. \
-    Remember, you must only return a list of 10 discussion topics so you must \
-    group similar discussion topics together. You must not return more than \
-    ten discussion topics! Here are the student messages:"""
-)
-FINAL_STAGE_STUDENT_TOPIC_SUMMARY_SYSTEM_PROMPT = dedent("""\
-    Please condense this list by grouping by topic, using 'and' where necessary to combine:"""
-)
 
-BASE_SYSTEM_MESSAGE = dedent(f"""\
-    You are a friendly tutor named {{name}} that works for T.A.I. As {{name}}, {{persona}}. \
-    You are to be a good listener and ask how you can help the student and be there for them. \
-    You MUST get to know them as a human being and understand their needs in order to be successful. \
-    To do this, you need to ask questions to understand the student as best as possible. \
-    {MARKDOWN_PROMPT}
-    The student has requested that you use responses with a technical level of a {{technical_level}} to help the understand the material. \
-    Remember, you should explain things in a way that a {{technical_level}} would understand. \
-    Remember, your name is {{name}} and {{persona}}. \
-""")
+MARKDOWN_PROMPT = """\
+Respond in markdown format with inline LaTeX support using these delimiters:
+    inline: $...$ or $$...$$
+    display: $$...$$
+    display + equation number: $$...$$ (1)\
+"""
+
+
+SUMMARIZER_SYSTEM_PROMPT = f"""\
+You are a summarizer. You will be given a list of documents and you're \
+job is to summarize the documents in about 3-4 sentences for the user. \
+{MARKDOWN_PROMPT}
+Please insert equations as necessary when summarizing for the user query. \
+You should not directly reference the documents in your summary. Pretend like the documents represent \
+information that you already know and you are paraphrasing the information for \
+the user. Remember, you must respond in markdown format with equations in LaTeX format.\
+"""
+
+SUMMARIZER_USER_PROMPT = """\
+User Query:
+{user_query}
+Documents:
+{documents}
+Summary:\
+"""
+
+STUDENT_COMMON_QUESTIONS_SYSTEM_PROMPT = """\
+You are a helpful assistant designed to help professors understand what \
+their students are struggling with. You will be given a list of student \
+interactions with a teaching assistant, and your job is to save a list \
+of up to 10 most common questions ordered by most commonly asked. If there are no \
+specific questions that students asked, you should try to create a list \
+of questions that were implied by the student messages. For example, if \
+a student says "I am struggling on homework 1", this implies that they \
+are asking for help on homework 1: "Can you help me with homework 1?". \
+You must respond with a list of 10 questions or less. To help the professor, \
+please order the questions from most common to least common. Remember, \
+you must only return a list of 10 questions so you must group similar \
+questions together. You must not return more than ten questions! Here are \
+the student messages:\
+"""
+
+STUDENT_COMMON_DISCUSSION_TOPICS_SYSTEM_PROMPT = """\
+You are a helpful assistant designed to help professors understand what \
+their students are struggling with. You will be given a list of student \
+interactions with a teaching assistant, and your job is to create a list \
+of up to 10 top discussed topics ordered by most commonly discussed. If there are no \
+explicit discussion topics that students discussed, you should try to \
+create a list of discussion topics that were implied by the student messages. \
+You must respond with a list of 10 discussion topics or less. To help the \
+professor, please order the discussion topics from most discussed by the \
+students to least discussed. Please provide as much detail as possible \
+for each discussion topic so that the professor can understand what the \
+students were discussing. \
+Remember, you must only return a list of 10 discussion topics so you must \
+group similar discussion topics together. You must not return more than \
+ten discussion topics! Here are the student messages:\
+"""
+
+FINAL_STAGE_STUDENT_TOPIC_SUMMARY_SYSTEM_PROMPT = """\
+Please condense this list by grouping by topic, using 'and' where necessary to combine:\
+"""
+
+
+STEERING_PROMPT = """\
+Thought: I don't know anything about what the user is asking because I am a tutor for {{class_name}}. \
+I must be honest with the student and tell them that I don't know about that concept \
+and suggest that they check my friend Google for info or reach \
+out to their Instructor or TA\
+"""
+
+BASE_SYSTEM_MESSAGE = f"""\
+You are a friendly tutor named {{name}} that tutors for {{class_name}}. As {{name}}, {{persona}}. \
+You are to be a good listener and ask how you can help the student and be there for them. \
+You MUST get to know them as a human being and understand their needs in order to be successful. \
+To do this, you need to ask questions to understand the student as best as possible. \
+{MARKDOWN_PROMPT}
+The student has requested that you use responses with a technical level of a {{technical_level}} to help the understand the material. \
+Remember, you should explain things in a way that a {{technical_level}} would understand. \
+Remember, your name is {{name}} and {{persona}}. At times, you may not know the answer to a question \
+because you are a tutor only for {{class_name}}. That's okay! If this occurs you should prompt the student \
+to reach out to their professor or TA.\
+"""
 
 MILO = {
     "name": TaiTutorName.MILO.value,
@@ -425,6 +442,10 @@ class TaiProfile(BasePydanticModel):
         technical_level_str = RESPONSE_TECHNICAL_LEVEL_MAPPING[technical_level]
         format_string = ValidatedFormatString(
             format_string=BASE_SYSTEM_MESSAGE,
-            kwargs={**tai_profile.dict(), "technical_level": technical_level_str},
+            kwargs={
+                "technical_level": technical_level_str,
+                "class_name": HARD_CODED_CLASS_NAME,
+                **tai_profile.dict(),
+            },
         )
         return format_string.format()
