@@ -207,7 +207,7 @@ class Indexer:
             if isinstance(loader, document_loaders.BSHTMLLoader):
                 input_format = InputFormat.GENERIC_TEXT # the beautiful soup loader converts html to text so we need to change the input format
             splitter: TextSplitter = get_splitter_text_splitter(input_format)
-            split_docs = loader.load_and_split(splitter)
+            split_docs = loader.load_and_split(splitter) # TODO: once we use mathpix, i think we can split pdfs better. Without mathpix, the pdfs don't get split well
         except Exception as e: # pylint: disable=broad-except
             logger.critical(traceback.format_exc())
             raise RuntimeError("Failed to load and split document.") from e

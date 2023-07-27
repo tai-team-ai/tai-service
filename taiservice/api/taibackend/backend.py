@@ -426,7 +426,7 @@ class Backend:
         student_msg = chat_session.last_student_message
         prompt = BETaiProfile.get_system_prompt(name=student_msg.tai_tutor_name, technical_level=student_msg.technical_level)
         chat_session.insert_system_prompt(prompt)
-        tai_llm.add_tai_tutor_chat_response(chat_session, chunks)
+        tai_llm.add_tai_tutor_chat_response(chat_session, chunks, ModelToUse=tai_llm.large_context_chat_model)
         chat_session.remove_system_prompt()
         logger.info(chat_session.dict())
         return self.to_api_chat_session(chat_session)
@@ -436,7 +436,7 @@ class Backend:
         """Search for class resources."""
         student_message = BEStudentMessage(content=query.query)
         self._archive_message(student_message, query.class_id)
-        chunks = self.get_relevant_class_resources(query.query, query.class_id)
+        chunks = self.get_relevant_class_resources(query.query, query.class_id, is_search=True)
         snippet = ""
         if chunks:
             tai_llm = TaiLLM(self._get_tai_llm_config())
@@ -449,7 +449,7 @@ class Backend:
         )
         return search_answer
 
-    def get_relevant_class_resources(self, query: str, class_id: UUID) -> list[ClassResourceChunkDocument]:
+    def get_relevant_class_resources(self, query: str, class_id: UUID, is_search: bool = False) -> list[ClassResourceChunkDocument]:
         """Get the most relevant class resources."""
         logger.info(f"Getting relevant class resources for query: {query}")
         chunk_doc = ClassResourceChunkDocument(
@@ -464,8 +464,10 @@ class Backend:
                 resource_type=DBResourceType.TEXTBOOK,
             )
         )
+        alpha = 0.4 if is_search else 0.7 # this is gut feel, we can tune this later, search is likely to use more precise terms
+        docs_to_return = 5 if is_search else 3
         pinecone_docs = self._indexer.embed_documents(documents=[chunk_doc], class_id=class_id)
-        similar_docs = self._pinecone_db.get_similar_documents(document=pinecone_docs.documents[0], alpha=0.7)
+        similar_docs = self._pinecone_db.get_similar_documents(document=pinecone_docs.documents[0], alpha=alpha, doc_to_return=docs_to_return)
         uuids = [doc.metadata.chunk_id for doc in similar_docs.documents]
         chunk_docs = self._doc_db.get_class_resources(uuids, ClassResourceChunkDocument, count_towards_metrics=True)
         logger.info(f"Got similar docs: {chunk_docs}")

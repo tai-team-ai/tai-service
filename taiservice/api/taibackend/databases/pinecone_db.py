@@ -84,7 +84,7 @@ class PineconeDB:
         """Upsert vectors into pinecone db."""
         self._execute_async_pinecone_operation("upsert", documents)
 
-    def get_similar_documents(self, document: PineconeDocument, alpha=0.8) -> PineconeDocuments:
+    def get_similar_documents(self, document: PineconeDocument, alpha:float = 0.8, doc_to_return: int = 4) -> PineconeDocuments:
         """
         Get similar vectors from pinecone db.
 
@@ -101,11 +101,11 @@ class PineconeDB:
             include_metadata=True,
             vector=dense,
             sparse_vector=sparse,
-            top_k=5,
+            top_k=doc_to_return,
         )
         docs = PineconeDocuments(class_id=document.metadata.class_id, documents=[])
         matches = results.to_dict()['matches']
-        threshold = 0.65 * alpha + 10 * (1 - alpha)
+        threshold = 0.65 * alpha + 10 * (1 - alpha) # 10 is arbitrary. Sparse vectors don't really have an upper bound for score
         logger.info(f"Found {len(matches)} matches")
         for result in matches:
             doc = PineconeDocument(**result)

@@ -191,10 +191,10 @@ class Ingestor(ABC):
             for chunk in chunks:
                 chunk.raw_chunk_url = split_resource_urls[chunk.metadata.page_number] if split_resource_urls else None
                 chunk.preview_image_url = screenshot_urls[chunk.metadata.page_number] if screenshot_urls else None
-        else:
-            for chunk in chunks:
-                chunk.raw_chunk_url = ingested_doc.full_resource_url
-                chunk.preview_image_url = screenshot_urls if screenshot_urls else None
+            return
+        for chunk in chunks:
+            chunk.raw_chunk_url = ingested_doc.full_resource_url
+            chunk.preview_image_url = screenshot_urls if screenshot_urls else None
 
     @classmethod
     def _upload_resource_to_cold_store_and_update_ingested_doc(

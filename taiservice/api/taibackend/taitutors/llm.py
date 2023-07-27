@@ -111,17 +111,17 @@ class TaiLLM:
             "openai_api_key": config.api_key,
             "streaming": config.stream_response,
         }
-        self._basic_chat_model: BaseChatModel = ChatOpenAI(
+        self.basic_chat_model: BaseChatModel = ChatOpenAI(
             model=config.basic_model_name,
             request_timeout=config.request_timeout,
             **base_config,
         )
-        self._large_context_chat_model: BaseChatModel = ChatOpenAI(
+        self.large_context_chat_model: BaseChatModel = ChatOpenAI(
             model=config.large_context_model_name,
             request_timeout=config.request_timeout + 15,
             **base_config,
         )
-        self._advanced_chat_model: BaseChatModel = ChatOpenAI(
+        self.advanced_chat_model: BaseChatModel = ChatOpenAI(
             model=config.advanced_model_name,
             request_timeout=config.request_timeout + 30,
             **base_config,
@@ -159,7 +159,7 @@ class TaiLLM:
             assert functions, "Must provide functions if function_to_call is provided."
             chain = create_openai_fn_chain(
                 functions=[function_to_call],
-                llm=self._large_context_chat_model,
+                llm=self.large_context_chat_model,
                 prompt=PromptTemplate(input_variables=[], template=""),
             )
             llm_kwargs = chain.llm_kwargs
@@ -220,14 +220,14 @@ class TaiLLM:
             messages,
             system_prompt,
             function,
-            ModelToUse=self._large_context_chat_model
+            ModelToUse=self.large_context_chat_model
         )
         if not as_questions:
             summaries = get_summaries(
                 "\n".join(summaries),
                 FINAL_STAGE_STUDENT_TOPIC_SUMMARY_SYSTEM_PROMPT,
                 function,
-                ModelToUse=self._advanced_chat_model
+                ModelToUse=self.advanced_chat_model
             )
         return summaries
 
@@ -240,7 +240,7 @@ class TaiLLM:
     ) -> None:
         """Get the response from the LLMs."""
         if not ModelToUse:
-            ModelToUse = self._basic_chat_model
+            ModelToUse = self.basic_chat_model
         chat_message = ModelToUse(messages=chat_session.messages, **kwargs)
         function_call: dict = chat_message.additional_kwargs.get("function_call")
         if function_call:
