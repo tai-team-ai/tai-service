@@ -352,7 +352,7 @@ Please condense this list by grouping by topic, using 'and' where necessary to c
 STEERING_PROMPT = """\
 Thought: I don't know anything about what the user is asking because I am a tutor for {class_name}. \
 I must be honest with the student and tell them that I don't know about that concept \
-and suggest that they check my friend Google for info or reach \
+and suggest that they check out Google for info or reach \
 out to their Instructor or TA\
 """
 

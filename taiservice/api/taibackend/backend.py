@@ -426,7 +426,7 @@ class Backend:
         student_msg = chat_session.last_student_message
         prompt = BETaiProfile.get_system_prompt(name=student_msg.tai_tutor_name, technical_level=student_msg.technical_level)
         chat_session.insert_system_prompt(prompt)
-        tai_llm.add_tai_tutor_chat_response(chat_session, chunks)
+        tai_llm.add_tai_tutor_chat_response(chat_session, chunks, ModelToUse=tai_llm.large_context_chat_model)
         chat_session.remove_system_prompt()
         logger.info(chat_session.dict())
         return self.to_api_chat_session(chat_session)
