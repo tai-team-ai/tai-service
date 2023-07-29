@@ -15,7 +15,7 @@ from aws_cdk import (
 from ...api.runtime_settings import TaiApiSettings
 from .stack_config_models import StackConfigBaseModel
 from .stack_helpers  import add_tags, Permissions
-from ..constructs.python_lambda_construct import (
+from ..constructs.lambda_construct import (
     DockerLambda,
     DockerLambdaConfigModel,
     BaseLambdaConfigModel,
