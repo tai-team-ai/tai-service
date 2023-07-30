@@ -14,6 +14,7 @@ from taiservice.cdk.stacks.stack_config_models import (
     AWSDeploymentSettings,
     DeploymentType,
 )
+from taiservice.cdk.stacks.search_service_stack import TaiSearchServiceStack
 from taiservice.cdk.stacks.frontend_stack import TaiFrontendServerStack
 
 app: App = App()
@@ -43,6 +44,21 @@ search_service_databases: SearchServiceDatabases = SearchServiceDatabases(
 	config=search_databases_config,
     doc_db_settings=DOCUMENT_DB_SETTINGS,
     pinecone_db_settings=PINECONE_DB_SETTINGS,
+)
+
+
+search_service_stack_config = StackConfigBaseModel(
+    stack_id="tai-search-service",
+    stack_name="tai-search-service",
+    description="Stack for the search service. This stack contains the search service " \
+        "implementation.",
+    duplicate_stack_for_development=True,
+    **BASE_SETTINGS,
+)
+search_service: TaiSearchServiceStack = TaiSearchServiceStack(
+    scope=app,
+    config=search_service_stack_config,
+    vpc=search_service_databases.vpc,
 )
 
 

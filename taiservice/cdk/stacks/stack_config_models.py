@@ -1,7 +1,7 @@
 from enum import Enum
 import os
 import re
-from typing import Optional
+from typing import Optional, Callable
 
 from pydantic import BaseModel, BaseSettings, Field, validator, Extra, root_validator
 from pygit2 import Repository
@@ -132,6 +132,19 @@ class StackConfigBaseModel(BaseModel):
         default=RemovalPolicy.RETAIN,
         description="The removal policy for the stack.",
     )
+    namer: Callable[[str], str] = Field(
+        default=lambda name: name,
+        description="The function to use to name resources in the stack.",
+    )
+
+    @root_validator()
+    def initialize_namer(cls, values: dict) -> dict:
+        """Initialize the namer."""
+        namer = values["namer"]
+        stack_name = values["stack_name"]
+        namer = lambda name: f"{stack_name}-{name}"
+        values["namer"] = namer
+        return values
 
     class Config:
         """Define configuration for stack configuration."""

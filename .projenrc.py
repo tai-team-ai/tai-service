@@ -154,7 +154,7 @@ make_file.add_rule(
 vscode = VsCode(project)
 vscode_launch_config: VsCodeLaunchConfig = VsCodeLaunchConfig(vscode)
 vscode_launch_config.add_configuration(
-    name="FastAPI",
+    name="TAI API",
     type="python",
     request="launch",
     program="${workspaceFolder}/.venv/bin/uvicorn",
@@ -162,6 +162,17 @@ vscode_launch_config.add_configuration(
         "taiservice.api.main:create_app",
         "--reload",
         "--factory"
+    ],
+    env=RUNTIME_ENV_VARS,
+)
+vscode_launch_config.add_configuration(
+    name="TAI Search Service",
+    type="python",
+    request="launch",
+    program="${workspaceFolder}/.venv/bin/uvicorn",
+    args=[
+        "taiservice.searchservice.main",
+        "--reload",
     ],
     env=RUNTIME_ENV_VARS,
 )
