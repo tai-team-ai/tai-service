@@ -34,8 +34,8 @@ from ..constructs.customresources.pinecone_db.pinecone_db_custom_resource import
 
 PATH_TO_SERVICE_DIR = "taiservice/searchservice"
 
-class SearchServiceDatabases(Stack):
-    """Define the search database stack."""
+class TaiSearchServiceStack(Stack):
+    """Define the search service for indexing and searching."""
 
     def __init__(
         self,

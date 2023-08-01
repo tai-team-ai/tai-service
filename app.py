@@ -1,8 +1,7 @@
 """Define the search service app."""
-import os
 from aws_cdk import App, RemovalPolicy
 from dotenv import load_dotenv
-from taiservice.cdk.stacks.search_service_stack import SearchServiceDatabases
+from taiservice.cdk.stacks.search_service_stack import TaiSearchServiceStack
 from taiservice.cdk.stacks.tai_api_stack import TaiApiStack
 from taiservice.cdk.stacks.search_databases_settings import (
     DOCUMENT_DB_SETTINGS,
@@ -14,7 +13,6 @@ from taiservice.cdk.stacks.stack_config_models import (
     AWSDeploymentSettings,
     DeploymentType,
 )
-from taiservice.cdk.stacks.search_service_stack import TaiSearchServiceStack
 from taiservice.cdk.stacks.frontend_stack import TaiFrontendServerStack
 
 app: App = App()
@@ -31,7 +29,7 @@ BASE_SETTINGS = {
     "removal_policy": REMOVAL_POLICY,
     "tags": TAGS,
 }
-search_databases_config = StackConfigBaseModel(
+search_service_config = StackConfigBaseModel(
 	stack_id="tai-search-service-databases",
 	stack_name="tai-search-service-databases",
 	description="Stack for the search service databases. This stack contains the document " \
@@ -39,27 +37,11 @@ search_databases_config = StackConfigBaseModel(
     duplicate_stack_for_development=False,
     **BASE_SETTINGS,
 )
-search_service_databases: SearchServiceDatabases = SearchServiceDatabases(
-    scope=app,
-	config=search_databases_config,
-    doc_db_settings=DOCUMENT_DB_SETTINGS,
-    pinecone_db_settings=PINECONE_DB_SETTINGS,
-)
-
-
-search_service_stack_config = StackConfigBaseModel(
-    stack_id="tai-search-service",
-    stack_name="tai-search-service",
-    description="Stack for the search service. This stack contains the search service " \
-        "implementation.",
-    duplicate_stack_for_development=True,
-    **BASE_SETTINGS,
-)
 search_service: TaiSearchServiceStack = TaiSearchServiceStack(
     scope=app,
-    config=search_service_stack_config,
-    vpc=search_service_databases.vpc,
-    sg_for_connecting_to_db=search_service_databases.security_group_for_connecting_to_doc_db,
+	config=search_service_config,
+    doc_db_settings=DOCUMENT_DB_SETTINGS,
+    pinecone_db_settings=PINECONE_DB_SETTINGS,
 )
 
 
@@ -70,13 +52,13 @@ tai_api_config = StackConfigBaseModel(
     duplicate_stack_for_development=True,
     **BASE_SETTINGS,
 )
-TAI_API_SETTINGS.doc_db_fully_qualified_domain_name = search_service_databases.document_db.fully_qualified_domain_name
+TAI_API_SETTINGS.doc_db_fully_qualified_domain_name = search_service.document_db.fully_qualified_domain_name
 tai_api: TaiApiStack = TaiApiStack(
     scope=app,
     config=tai_api_config,
     api_settings=TAI_API_SETTINGS,
-    vpc=search_service_databases.vpc,
-    security_group_allowing_db_connections=search_service_databases.security_group_for_connecting_to_doc_db,
+    vpc=search_service.vpc,
+    security_group_allowing_db_connections=search_service.security_group_for_connecting_to_doc_db,
 )
 
 
