@@ -22,7 +22,7 @@ from .construct_helpers import (
     create_restricted_security_group,
     vpc_interface_exists,
 )
-from .python_lambda_construct import (
+from .lambda_construct import (
     PythonLambda,
     BaseLambdaConfigModel,
 )
