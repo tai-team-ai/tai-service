@@ -2,7 +2,7 @@
 import os
 from aws_cdk import App, RemovalPolicy
 from dotenv import load_dotenv
-from taiservice.cdk.stacks.search_database_stack import SearchServiceDatabases
+from taiservice.cdk.stacks.search_service_stack import SearchServiceDatabases
 from taiservice.cdk.stacks.tai_api_stack import TaiApiStack
 from taiservice.cdk.stacks.search_databases_settings import (
     DOCUMENT_DB_SETTINGS,
@@ -59,6 +59,7 @@ search_service: TaiSearchServiceStack = TaiSearchServiceStack(
     scope=app,
     config=search_service_stack_config,
     vpc=search_service_databases.vpc,
+    sg_for_connecting_to_db=search_service_databases.security_group_for_connecting_to_doc_db,
 )
 
 
