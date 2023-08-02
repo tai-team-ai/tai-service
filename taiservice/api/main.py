@@ -5,8 +5,6 @@ from fastapi import APIRouter, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from loguru import logger
-
-
 # first imports are for local development, second imports are for deployment
 try:
     from .routers import (

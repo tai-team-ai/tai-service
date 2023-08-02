@@ -19,7 +19,7 @@ try:
         save_student_conversation_topics,
         save_student_questions,
     )
-    from ..databases.document_db_schemas import ClassResourceChunkDocument
+    from ...routers.tai_schemas import ClassResourceSnippet
     from ..databases.archiver import Archive
     from .llm_schemas import (
         TaiChatSession,
@@ -37,13 +37,13 @@ try:
         ValidatedFormatString,
     )
 except (KeyError, ImportError):
+    from routers.tai_schemas import ClassResourceSnippet
     from taibackend.shared_schemas import BaseOpenAIConfig
     from taibackend.taitutors.llm_functions import (
         get_relevant_class_resource_chunks,
         save_student_conversation_topics,
         save_student_questions,
     )
-    from taibackend.databases.document_db_schemas import ClassResourceChunkDocument
     from taibackend.databases.archiver import Archive
     from taibackend.taitutors.llm_schemas import (
         TaiChatSession,
@@ -132,7 +132,7 @@ class TaiLLM:
     def add_tai_tutor_chat_response(
         self,
         chat_session: TaiChatSession,
-        relevant_chunks: Optional[list[ClassResourceChunkDocument]] = None,
+        relevant_chunks: Optional[list[ClassResourceSnippet]] = None,
         function_to_call: Optional[callable] = None,
         functions: Optional[list[callable]] = None,
         ModelToUse: Optional[BaseChatModel] = None,
@@ -172,7 +172,7 @@ class TaiLLM:
         self,
         class_id: UUID,
         search_query: str,
-        chunks: list[ClassResourceChunkDocument]
+        chunks: list[ClassResourceSnippet]
     ) -> str:
         """Create a snippet of the search result summary."""
         session: TaiChatSession = TaiChatSession.from_message(
@@ -234,7 +234,7 @@ class TaiLLM:
     def _append_model_response(
         self,
         chat_session: TaiChatSession,
-        chunks: list[ClassResourceChunkDocument] = None,
+        chunks: list[ClassResourceSnippet] = None,
         ModelToUse: Optional[BaseChatModel] = None,
         **kwargs: Dict[str, Any],
     ) -> None:
@@ -262,7 +262,7 @@ class TaiLLM:
         chat_session: TaiChatSession,
         function_to_call: callable,
         function_kwargs: dict,
-        relevant_chunks: list[ClassResourceChunkDocument] = None,
+        relevant_chunks: list[ClassResourceSnippet] = None,
     ) -> None:
         """Append the context chat to the chat session."""
         last_student_chat = chat_session.last_student_message
@@ -278,7 +278,7 @@ class TaiLLM:
         func_message = self._function_msg_from_chunks(relevant_chunks)
         chat_session.append_chat_messages([tutor_chat, func_message])
 
-    def _function_msg_from_chunks(self, chunks: list[ClassResourceChunkDocument]) -> FunctionMessage:
+    def _function_msg_from_chunks(self, chunks: list[ClassResourceSnippet]) -> FunctionMessage:
         """Create a function message from the chunks."""
         chunks = "\n".join([chunk.simplified_string for chunk in chunks])
         msg = FunctionMessage(

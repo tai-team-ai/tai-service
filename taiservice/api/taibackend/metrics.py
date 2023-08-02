@@ -5,19 +5,13 @@ from pydantic import Field, conint
 # first imports are for local development, second imports are for deployment
 try:
     from ...api.taibackend.shared_schemas import BasePydanticModel, DateRange
-    from .databases.document_db_schemas import ClassResourceChunkDocument
     from ...api.taibackend.databases.archiver import Archive
     from ...api.taibackend.databases.archive_schemas import HumanMessageRecord
-    from .databases.document_db import DocumentDB
-    from .databases.pinecone_db import PineconeDB
     from ...api.taibackend.taitutors.llm import TaiLLM, ChatOpenAIConfig
 except ImportError:
     from shared_schemas import BasePydanticModel, DateRange
-    from databases.document_db_schemas import ClassResourceChunkDocument
     from databases.archiver import Archive
     from databases.archive_schemas import HumanMessageRecord
-    from databases.document_db import DocumentDB
-    from databases.pinecone_db import PineconeDB
     from taitutors.llm import TaiLLM, ChatOpenAIConfig
 
 

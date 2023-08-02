@@ -1,12 +1,9 @@
-from pathlib import Path
+"""Define the runtime settings for the TAI API."""
 from pydantic import Field, BaseSettings
-
 # first imports are for local development, second imports are for deployment
 try:
-    from .taibackend.databases.pinecone_db import Environment as PineconeEnvironment
     from .taibackend.taitutors.llm import ModelName
 except ImportError:
-    from taibackend.databases.pinecone_db import Environment as PineconeEnvironment
     from taibackend.taitutors.llm import ModelName
 
 BACKEND_ATTRIBUTE_NAME = "tai_backend"

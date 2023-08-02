@@ -6,7 +6,7 @@ try:
     from ..taibackend.backend import Backend
     from ...searchservice.backend.databases.errors import DuplicateClassResourceError
     from ..runtime_settings import BACKEND_ATTRIBUTE_NAME
-except ImportError:
+except ImportError as e:
     from routers.class_resources_schema import ClassResource, ClassResources, ClassResourceIds
     from taiservice.searchservice.backend.databases.errors import DuplicateClassResourceError
     from taibackend.backend import Backend

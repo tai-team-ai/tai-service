@@ -48,8 +48,10 @@ except (KeyError, ImportError):
         DateRange as BEDateRange,
     )
     from routers.common_resources_schema import (
-        CommonQuestions as APICommonQuestions,
         CommonQuestion as APICommonQuestion,
+        CommonQuestions as APICommonQuestions,
+        FrequentlyAccessedResource as APIFrequentlyAccessedResource,
+        FrequentlyAccessedResources as APIFrequentlyAccessedResources,
         DateRange as APIDateRange,
     )
     from taibackend.taitutors.llm import TaiLLM, ChatOpenAIConfig
@@ -209,6 +211,16 @@ class Backend:
                 )
             )
         return api_questions
+
+    def get_frequently_accessed_class_resources(
+        self,
+        class_id: UUID,
+        start_date: Optional[date] = None,
+        end_date: Optional[date] = None,
+    ) -> APIFrequentlyAccessedResources:
+        """Get the most frequently accessed class resources."""
+        pass # TODO: call search service
+
 
     # TODO: Add a test to verify the archive method is called
     def get_tai_response(self, chat_session: APIChatSession, stream: bool=False) -> APIChatSession:
