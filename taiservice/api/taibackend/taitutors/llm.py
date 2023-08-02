@@ -93,7 +93,7 @@ class ChatOpenAIConfig(BaseOpenAIConfig):
     )
     class_name: str = Field(
         default=HARD_CODED_CLASS_NAME,
-        description="The name of the class.",
+        description="The name of the class that the llm is tutoring for.",
     )
 
     class Config:

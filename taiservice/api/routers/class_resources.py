@@ -4,11 +4,11 @@ from fastapi import APIRouter, Request, Response, status
 try:
     from .class_resources_schema import ClassResource, ClassResources, ClassResourceIds
     from ..taibackend.backend import Backend
-    from ..taibackend.errors import DuplicateClassResourceError
+    from ...searchservice.backend.databases.errors import DuplicateClassResourceError
     from ..runtime_settings import BACKEND_ATTRIBUTE_NAME
 except ImportError:
     from routers.class_resources_schema import ClassResource, ClassResources, ClassResourceIds
-    from taibackend.errors import DuplicateClassResourceError
+    from taiservice.searchservice.backend.databases.errors import DuplicateClassResourceError
     from taibackend.backend import Backend
     from runtime_settings import BACKEND_ATTRIBUTE_NAME
 
