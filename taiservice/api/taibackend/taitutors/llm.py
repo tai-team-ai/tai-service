@@ -1,16 +1,15 @@
 """Define the llms interface used for the TAI chat backend."""
+import json
+from typing import Any, Dict, Optional
 from uuid import UUID
 from uuid import uuid4
 from enum import Enum
-from pydantic import BaseModel
-import json
-from typing import Any, Dict, Optional
+from pydantic import BaseModel, Field
 from langchain.chat_models import ChatOpenAI
 from langchain import PromptTemplate
 from langchain.chat_models.base import BaseChatModel
 from langchain.chains.openai_functions.base import create_openai_fn_chain
 from loguru import logger
-from pydantic import Field
 # first imports are for local development, second imports are for deployment
 try:
     from .llm_functions import (

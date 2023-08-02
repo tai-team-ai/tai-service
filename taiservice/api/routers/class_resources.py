@@ -1,14 +1,12 @@
 """Define CRUD endpoints for class resources."""
-from fastapi import APIRouter, Request, Response, status
+from fastapi import APIRouter, Request, Response
 # first imports are for local development, second imports are for deployment
 try:
     from .class_resources_schema import ClassResource, ClassResources, ClassResourceIds
     from ..taibackend.backend import Backend
-    from ...searchservice.backend.databases.errors import DuplicateClassResourceError
     from ..runtime_settings import BACKEND_ATTRIBUTE_NAME
 except ImportError as e:
     from routers.class_resources_schema import ClassResource, ClassResources, ClassResourceIds
-    from taiservice.searchservice.backend.databases.errors import DuplicateClassResourceError
     from taibackend.backend import Backend
     from runtime_settings import BACKEND_ATTRIBUTE_NAME
 
@@ -28,8 +26,8 @@ def get_class_resources(ids: ClassResourceIds, request: Request, from_class_ids:
 def create_class_resource(class_resource: ClassResource, request: Request, response: Response):
     """Create a class resource."""
     backend: Backend = getattr(request.app.state, BACKEND_ATTRIBUTE_NAME)
-    try:
-        backend.create_class_resources([class_resource])
-    except DuplicateClassResourceError as error:
-        response.status_code = status.HTTP_409_CONFLICT
-        return {"message": error.message}
+    # try:
+    backend.create_class_resources([class_resource])
+    # except DuplicateClassResourceError as error:
+    #     response.status_code = status.HTTP_409_CONFLICT
+    #     return {"message": error.message}
