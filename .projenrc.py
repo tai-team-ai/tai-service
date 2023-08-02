@@ -161,7 +161,7 @@ vscode_launch_config.add_configuration(
     args=[
         "taiservice.api.main:create_app",
         "--reload",
-        "--factory"
+        "--factory",
     ],
     env=RUNTIME_ENV_VARS,
 )
@@ -171,8 +171,9 @@ vscode_launch_config.add_configuration(
     request="launch",
     program="${workspaceFolder}/.venv/bin/uvicorn",
     args=[
-        "taiservice.searchservice.main",
+        "taiservice.searchservice.main:create_app",
         "--reload",
+        "--factory",
     ],
     env=RUNTIME_ENV_VARS,
 )

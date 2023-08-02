@@ -15,8 +15,9 @@ try:
         DateRange as BEDateRange,
     )
     from ..routers.common_resources_schema import (
-        CommonQuestions as APICommonQuestions,
         CommonQuestion as APICommonQuestion,
+        CommonQuestions as APICommonQuestions,
+        FrequentlyAccessedResources as APIFrequentlyAccessedResources,
         DateRange as APIDateRange,
     )
     from ..taibackend.taitutors.llm import TaiLLM, ChatOpenAIConfig
@@ -50,7 +51,6 @@ except (KeyError, ImportError):
     from routers.common_resources_schema import (
         CommonQuestion as APICommonQuestion,
         CommonQuestions as APICommonQuestions,
-        FrequentlyAccessedResource as APIFrequentlyAccessedResource,
         FrequentlyAccessedResources as APIFrequentlyAccessedResources,
         DateRange as APIDateRange,
     )

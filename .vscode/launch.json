@@ -36,8 +36,9 @@
       "request": "launch",
       "type": "python",
       "args": [
-        "taiservice.searchservice.main",
-        "--reload"
+        "taiservice.searchservice.main:create_app",
+        "--reload",
+        "--factory"
       ],
       "env": {
         "PINECONE_DB_API_KEY_SECRET_NAME": "dev/tai_service/pinecone_db/api_key",
