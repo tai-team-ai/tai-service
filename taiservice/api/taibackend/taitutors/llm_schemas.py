@@ -17,10 +17,10 @@ from langchain.schema import (
 )
 # first imports for local development, second imports for deployment
 try:
-    from ...routers.tai_schemas import ClassResourceSnippet 
+    from ...routers.tai_schemas import ClassResourceSnippet
     from ..shared_schemas import BasePydanticModel
 except (KeyError, ImportError):
-    from taibackend.routers.tai_schemas import ClassResourceSnippet
+    from routers.tai_schemas import ClassResourceSnippet
     from taibackend.shared_schemas import BasePydanticModel
 
 class TaiTutorName(str, Enum):

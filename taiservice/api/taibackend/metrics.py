@@ -9,10 +9,10 @@ try:
     from ...api.taibackend.databases.archive_schemas import HumanMessageRecord
     from ...api.taibackend.taitutors.llm import TaiLLM, ChatOpenAIConfig
 except ImportError:
-    from shared_schemas import BasePydanticModel, DateRange
-    from databases.archiver import Archive
-    from databases.archive_schemas import HumanMessageRecord
-    from taitutors.llm import TaiLLM, ChatOpenAIConfig
+    from taibackend.shared_schemas import BasePydanticModel, DateRange
+    from taibackend.databases.archiver import Archive
+    from taibackend.databases.archive_schemas import HumanMessageRecord
+    from taibackend.taitutors.llm import TaiLLM, ChatOpenAIConfig
 
 
 class MetricsConfig(BasePydanticModel):
