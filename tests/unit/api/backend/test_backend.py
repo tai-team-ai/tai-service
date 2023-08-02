@@ -8,7 +8,7 @@ from taiservice.api.routers.tai_schemas import (
     Chat as APIChat,
     BaseChatSession as APIChatSession,
 )
-from taiservice.api.taibackend.backend import (
+from taiservice.searchservice.backend.backend import (
     Backend,
     BaseClassResourceDocument,
     ClassResourceProcessingStatus,
@@ -19,8 +19,8 @@ from taiservice.api.taibackend.taitutors.llm_schemas import (
     BaseMessage as BEBaseMessage,
 )
 from taiservice.api.routers.class_resources_schema import ClassResource, ClassResourceType
-from taiservice.api.taibackend.databases.document_db_schemas import ClassResourceChunkDocument, ClassResourceDocument
-from taiservice.api.taibackend.indexer.data_ingestor_schema import InputDocument
+from taiservice.searchservice.backend.databases.document_db_schemas import ClassResourceChunkDocument, ClassResourceDocument
+from taiservice.searchservice.backend.indexer.data_ingestor_schema import InputDocument
 
 def get_valid_metadata_dict():
     """Get a valid metadata dictionary"""

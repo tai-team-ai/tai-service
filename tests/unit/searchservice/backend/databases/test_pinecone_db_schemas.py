@@ -3,13 +3,13 @@ import copy
 import uuid
 import pytest
 from pydantic import ValidationError
-from taiservice.api.taibackend.databases.pinecone_db_schemas import (
+from taiservice.searchservice.backend.databases.pinecone_db_schemas import (
     BasePydanticModel,
     PineconeDocument,
     PineconeDocuments,
     ChunkMetadata,
 )
-from taiservice.api.taibackend.shared_schemas import Metadata
+from taiservice.searchservice.backend.shared_schemas import Metadata
 from .test_shared_schemas import EXAMPLE_METADATA, assert_schema1_inherits_from_schema2
 
 def test_chunk_metadata_schema():

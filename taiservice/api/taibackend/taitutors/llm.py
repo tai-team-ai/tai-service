@@ -1,10 +1,10 @@
 """Define the llms interface used for the TAI chat backend."""
-import traceback
 from uuid import UUID
 from uuid import uuid4
 from enum import Enum
+from pydantic import BaseModel
 import json
-from typing import Any, Dict, Optional, Union
+from typing import Any, Dict, Optional
 from langchain.chat_models import ChatOpenAI
 from langchain import PromptTemplate
 from langchain.chat_models.base import BaseChatModel
@@ -13,7 +13,6 @@ from loguru import logger
 from pydantic import Field
 # first imports are for local development, second imports are for deployment
 try:
-    from ..shared_schemas import BaseOpenAIConfig
     from .llm_functions import (
         get_relevant_class_resource_chunks,
         save_student_conversation_topics,
@@ -38,7 +37,6 @@ try:
     )
 except (KeyError, ImportError):
     from routers.tai_schemas import ClassResourceSnippet
-    from taibackend.shared_schemas import BaseOpenAIConfig
     from taibackend.taitutors.llm_functions import (
         get_relevant_class_resource_chunks,
         save_student_conversation_topics,
@@ -69,8 +67,16 @@ class ModelName(str, Enum):
     GPT_4 = "gpt-4"
 
 
-class ChatOpenAIConfig(BaseOpenAIConfig):
+class ChatOpenAIConfig(BaseModel):
     """Define the config for the chat openai model."""
+    api_key: str = Field(
+        ...,
+        description="The openai api key.",
+    )
+    request_timeout: int = Field(
+        default=15,
+        description="The number of seconds to wait for a response from the openai api.",
+    )
     basic_model_name: ModelName = Field(
         default=ModelName.GPT_TURBO,
         description="The name of the model to use for the llm tutor for basic queries.",
