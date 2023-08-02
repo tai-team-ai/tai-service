@@ -4,33 +4,19 @@ from uuid import UUID
 from pydantic import Field, conint
 # first imports are for local development, second imports are for deployment
 try:
-    from .shared_schemas import BasePydanticModel, DateRange
-    from .databases.document_db_schemas import ClassResourceChunkDocument
-    from .databases.archiver import Archive
-    from .databases.archive_schemas import HumanMessageRecord
-    from .databases.document_db import DocumentDB
-    from .databases.pinecone_db import PineconeDB
-    from .taitutors.llm import TaiLLM, ChatOpenAIConfig
+    from ...api.taibackend.shared_schemas import BasePydanticModel, DateRange
+    from ...api.taibackend.databases.archiver import Archive
+    from ...api.taibackend.databases.archive_schemas import HumanMessageRecord
+    from ...api.taibackend.taitutors.llm import TaiLLM, ChatOpenAIConfig
 except ImportError:
     from shared_schemas import BasePydanticModel, DateRange
-    from databases.document_db_schemas import ClassResourceChunkDocument
     from databases.archiver import Archive
     from databases.archive_schemas import HumanMessageRecord
-    from databases.document_db import DocumentDB
-    from databases.pinecone_db import PineconeDB
     from taitutors.llm import TaiLLM, ChatOpenAIConfig
 
 
 class MetricsConfig(BasePydanticModel):
     """Define the metrics config."""
-    document_db_instance: DocumentDB = Field(
-        ...,
-        description="The instance of the document db.",
-    )
-    pinecone_db_instance: PineconeDB = Field(
-        ...,
-        description="The instance of the pinecone db.",
-    )
     archive: Archive = Field(
         ...,
         description="The instance of the archive.",
@@ -77,14 +63,6 @@ class CommonQuestion(BaseFrequentlyAccessedObject):
     )
 
 
-class FrequentlyAccessedResource(BaseFrequentlyAccessedObject):
-    """Define a schema for a common resource."""
-    resource: ClassResourceChunkDocument = Field(
-        ...,
-        description="The resource that was most common during the date range.",
-    )
-
-
 class CommonQuestions(BaseFrequentlyAccessedObjects):
     """Define a schema for common questions."""
     common_questions: list[CommonQuestion] = Field(
@@ -93,20 +71,10 @@ class CommonQuestions(BaseFrequentlyAccessedObjects):
     )
 
 
-class FrequentlyAccessedResources(BaseFrequentlyAccessedObjects):
-    """Define a schema for common resources."""
-    resources: list[FrequentlyAccessedResource] = Field(
-        ...,
-        description="The list of the most frequently accessed resources during the date range.",
-    )
-
-
 class Metrics:
     """Define the metrics class."""
     def __init__(self, config: MetricsConfig):
         """Initialize the metrics class."""
-        self._document_db = config.document_db_instance
-        self._pinecone_db = config.pinecone_db_instance
         self._openai_config = config.openai_config
         self._archive = config.archive
 
@@ -153,52 +121,3 @@ class Metrics:
             common_questions=self._rank_summaries(messages)
         )
         return common_questions
-
-
-    def get_most_frequently_accessed_resources(self, class_id: UUID, date_range: Optional[DateRange] = None) -> FrequentlyAccessedResources:
-        """Get the most frequently accessed resources."""
-        if date_range is None:
-            date_range = DateRange()
-        pipeline_usage = [
-            {
-                '$match': {
-                    'class_id': str(class_id),
-                }
-            },
-            {
-                '$unwind': '$usage_log'
-            },
-            {
-                '$match': {
-                    'usage_log.timestamp': {'$gte': date_range.start_date, '$lte': date_range.end_date} ,
-                },
-            },
-            {
-                '$group': {
-                    '_id': '$_id',
-                    'resource_count': {'$sum': 1 },
-                }
-            },
-            {
-                '$sort': {'resource_count': -1}
-            }
-        ]
-        resources_usage = list(self._document_db.run_aggregate_query(pipeline_usage, ClassResourceChunkDocument))
-        ids = [resource_usage['_id'] for resource_usage in resources_usage] 
-        frequently_accessed_resources: list[FrequentlyAccessedResource] = []
-        for rank, doc_id in enumerate(ids, 1):
-            document = self._document_db.find_one(doc_id, ClassResourceChunkDocument)
-            frequently_accessed_resources.append(FrequentlyAccessedResource(
-                rank=rank,
-                appearances_during_period=resources_usage[rank - 1]['resource_count'],
-                resource=document,
-            ))
-        frequently_accessed_resources = FrequentlyAccessedResources(
-            class_id=class_id,
-            date_range=DateRange(
-                start_date=date_range.start_date,
-                end_date=date_range.end_date,
-            ),
-            resources=[resource.dict() for resource in frequently_accessed_resources]
-        )
-        return frequently_accessed_resources

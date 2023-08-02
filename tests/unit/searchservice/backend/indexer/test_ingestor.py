@@ -2,13 +2,13 @@
 from uuid import uuid4
 from pydantic import ValidationError
 import pytest
-from taiservice.api.taibackend.databases.document_db_schemas import (
+from taiservice.searchservice.backend.databases.document_db_schemas import (
     Metadata,
 )
-from taiservice.api.taibackend.shared_schemas import (
+from taiservice.searchservice.backend.shared_schemas import (
     ClassResourceType,
 )
-from taiservice.api.taibackend.indexer.data_ingestor_schema import(
+from taiservice.searchservice.backend.indexer.data_ingestor_schema import(
     IngestedDocument,
     LoadingStrategy,
     InputFormat,

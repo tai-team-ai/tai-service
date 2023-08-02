@@ -17,10 +17,10 @@ from langchain.schema import (
 )
 # first imports for local development, second imports for deployment
 try:
-    from ..databases.document_db_schemas import ClassResourceChunkDocument
+    from ...routers.tai_schemas import ClassResourceSnippet 
     from ..shared_schemas import BasePydanticModel
 except (KeyError, ImportError):
-    from taibackend.databases.document_db_schemas import ClassResourceChunkDocument
+    from taibackend.routers.tai_schemas import ClassResourceSnippet
     from taibackend.shared_schemas import BasePydanticModel
 
 class TaiTutorName(str, Enum):
@@ -127,7 +127,7 @@ class TaiTutorMessage(AIMessage, TutorAndStudentBaseMessage):
         const=True,
         description="The role of the creator of the chat message.",
     )
-    class_resource_chunks: list[ClassResourceChunkDocument] = Field(
+    class_resource_snippets: list[ClassResourceSnippet] = Field(
         default=[],
         description="The class resource chunks that were used to generate this message, if any.",
     )

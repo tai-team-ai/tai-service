@@ -1,10 +1,10 @@
 """Define the llms interface used for the TAI chat backend."""
-import traceback
 from uuid import UUID
 from uuid import uuid4
 from enum import Enum
+from pydantic import BaseModel
 import json
-from typing import Any, Dict, Optional, Union
+from typing import Any, Dict, Optional
 from langchain.chat_models import ChatOpenAI
 from langchain import PromptTemplate
 from langchain.chat_models.base import BaseChatModel
@@ -13,13 +13,12 @@ from loguru import logger
 from pydantic import Field
 # first imports are for local development, second imports are for deployment
 try:
-    from ..shared_schemas import BaseOpenAIConfig
     from .llm_functions import (
         get_relevant_class_resource_chunks,
         save_student_conversation_topics,
         save_student_questions,
     )
-    from ..databases.document_db_schemas import ClassResourceChunkDocument
+    from ...routers.tai_schemas import ClassResourceSnippet
     from ..databases.archiver import Archive
     from .llm_schemas import (
         TaiChatSession,
@@ -37,13 +36,12 @@ try:
         ValidatedFormatString,
     )
 except (KeyError, ImportError):
-    from taibackend.shared_schemas import BaseOpenAIConfig
+    from routers.tai_schemas import ClassResourceSnippet
     from taibackend.taitutors.llm_functions import (
         get_relevant_class_resource_chunks,
         save_student_conversation_topics,
         save_student_questions,
     )
-    from taibackend.databases.document_db_schemas import ClassResourceChunkDocument
     from taibackend.databases.archiver import Archive
     from taibackend.taitutors.llm_schemas import (
         TaiChatSession,
@@ -69,8 +67,16 @@ class ModelName(str, Enum):
     GPT_4 = "gpt-4"
 
 
-class ChatOpenAIConfig(BaseOpenAIConfig):
+class ChatOpenAIConfig(BaseModel):
     """Define the config for the chat openai model."""
+    api_key: str = Field(
+        ...,
+        description="The openai api key.",
+    )
+    request_timeout: int = Field(
+        default=15,
+        description="The number of seconds to wait for a response from the openai api.",
+    )
     basic_model_name: ModelName = Field(
         default=ModelName.GPT_TURBO,
         description="The name of the model to use for the llm tutor for basic queries.",
@@ -93,7 +99,7 @@ class ChatOpenAIConfig(BaseOpenAIConfig):
     )
     class_name: str = Field(
         default=HARD_CODED_CLASS_NAME,
-        description="The name of the class.",
+        description="The name of the class that the llm is tutoring for.",
     )
 
     class Config:
@@ -132,7 +138,7 @@ class TaiLLM:
     def add_tai_tutor_chat_response(
         self,
         chat_session: TaiChatSession,
-        relevant_chunks: Optional[list[ClassResourceChunkDocument]] = None,
+        relevant_chunks: Optional[list[ClassResourceSnippet]] = None,
         function_to_call: Optional[callable] = None,
         functions: Optional[list[callable]] = None,
         ModelToUse: Optional[BaseChatModel] = None,
@@ -172,7 +178,7 @@ class TaiLLM:
         self,
         class_id: UUID,
         search_query: str,
-        chunks: list[ClassResourceChunkDocument]
+        chunks: list[ClassResourceSnippet]
     ) -> str:
         """Create a snippet of the search result summary."""
         session: TaiChatSession = TaiChatSession.from_message(
@@ -234,7 +240,7 @@ class TaiLLM:
     def _append_model_response(
         self,
         chat_session: TaiChatSession,
-        chunks: list[ClassResourceChunkDocument] = None,
+        chunks: list[ClassResourceSnippet] = None,
         ModelToUse: Optional[BaseChatModel] = None,
         **kwargs: Dict[str, Any],
     ) -> None:
@@ -262,7 +268,7 @@ class TaiLLM:
         chat_session: TaiChatSession,
         function_to_call: callable,
         function_kwargs: dict,
-        relevant_chunks: list[ClassResourceChunkDocument] = None,
+        relevant_chunks: list[ClassResourceSnippet] = None,
     ) -> None:
         """Append the context chat to the chat session."""
         last_student_chat = chat_session.last_student_message
@@ -278,7 +284,7 @@ class TaiLLM:
         func_message = self._function_msg_from_chunks(relevant_chunks)
         chat_session.append_chat_messages([tutor_chat, func_message])
 
-    def _function_msg_from_chunks(self, chunks: list[ClassResourceChunkDocument]) -> FunctionMessage:
+    def _function_msg_from_chunks(self, chunks: list[ClassResourceSnippet]) -> FunctionMessage:
         """Create a function message from the chunks."""
         chunks = "\n".join([chunk.simplified_string for chunk in chunks])
         msg = FunctionMessage(

@@ -32,8 +32,8 @@ BASE_SETTINGS = {
 search_service_config = StackConfigBaseModel(
 	stack_id="tai-search-service-databases",
 	stack_name="tai-search-service-databases",
-	description="Stack for the search service databases. This stack contains the document " \
-    	"database and the pinecone database used by the tai search service.",
+	description="Stack for the search service. This stack contains the document " \
+    	"database, pinecone database, and search engine used by the tai platform.",
     duplicate_stack_for_development=False,
     **BASE_SETTINGS,
 )

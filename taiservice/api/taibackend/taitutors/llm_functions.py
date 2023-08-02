@@ -1,13 +1,12 @@
 """Define functions that cen be called by the LLM."""
 from typing import List
-from pydantic import BaseModel
 # first imports are for local development, second imports are for deployment
 try:
-    from taiservice.api.taibackend.databases.document_db import ClassResourceChunkDocument
+    from ...routers.tai_schemas import ClassResourceSnippet
 except (KeyError, ImportError):
-    from taibackend.databases.document_db import ClassResourceChunkDocument
+    from routers.tai_schemas import ClassResourceSnippet
 
-def get_relevant_class_resource_chunks(student_message: str) -> list[ClassResourceChunkDocument]:
+def get_relevant_class_resource_chunks(student_message: str) -> list[ClassResourceSnippet]:
     """
     Return the class resource chunks that are relevant to the student message.
 

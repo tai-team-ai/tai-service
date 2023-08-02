@@ -2,8 +2,8 @@
 from unittest.mock import MagicMock
 import pytest
 from pydantic import ValidationError
-from taiservice.api.taibackend import shared_schemas as backend_shared_schemas
-from taiservice.api.taibackend.databases import document_db_schemas as backend_db_schemas
+from taiservice.searchservice.backend import shared_schemas as backend_shared_schemas
+from taiservice.searchservice.backend.databases import document_db_schemas as backend_db_schemas
 from taiservice.api.routers.class_resources import (
     ClassResources,
     create_class_resource,
