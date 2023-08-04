@@ -1,4 +1,5 @@
 """Define the main entry point for the tai service API."""
+import os
 from http.client import HTTPException
 import traceback
 from fastapi import APIRouter, FastAPI, Request
@@ -22,6 +23,8 @@ ROUTERS = [
 
 def create_app() -> FastAPI:
     """Create the FastAPI app."""
+    # print the environment variables
+    print(f"Environment variables: {os.environ}")
     runtime_settings = SearchServiceSettings()
     app = FastAPI(
         title=TITLE,

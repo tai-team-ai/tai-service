@@ -158,7 +158,7 @@ class TaiSearchServiceStack(Stack):
         return db
 
     def _get_search_service(self, sg_for_connecting_to_db: ec2.SecurityGroup) -> Ec2Service:
-        target_port = 80
+        target_port = 8080
         self._create_docker_file(target_port)
         cluster: Cluster = self._get_cluster()
         task_definition: Ec2TaskDefinition = Ec2TaskDefinition(
@@ -190,7 +190,9 @@ class TaiSearchServiceStack(Stack):
             name="Deep Learning Base GPU AMI (Ubuntu 20.04) *",
         )
         instance_type = ec2.InstanceType.of(
-            instance_class=ec2.InstanceClass.G4AD,
+            # instance_class=ec2.InstanceClass.G4AD,
+            # instance_size=ec2.InstanceSize.XLARGE,
+            instance_class=ec2.InstanceClass.R5A,
             instance_size=ec2.InstanceSize.XLARGE,
         )
         cluster = Cluster(
@@ -201,6 +203,7 @@ class TaiSearchServiceStack(Stack):
                 instance_type=instance_type,
                 max_capacity=1,
                 machine_image=deep_learning_ami,
+                spot_price="0.15",
             ),
         )
         return cluster

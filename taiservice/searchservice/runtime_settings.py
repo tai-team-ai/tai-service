@@ -1,13 +1,38 @@
+"""Define the runtime settings for the TAI Search Service."""
+import json
 from pathlib import Path
-from pydantic import Field
+from pydantic import Field, BaseSettings
 from .backend.databases.pinecone_db import Environment as PineconeEnvironment
-from .backend.shared_schemas import BasePydanticModel
 
 
 BACKEND_ATTRIBUTE_NAME = "tai_backend"
 
+class EnvironmentSettings(BaseSettings):
+    """Define the base settings for the package."""
 
-class SearchServiceSettings(BasePydanticModel):
+    def dict(self, *args, for_environment: bool = True, **kwargs):
+        """Override the dict method to convert nested, dicts, sets and sequences to JSON."""
+        output = super().dict(*args, **kwargs)
+        if for_environment:
+            new_output = {}
+            for key, value in output.items():
+                if hasattr(self.Config, "env_prefix"):
+                    key = self.Config.env_prefix + key
+                if isinstance(value, dict) or isinstance(value, list) or isinstance(value, set) or isinstance(value, tuple):
+                    value = json.dumps(value)
+                key = key.upper()
+                new_output[key] = str(value)
+            return new_output
+        return output
+
+    class Config:
+        """Define the Pydantic config."""
+        use_enum_values = True
+        env_file = ".env"
+        env_file_encoding = "utf-8"
+
+
+class SearchServiceSettings(EnvironmentSettings):
     """Define the configuration model for the TAI API service."""
 
     pinecone_db_api_key_secret_name: str = Field(
@@ -68,12 +93,12 @@ class SearchServiceSettings(BasePydanticModel):
         default=50,
         description="The batch size for OpenAI requests.",
     )
-    nltk_data: str = Field(
-        default="/var/task/nltk_data",
+    nltk_data: Path = Field(
+        default=Path("/var/task/nltk_data"),
         description="The path to the nltk data.",
     )
-    transformers_cache: str = Field(
-        default="/tmp/transformers_cache",
+    transformers_cache: Path = Field(
+        default=Path("/tmp/transformers_cache"),
         description="The path to the transformers cache.",
     )
     cold_store_bucket_name: str = Field(
