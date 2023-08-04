@@ -4,6 +4,7 @@ from uuid import UUID
 from uuid import uuid4
 from enum import Enum
 from typing import Any, Optional
+from pathlib import Path
 from pydantic import BaseModel, Field, Extra, HttpUrl, constr
 
 
@@ -46,10 +47,12 @@ class BasePydanticModel(BaseModel):
             obj = serialize(obj)
         return obj
 
-    def dict(self, *args, serialize_dates: bool = True, **kwargs):
+    def dict(self, *args, serialize_dates: bool = True, serialize_nums: bool = True, **kwargs):
         """Convert all objects to strs."""
         super_result = super().dict(*args, **kwargs)
-        types_to_serialize = (UUID, Enum)
+        types_to_serialize = (UUID, Enum, Path)
+        if serialize_nums:
+            types_to_serialize += (int, float)
         if serialize_dates:
             types_to_serialize += (datetime,)
         result = self._recurse_and_serialize(super_result, types_to_serialize)

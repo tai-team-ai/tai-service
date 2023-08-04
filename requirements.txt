@@ -16,6 +16,7 @@ openai
 pdf2image
 pinecone-client[grpc]
 pinecone-text
+pinecone-text[splade]
 pydantic[dotenv]<=1.10.11
 pydantic<=1.10.11
 pygit2
@@ -27,7 +28,5 @@ pytest-cov
 requests
 selenium
 tiktoken
-torch -f https://download.pytorch.org/whl/cpu
-transformers
 unstructured
 uvicorn

@@ -14,6 +14,7 @@ from aws_cdk import (
     aws_s3 as s3,
     aws_iam as iam,
 )
+from .construct_config import Permissions
 
 
 class   VersionedBucketConfigModel(BaseModel):
@@ -112,6 +113,37 @@ class VersionedBucket(Construct):
     def bucket_name(self) -> str:
         """Return the bucket name."""
         return self.bucket.bucket_name
+
+    @staticmethod
+    def create_bucket(
+        scope: Construct,
+        bucket_name: str,
+        public_read_access: bool,
+        permissions: Permissions,
+        removal_policy: RemovalPolicy,
+        role: Optional[iam.Role] = None,
+    ) -> 'VersionedBucket':
+        """Create a versioned bucket."""
+        config = VersionedBucketConfigModel(
+            bucket_name=bucket_name,
+            public_read_access=public_read_access,
+            removal_policy=removal_policy,
+            delete_objects_on_bucket_removal=True if removal_policy == RemovalPolicy.DESTROY else False,
+        )
+        bucket: VersionedBucket = VersionedBucket(
+            scope=scope,
+            construct_id=f"{config.bucket_name}-bucket",
+            config=config,
+        )
+        if role:
+            if permissions == Permissions.READ:
+                bucket.grant_read_access(role)
+            elif permissions == Permissions.READ_WRITE:
+                bucket.grant_read_write_access(role)
+            else:
+                raise ValueError(f"Invalid permissions: {permissions} for bucket {bucket_name}")
+        return bucket
+
 
     def _create_metrics_for_bucket(self) -> s3.BucketMetrics:
         """Create metrics for the bucket."""

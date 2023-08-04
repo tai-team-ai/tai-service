@@ -1,6 +1,15 @@
 """Define base configurations for the constructs."""
 import json
+from enum import Enum
 from pydantic import BaseSettings
+
+
+class Permissions(str, Enum):
+    """Define permissions for AWS resources."""
+
+    READ = "read"
+    WRITE = "write"
+    READ_WRITE = "read_write"
 
 
 class BaseDeploymentSettings(BaseSettings):
