@@ -24,7 +24,6 @@ ROUTERS = [
 def create_app() -> FastAPI:
     """Create the FastAPI app."""
     # print the environment variables
-    print(f"Environment variables: {os.environ}")
     runtime_settings = SearchServiceSettings()
     app = FastAPI(
         title=TITLE,

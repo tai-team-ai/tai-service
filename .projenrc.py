@@ -193,6 +193,8 @@ vscode_launch_config.add_configuration(
         "taiservice.searchservice.main:create_app",
         "--reload",
         "--factory",
+        "--port",
+        "8080",
     ],
     env=RUNTIME_ENV_VARS,
 )

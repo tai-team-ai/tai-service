@@ -9,6 +9,7 @@ from loguru import logger
 
 from taiservice.api.routers.class_resources_schema import (
     ClassResource,
+    ClassResources,
     BaseClassResource as APIBaseClassResource,
     Metadata as APIResourceMetadata,
 )
@@ -83,7 +84,7 @@ class Backend:
         )
 
     @staticmethod
-    def to_backend_input_docs(resources: list[ClassResource]) -> list[indexer.InputDocument]:
+    def to_backend_input_docs(resources: ClassResources) -> list[indexer.InputDocument]:
         """Convert the API documents to database documents."""
         input_documents = []
         for resource in resources:
@@ -172,7 +173,7 @@ class Backend:
             output_documents.append(output_doc)
         return output_documents
 
-    def create_class_resources(self, class_resources: list[ClassResource]) -> None:
+    def create_class_resources(self, class_resources: ClassResources) -> None:
         """Create the class resources."""
         input_docs = self.to_backend_input_docs(class_resources)
         doc_pairs: list[tuple[indexer.Indexer, ClassResourceDocument]] = []

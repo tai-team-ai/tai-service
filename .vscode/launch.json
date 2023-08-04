@@ -5,7 +5,11 @@
       "name": "TAI API",
       "request": "launch",
       "type": "python",
-      "args": ["taiservice.api.main:create_app", "--reload", "--factory"],
+      "args": [
+        "taiservice.api.main:create_app",
+        "--reload",
+        "--factory"
+      ],
       "env": {
         "PINECONE_DB_API_KEY_SECRET_NAME": "dev/tai_service/pinecone_db/api_key",
         "PINECONE_DB_ENVIRONMENT": "us-east-1-aws",
@@ -35,7 +39,9 @@
       "args": [
         "taiservice.searchservice.main:create_app",
         "--reload",
-        "--factory"
+        "--factory",
+        "--port",
+        "8080"
       ],
       "env": {
         "PINECONE_DB_API_KEY_SECRET_NAME": "dev/tai_service/pinecone_db/api_key",

@@ -32,7 +32,7 @@ try:
         TaiProfile as BETaiProfile,
     )
     from ..runtime_settings import TaiApiSettings
-    from ..routers.class_resources_schema import ClassResource
+    from ..routers.class_resources_schema import ClassResource, ClassResources
     from ..routers.tai_schemas import (
         BaseChatSession as APIChatSession,
         Chat as APIChat,
@@ -66,7 +66,7 @@ except (KeyError, ImportError):
         FrequentlyAccessedResources as APIFrequentlyAccessedResources,
         DateRange as APIDateRange,
     )
-    from routers.class_resources_schema import ClassResource
+    from routers.class_resources_schema import ClassResource, ClassResources
     from routers.tai_schemas import (
         BaseChatSession as APIChatSession,
         Chat as APIChat,
@@ -260,9 +260,13 @@ class Backend:
         )
         return search_answer
 
-    def create_class_resources(self, class_resources: list[ClassResource]) -> None:
+    def create_class_resources(self, class_resources: ClassResources) -> None:
         """Create a list of class resources."""
-        pass #TODO call new tai search service
+        url = f"{self._runtime_settings.search_service_api_url}/class_resources"
+        response = requests.post(url, data=class_resources.json(), timeout=30)
+        if response.status_code != 200:
+            error_message = f"Failed to create class resources. Status code: {response.status_code}"
+            logger.error(error_message)
 
     def get_class_resources(self, ids: list[UUID], from_class_ids: bool = False) -> list[ClassResource]:
         """Get the class resources."""

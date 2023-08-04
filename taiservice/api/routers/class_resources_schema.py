@@ -123,3 +123,6 @@ class ClassResources(BasePydanticModel):
             },
         }
 
+    def __iter__(self):
+        """Permit iteration over class resources."""
+        return iter(self.class_resources)

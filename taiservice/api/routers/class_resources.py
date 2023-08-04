@@ -6,7 +6,7 @@ try:
     from ..taibackend.backend import Backend
     from ..runtime_settings import BACKEND_ATTRIBUTE_NAME
 except ImportError as e:
-    from routers.class_resources_schema import ClassResource, ClassResources, ClassResourceIds
+    from routers.class_resources_schema import ClassResources, ClassResourceIds
     from taibackend.backend import Backend
     from runtime_settings import BACKEND_ATTRIBUTE_NAME
 
@@ -27,7 +27,8 @@ def create_class_resource(class_resource: ClassResource, request: Request, respo
     """Create a class resource."""
     backend: Backend = getattr(request.app.state, BACKEND_ATTRIBUTE_NAME)
     # try:
-    backend.create_class_resources([class_resource])
+    class_resources = ClassResources(class_resources=[class_resource])
+    backend.create_class_resources(class_resources)
     # except DuplicateClassResourceError as error:
     #     response.status_code = status.HTTP_409_CONFLICT
     #     return {"message": error.message}
