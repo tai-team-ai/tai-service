@@ -36,3 +36,7 @@ class TaiApiSettings(BaseSettings):
         default=ModelName.GPT_4,
         description="The name of the model to use for the llm tutor for advanced queries.",
     )
+    search_service_api_url: str = Field(
+        ...,
+        description="The URL of the search service API.",
+    )

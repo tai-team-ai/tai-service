@@ -5,11 +5,7 @@
       "name": "TAI API",
       "request": "launch",
       "type": "python",
-      "args": [
-        "taiservice.api.main:create_app",
-        "--reload",
-        "--factory"
-      ],
+      "args": ["taiservice.api.main:create_app", "--reload", "--factory"],
       "env": {
         "PINECONE_DB_API_KEY_SECRET_NAME": "dev/tai_service/pinecone_db/api_key",
         "PINECONE_DB_ENVIRONMENT": "us-east-1-aws",
@@ -27,7 +23,8 @@
         "COLD_STORE_BUCKET_NAME": "tai-service-class-resource-cold-store-dev",
         "DOCUMENTS_TO_INDEX_QUEUE": "frontend-data-transfer-[branch-name]",
         "NLTK_DATA": "/tmp/nltk_data",
-        "MESSAGE_ARCHIVE_BUCKET_NAME": "tai-service-message-archive-dev"
+        "MESSAGE_ARCHIVE_BUCKET_NAME": "tai-service-message-archive-dev",
+        "SEARCH_SERVICE_API_URL": "http://localhost:8080"
       },
       "program": "${workspaceFolder}/.venv/bin/uvicorn"
     },
@@ -57,7 +54,8 @@
         "COLD_STORE_BUCKET_NAME": "tai-service-class-resource-cold-store-dev",
         "DOCUMENTS_TO_INDEX_QUEUE": "frontend-data-transfer-[branch-name]",
         "NLTK_DATA": "/tmp/nltk_data",
-        "MESSAGE_ARCHIVE_BUCKET_NAME": "tai-service-message-archive-dev"
+        "MESSAGE_ARCHIVE_BUCKET_NAME": "tai-service-message-archive-dev",
+        "SEARCH_SERVICE_API_URL": "http://localhost:8080"
       },
       "program": "${workspaceFolder}/.venv/bin/uvicorn"
     }

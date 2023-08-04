@@ -68,6 +68,7 @@ env_file: TextFile = TextFile(
         'DOC_DB_ADMIN_USER_PASSWORD_SECRET_NAME="dev/tai_service/document_DB/admin_password"',
         'AWS_DEPLOYMENT_ACCOUNT_ID="645860363137"',
         'DEPLOYMENT_TYPE="dev"',
+        'SEARCH_SERVICE_API_URL="tai-s-taise-AZC3PUQV8RIL-990860086.us-east-1.elb.amazonaws.com"',
     ]
 )
 docker_ignore_file: TextFile = TextFile(
@@ -146,6 +147,7 @@ RUNTIME_ENV_VARS = {
     "DOCUMENTS_TO_INDEX_QUEUE": "frontend-data-transfer-[branch-name]",
     "NLTK_DATA": "/tmp/nltk_data",
     "MESSAGE_ARCHIVE_BUCKET_NAME": "tai-service-message-archive-dev",
+    "SEARCH_SERVICE_API_URL": "http://localhost:8080",
 }
 make_file.add_rule(
     targets=["build-and-run-docker"],

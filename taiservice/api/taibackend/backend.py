@@ -4,6 +4,7 @@ import traceback
 from datetime import datetime, date, timedelta
 from uuid import UUID
 from typing import Union, Any, Optional
+import requests
 from loguru import logger
 import boto3
 from botocore.exceptions import ClientError
@@ -48,12 +49,6 @@ except (KeyError, ImportError):
         MetricsConfig,
         DateRange as BEDateRange,
     )
-    from routers.common_resources_schema import (
-        CommonQuestion as APICommonQuestion,
-        CommonQuestions as APICommonQuestions,
-        FrequentlyAccessedResources as APIFrequentlyAccessedResources,
-        DateRange as APIDateRange,
-    )
     from taibackend.taitutors.llm import TaiLLM, ChatOpenAIConfig
     from taibackend.taitutors.llm_schemas import (
         TaiTutorMessage as BETaiTutorMessage,
@@ -65,6 +60,12 @@ except (KeyError, ImportError):
         TaiProfile as BETaiProfile,
     )
     from runtime_settings import TaiApiSettings
+    from routers.common_resources_schema import (
+        CommonQuestion as APICommonQuestion,
+        CommonQuestions as APICommonQuestions,
+        FrequentlyAccessedResources as APIFrequentlyAccessedResources,
+        DateRange as APIDateRange,
+    )
     from routers.class_resources_schema import ClassResource
     from routers.tai_schemas import (
         BaseChatSession as APIChatSession,
@@ -263,9 +264,26 @@ class Backend:
         """Create a list of class resources."""
         pass #TODO call new tai search service
 
-    def get_class_resources(self, ids: list[UUID], from_class_ids: bool=False) -> list[ClassResource]:
+    def get_class_resources(self, ids: list[UUID], from_class_ids: bool = False) -> list[ClassResource]:
         """Get the class resources."""
-        pass #TODO call new tai search service
+        url = f"{self._runtime_settings.search_service_api_url}/class_resources"
+        params = {
+            'ids': ids,
+            'from_class_ids': from_class_ids
+        }
+        response = requests.get(url, params=params, timeout=4)
+        class_resources = []
+        if response.status_code == 200:
+            try:
+                data = response.json()
+                class_resources = [ClassResource(**item) for item in data['classResources']]
+            except Exception as e: # pylint: disable=broad-except
+                error_message = f"Failed to parse class resources. Exception: {e}"
+                logger.error(error_message)
+        else:
+            error_message = f"Failed to retrieve class resources. Status code: {response.status_code}"
+            logger.error(error_message)
+        return class_resources
 
     def update_class_resources(self, class_resources: list[ClassResource]) -> None:
         """Update a list of class resources."""
