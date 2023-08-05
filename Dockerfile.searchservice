@@ -1,0 +1,25 @@
+FROM 763104351884.dkr.ecr.us-east-1.amazonaws.com/pytorch-inference:2.0.1-gpu-py310-cu118-ubuntu20.04-ec2 AS build
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt-get update && apt-get install -y curl
+RUN curl -sL https://deb.nodesource.com/setup_18.x | bash
+RUN apt-get update && \                
+	apt-get install -y nodejs poppler-utils wget unzip
+RUN mkdir -p /var/task/chromedriver
+RUN wget -O /var/task/chromedriver.zip https://chromedriver.storage.googleapis.com/90.0.4430.24/chromedriver_linux64.zip
+RUN unzip /var/task/chromedriver.zip -d /var/task/chromedriver
+RUN apt-get install -y libglib2.0-0 libnss3 libgconf-2-4 libfontconfig1 chromium-browser
+
+FROM build AS dependencies
+WORKDIR /app
+RUN pip install --upgrade pip && pip install nltk projen uvicorn
+RUN mkdir -p /var/task/nltk_data
+RUN python3 -m nltk.downloader -d /var/task/nltk_data punkt stopwords averaged_perceptron_tagger
+COPY .projenrc.py .projenrc.py
+COPY .projen .projen
+RUN projen
+
+FROM dependencies AS runtime
+WORKDIR /app
+COPY . .
+EXPOSE 8080
+CMD [".venv/bin/python", "-m", "uvicorn", "taiservice.searchservice.main:create_app", "--host", "0.0.0.0", "--port", "8080", "--factory"]

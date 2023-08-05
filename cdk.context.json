@@ -56,5 +56,6 @@
         ]
       }
     ]
-  }
+  },
+  "ami:account=645860363137:filters.image-type.0=machine:filters.name.0=Deep Learning Base GPU AMI (Ubuntu 20.04) *:filters.state.0=available:region=us-east-1": "ami-0d0ad37f1c3d46a93"
 }

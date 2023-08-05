@@ -1,3 +1,5 @@
+"""Define the runtime settings for the TAI Search Service."""
+import json
 from pathlib import Path
 from pydantic import Field, BaseSettings
 from .backend.databases.pinecone_db import Environment as PineconeEnvironment
@@ -5,8 +7,32 @@ from .backend.databases.pinecone_db import Environment as PineconeEnvironment
 
 BACKEND_ATTRIBUTE_NAME = "tai_backend"
 
+class EnvironmentSettings(BaseSettings):
+    """Define the base settings for the package."""
 
-class TaiApiSettings(BaseSettings):
+    def dict(self, *args, for_environment: bool = True, **kwargs):
+        """Override the dict method to convert nested, dicts, sets and sequences to JSON."""
+        output = super().dict(*args, **kwargs)
+        if for_environment:
+            new_output = {}
+            for key, value in output.items():
+                if hasattr(self.Config, "env_prefix"):
+                    key = self.Config.env_prefix + key
+                if isinstance(value, dict) or isinstance(value, list) or isinstance(value, set) or isinstance(value, tuple):
+                    value = json.dumps(value)
+                key = key.upper()
+                new_output[key] = str(value)
+            return new_output
+        return output
+
+    class Config:
+        """Define the Pydantic config."""
+        use_enum_values = True
+        env_file = ".env"
+        env_file_encoding = "utf-8"
+
+
+class SearchServiceSettings(EnvironmentSettings):
     """Define the configuration model for the TAI API service."""
 
     pinecone_db_api_key_secret_name: str = Field(
@@ -55,10 +81,6 @@ class TaiApiSettings(BaseSettings):
         ...,
         description="The name of the collection in the document db for class resource chunks.",
     )
-    message_archive_bucket_name: str = Field(
-        ...,
-        description="The name of the student message archive bucket to store all student messages.",
-    )
     openAI_api_key_secret_name: str = Field(
         ...,
         description="The name of the secret containing the OpenAI API key.",
@@ -71,17 +93,21 @@ class TaiApiSettings(BaseSettings):
         default=50,
         description="The batch size for OpenAI requests.",
     )
-    nltk_data: str = Field(
-        default="/var/task/nltk_data",
+    nltk_data: Path = Field(
+        default=Path("/var/task/nltk_data"),
         description="The path to the nltk data.",
     )
-    transformers_cache: str = Field(
-        default="/tmp/transformers_cache",
+    transformers_cache: Path = Field(
+        default=Path("/tmp/transformers_cache"),
         description="The path to the transformers cache.",
     )
     cold_store_bucket_name: str = Field(
         ...,
         description="The name of the cold store bucket.",
+    )
+    documents_to_index_queue: str = Field(
+        ...,
+        description="The name of the data to index transfer bucket. Documents should be uploaded to this bucket.",
     )
     chrome_driver_path: Path = Field(
         default=Path("/var/task/chromedriver"),
@@ -91,3 +117,39 @@ class TaiApiSettings(BaseSettings):
         default=240,
         description="The timeout for class resource processing.",
     )
+
+    def get_docker_file_contents(self, port: int, fully_qualified_handler_path: str) -> str:
+        """Create and return the path to the Dockerfile."""
+        docker_file = [
+            "FROM 763104351884.dkr.ecr.us-east-1.amazonaws.com/pytorch-inference:2.0.1-gpu-py310-cu118-ubuntu20.04-ec2 AS build",
+            "ENV DEBIAN_FRONTEND=noninteractive",
+            "RUN apt-get update && apt-get install -y curl",
+            "RUN curl -sL https://deb.nodesource.com/setup_18.x | bash",
+            # poppler-utils is used for the python pdf to image package
+            "RUN apt-get update && \\\
+                \n\tapt-get install -y nodejs poppler-utils wget unzip",
+            # install chrome driver for selenium use
+            # install extra dependencies for chrome driver
+            f"RUN mkdir -p {self.chrome_driver_path}",
+            f"RUN wget -O {self.chrome_driver_path}.zip https://chromedriver.storage.googleapis.com/90.0.4430.24/chromedriver_linux64.zip",
+            # unzip to the self._settings.chrome_driver_path directory
+            f"RUN unzip {self.chrome_driver_path}.zip -d {self.chrome_driver_path}",
+            "RUN apt-get install -y libglib2.0-0 libnss3 libgconf-2-4 libfontconfig1 chromium-browser",
+            "\nFROM build AS dependencies",
+            "WORKDIR /app",
+            "RUN pip install --upgrade pip && pip install nltk projen uvicorn",
+            f"RUN mkdir -p {self.nltk_data}",  # Create directory for model
+            # punkt and and stopwords are used for pinecone SPLADE
+            # averaged_perceptron_tagger is used for langchain for HTML parsing
+            # the path is specified as lambda does NOT have access to the default path
+            f"RUN python3 -m nltk.downloader -d {self.nltk_data} punkt stopwords averaged_perceptron_tagger",  # Download the model and save it to the directory
+            "COPY .projenrc.py .projenrc.py",
+            "COPY .projen .projen",
+            "RUN projen",
+            "\nFROM dependencies AS runtime",
+            "WORKDIR /app",
+            "COPY . .",
+            f"EXPOSE {port}",
+            f'CMD [".venv/bin/python", "-m", "uvicorn", "{fully_qualified_handler_path}", "--host", "0.0.0.0", "--port", "{port}", "--factory"]',
+        ]
+        return "\n".join(docker_file)

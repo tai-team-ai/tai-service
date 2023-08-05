@@ -47,9 +47,7 @@ project:Project = AwsCdkPythonApp(
         "tiktoken",
         "aws-lambda-powertools",
         "pinecone-text",
-        # "pinecone-text[splade]", # this installs cuda too, which we don't want
-        "torch -f https://download.pytorch.org/whl/cpu",
-        "transformers",
+        "pinecone-text[splade]",
         "pymupdf",
         "pdf2image",
         "PyPDF2",
@@ -70,7 +68,21 @@ env_file: TextFile = TextFile(
         'DOC_DB_ADMIN_USER_PASSWORD_SECRET_NAME="dev/tai_service/document_DB/admin_password"',
         'AWS_DEPLOYMENT_ACCOUNT_ID="645860363137"',
         'DEPLOYMENT_TYPE="dev"',
+        'SEARCH_SERVICE_API_URL="tai-s-taise-AZC3PUQV8RIL-990860086.us-east-1.elb.amazonaws.com"',
     ]
+)
+docker_ignore_file: TextFile = TextFile(
+    project,
+    "./.dockerignore",
+    lines=[
+        ".git",
+        ".gitignore",
+        "**/.venv",
+        "**/venv",
+        "**/tests",
+        "**/test-reports",
+        "**/.build*/"
+    ],
 )
 make_file: Makefile = Makefile(
     project,
@@ -108,6 +120,12 @@ make_file.add_rule(
         "sudo systemctl start docker",
     ],
 )
+make_file.add_rule(
+    targets=["ecr-docker-login"],
+    recipe=[
+        "sudo aws ecr get-login-password --region us-east-1 | sudo docker login --username AWS --password-stdin 763104351884.dkr.ecr.us-east-1.amazonaws.com",
+    ],
+)
 def convert_dict_env_vars_to_docker_env_vars(env_vars: dict):
     return " ".join([f"-e {key}=\"{value}\"" for key, value in env_vars.items()])
 
@@ -126,17 +144,18 @@ RUNTIME_ENV_VARS = {
     "OPENAI_API_KEY_SECRET_NAME": "dev/tai_service/openai/api_key",
     "AWS_DEFAULT_REGION": "us-east-1",
     "COLD_STORE_BUCKET_NAME": "tai-service-class-resource-cold-store-dev",
-    "FRONTEND_DATA_TRANSFER_BUCKET_NAME": "frontend-data-transfer-[branch-name]",
+    "DOCUMENTS_TO_INDEX_QUEUE": "frontend-data-transfer-[branch-name]",
     "NLTK_DATA": "/tmp/nltk_data",
-    "MESSAGE_ARCHIVE_BUCKET_NAME": "llm-message-archive-add-common-dev",
+    "MESSAGE_ARCHIVE_BUCKET_NAME": "tai-service-message-archive-dev",
+    "SEARCH_SERVICE_API_URL": "http://localhost:8080",
 }
 make_file.add_rule(
     targets=["build-and-run-docker"],
     recipe=[
         "cdk synth && \\",
         "cd $(DIR) && \\",
-        "docker build -t test-container . && \\",
-        f"docker run --network host {convert_dict_env_vars_to_docker_env_vars(RUNTIME_ENV_VARS)} test-container",
+        "sudo docker build -t test-container -f $(DOCKER_FILE) . && \\",
+        f"sudo docker run --network host {convert_dict_env_vars_to_docker_env_vars(RUNTIME_ENV_VARS)} test-container",
     ],
 )
 make_file.add_rule(
@@ -174,6 +193,8 @@ vscode_launch_config.add_configuration(
         "taiservice.searchservice.main:create_app",
         "--reload",
         "--factory",
+        "--port",
+        "8080",
     ],
     env=RUNTIME_ENV_VARS,
 )

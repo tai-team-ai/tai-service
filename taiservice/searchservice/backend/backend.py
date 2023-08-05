@@ -9,6 +9,7 @@ from loguru import logger
 
 from taiservice.api.routers.class_resources_schema import (
     ClassResource,
+    ClassResources,
     BaseClassResource as APIBaseClassResource,
     Metadata as APIResourceMetadata,
 )
@@ -20,7 +21,7 @@ from taiservice.api.routers.common_resources_schema import (
 from taiservice.api.routers.tai_schemas import (
     ClassResourceSnippet as APIClassResourceSnippet,
 )
-from ..runtime_settings import TaiApiSettings
+from ..runtime_settings import SearchServiceSettings
 from .databases.document_db import DocumentDB, DocumentDBConfig
 from .databases.document_db_schemas import (
     ClassResourceProcessingStatus,
@@ -41,7 +42,7 @@ from .indexer import indexer
 
 class Backend:
     """Class to handle the class resources backend."""
-    def __init__(self, runtime_settings: TaiApiSettings) -> None:
+    def __init__(self, runtime_settings: SearchServiceSettings) -> None:
         """Initialize the class resources backend."""
         self._runtime_settings = runtime_settings
         pinecone_api_key = self._get_secret_value(runtime_settings.pinecone_db_api_key_secret_name)
@@ -83,7 +84,7 @@ class Backend:
         )
 
     @staticmethod
-    def to_backend_input_docs(resources: list[ClassResource]) -> list[indexer.InputDocument]:
+    def to_backend_input_docs(resources: ClassResources) -> list[indexer.InputDocument]:
         """Convert the API documents to database documents."""
         input_documents = []
         for resource in resources:
@@ -172,7 +173,7 @@ class Backend:
             output_documents.append(output_doc)
         return output_documents
 
-    def create_class_resources(self, class_resources: list[ClassResource]) -> None:
+    def create_class_resources(self, class_resources: ClassResources) -> None:
         """Create the class resources."""
         input_docs = self.to_backend_input_docs(class_resources)
         doc_pairs: list[tuple[indexer.Indexer, ClassResourceDocument]] = []

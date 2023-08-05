@@ -1,12 +1,14 @@
 """Define the main entry point for the tai service API."""
+import os
 from http.client import HTTPException
 import traceback
 from fastapi import APIRouter, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from loguru import logger
+import torch
 from .backend.backend import Backend
-from .runtime_settings import TaiApiSettings, BACKEND_ATTRIBUTE_NAME
+from .runtime_settings import SearchServiceSettings, BACKEND_ATTRIBUTE_NAME
 from .routers import class_resources
 
 TITLE = "T.A.I. Service"
@@ -14,6 +16,7 @@ DESCRIPTION = "A service for the T.A.I. project."
 
 ROUTER = APIRouter()
 ROUTER.get("/health-check")(lambda: {"status": "ok"})
+ROUTER.get("/cuda", include_in_schema=False)(lambda: {"cuda available": torch.cuda.is_available()})
 ROUTERS = [
     ROUTER,
     class_resources.ROUTER,
@@ -21,7 +24,8 @@ ROUTERS = [
 
 def create_app() -> FastAPI:
     """Create the FastAPI app."""
-    runtime_settings = TaiApiSettings()
+    # print the environment variables
+    runtime_settings = SearchServiceSettings()
     app = FastAPI(
         title=TITLE,
         description=DESCRIPTION,

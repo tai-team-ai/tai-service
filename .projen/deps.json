@@ -76,6 +76,10 @@
       "type": "runtime"
     },
     {
+      "name": "pinecone-text[splade]",
+      "type": "runtime"
+    },
+    {
       "name": "pydantic[dotenv]<=1.10.11",
       "type": "runtime"
     },
@@ -117,14 +121,6 @@
     },
     {
       "name": "tiktoken",
-      "type": "runtime"
-    },
-    {
-      "name": "torch -f https://download.pytorch.org/whl/cpu",
-      "type": "runtime"
-    },
-    {
-      "name": "transformers",
       "type": "runtime"
     },
     {

@@ -1,5 +1,7 @@
 """Define the search database stack."""
+import os
 from constructs import Construct
+from pathlib import Path
 from aws_cdk import (
     Stack,
     aws_ec2 as ec2,
@@ -20,19 +22,23 @@ from aws_cdk.aws_elasticloadbalancingv2 import (
     ApplicationProtocol,
     ApplicationTargetGroup,
 )
+from taiservice.searchservice.runtime_settings import SearchServiceSettings
 from .stack_helpers import add_tags
 from .stack_config_models import StackConfigBaseModel
+from ..constructs.construct_config import Permissions
 from ..constructs.document_db_construct import (
     DocumentDatabase,
     ElasticDocumentDBConfigModel,
     DocumentDBSettings,
 )
 from ..constructs.pinecone_db_construct import PineconeDatabase
+from ..constructs.bucket_construct import VersionedBucket
 from ..constructs.customresources.pinecone_db.pinecone_db_custom_resource import PineconeDBSettings
 
 
-
-PATH_TO_SERVICE_DIR = "taiservice/searchservice"
+DOCKER_FILE_NAME = "Dockerfile.searchservice"
+FULLY_QUALIFIED_HANDLER_NAME = "taiservice.searchservice.main:create_app"
+CWD = os.getcwd()
 
 class TaiSearchServiceStack(Stack):
     """Define the search service for indexing and searching."""
@@ -43,6 +49,7 @@ class TaiSearchServiceStack(Stack):
         config: StackConfigBaseModel,
         pinecone_db_settings: PineconeDBSettings,
         doc_db_settings: DocumentDBSettings,
+        search_service_settings: SearchServiceSettings,
     ) -> None:
         """Initialize the search database stack."""
         super().__init__(
@@ -54,6 +61,7 @@ class TaiSearchServiceStack(Stack):
             tags=config.tags,
             termination_protection=config.termination_protection,
         )
+        self._search_service_settings = search_service_settings
         self._pinecone_db_settings = pinecone_db_settings
         self._doc_db_settings = doc_db_settings
         self._config = config
@@ -61,9 +69,24 @@ class TaiSearchServiceStack(Stack):
         self._subnet_type_for_doc_db = ec2.SubnetType.PRIVATE_WITH_EGRESS
         self.vpc = self._create_vpc()
         self.document_db = self._get_document_db(doc_db_settings=doc_db_settings)
+        search_service_settings.doc_db_fully_qualified_domain_name = self.document_db.fully_qualified_domain_name
         self._security_group_for_connecting_to_doc_db = self.document_db.security_group_for_connecting_to_cluster
         self.pinecone_db = self._get_pinecone_db()
         self.search_service = self._get_search_service(self._security_group_for_connecting_to_doc_db)
+        self._cold_store_bucket: VersionedBucket = VersionedBucket.create_bucket(
+            scope=self,
+            bucket_name=search_service_settings.cold_store_bucket_name,
+            public_read_access=True,
+            permissions=Permissions.READ_WRITE,
+            removal_policy=config.removal_policy,
+        )
+        self._documents_to_index_queue: VersionedBucket = VersionedBucket.create_bucket(
+            scope=self,
+            bucket_name=search_service_settings.documents_to_index_queue,
+            public_read_access=True,
+            permissions=Permissions.READ_WRITE,
+            removal_policy=config.removal_policy,
+        )
         add_tags(self, config.tags)
 
     @property
@@ -74,6 +97,11 @@ class TaiSearchServiceStack(Stack):
         If you want to connect to the document db from another stack, you need to use this security group.
         """
         return self._security_group_for_connecting_to_doc_db
+
+    @property
+    def documents_to_index_queue(self) -> VersionedBucket:
+        """Return the bucket for transferring documents to index."""
+        return self._documents_to_index_queue
 
     def _create_vpc(self) -> ec2.Vpc:
         subnet_configurations = []
@@ -130,7 +158,8 @@ class TaiSearchServiceStack(Stack):
         return db
 
     def _get_search_service(self, sg_for_connecting_to_db: ec2.SecurityGroup) -> Ec2Service:
-        target_port = 80
+        target_port = 8080
+        self._create_docker_file(target_port)
         cluster: Cluster = self._get_cluster()
         task_definition: Ec2TaskDefinition = Ec2TaskDefinition(
             self,
@@ -151,10 +180,20 @@ class TaiSearchServiceStack(Stack):
         self._get_scalable_task(service, target_group)
         return service
 
+    def _create_docker_file(self, target_port: int) -> None:
+        docker_file_path = os.path.join(CWD, DOCKER_FILE_NAME)
+        with open(docker_file_path, "w", encoding="utf-8") as f:
+            f.write(self._search_service_settings.get_docker_file_contents(target_port, FULLY_QUALIFIED_HANDLER_NAME))
+
     def _get_cluster(self) -> Cluster:
+        deep_learning_ami = ec2.LookupMachineImage(
+            name="Deep Learning Base GPU AMI (Ubuntu 20.04) *",
+        )
         instance_type = ec2.InstanceType.of(
-            instance_class=ec2.InstanceClass.BURSTABLE3,
-            instance_size=ec2.InstanceSize.SMALL,
+            instance_class=ec2.InstanceClass.G4AD,
+            instance_size=ec2.InstanceSize.XLARGE,
+            # instance_class=ec2.InstanceClass.R5A,
+            # instance_size=ec2.InstanceSize.XLARGE,
         )
         cluster = Cluster(
             self,
@@ -163,6 +202,8 @@ class TaiSearchServiceStack(Stack):
             capacity=AddCapacityOptions(
                 instance_type=instance_type,
                 max_capacity=1,
+                machine_image=deep_learning_ami,
+                spot_price="0.15",
             ),
         )
         return cluster
@@ -170,8 +211,9 @@ class TaiSearchServiceStack(Stack):
     def _get_container_definition(self, task_definition: Ec2TaskDefinition) -> ContainerDefinition:
         container: ContainerDefinition = task_definition.add_container(
             self._namer("container"),
-            image=ContainerImage.from_asset(PATH_TO_SERVICE_DIR),
+            image=ContainerImage.from_asset(directory=CWD, file=DOCKER_FILE_NAME),
             memory_limit_mib=512,
+            environment=self._search_service_settings.dict(),
         )
         container.add_port_mappings(
             PortMapping(container_port=8080)

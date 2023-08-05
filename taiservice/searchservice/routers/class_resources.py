@@ -1,6 +1,6 @@
 """Define CRUD endpoints for class resources."""
 from fastapi import APIRouter, Request, Response, status
-from ...api.routers.class_resources_schema import ClassResource, ClassResources, ClassResourceIds
+from ...api.routers.class_resources_schema import ClassResources, ClassResourceIds
 from ..backend.backend import Backend
 from ...searchservice.backend.databases.errors import DuplicateClassResourceError
 from ..runtime_settings import BACKEND_ATTRIBUTE_NAME
@@ -18,11 +18,11 @@ def get_class_resources(ids: ClassResourceIds, request: Request, from_class_ids:
 
 
 @ROUTER.post("/class_resources")
-def create_class_resource(class_resource: ClassResource, request: Request, response: Response):
+def create_class_resource(class_resources: ClassResources, request: Request, response: Response):
     """Create a class resource."""
     backend: Backend = getattr(request.app.state, BACKEND_ATTRIBUTE_NAME)
     try:
-        backend.create_class_resources([class_resource])
+        backend.create_class_resources(class_resources)
     except DuplicateClassResourceError as error:
         response.status_code = status.HTTP_409_CONFLICT
         return {"message": error.message}

@@ -8,14 +8,6 @@ from constructs import Construct
 from taiservice.cdk.stacks.stack_config_models import AWSDeploymentSettings
 
 
-class Permissions(str, Enum):
-    """Define permissions for AWS resources."""
-
-    READ = "read"
-    WRITE = "write"
-    READ_WRITE = "read_write"
-
-
 def add_tags(scope: Construct, tags: dict):
     """Add tags to a CDK stack.
 
