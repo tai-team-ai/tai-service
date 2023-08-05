@@ -15,7 +15,8 @@ TITLE = "T.A.I. Service"
 DESCRIPTION = "A service for the T.A.I. project."
 
 ROUTER = APIRouter()
-ROUTER.get("/health-check")(lambda: {"status": torch.cuda.is_available()})
+ROUTER.get("/health-check")(lambda: {"status": "ok"})
+ROUTER.get("/cuda", include_in_schema=False)(lambda: {"cuda available": torch.cuda.is_available()})
 ROUTERS = [
     ROUTER,
     class_resources.ROUTER,

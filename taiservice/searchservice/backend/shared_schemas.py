@@ -182,8 +182,9 @@ class BaseClassResourceDocument(BasePydanticModel):
 
     def dict(self, *args, **kwargs) -> dict:
         """Convert all objects to strs."""
-        self.modified_timestamp = datetime.utcnow()
-        return super().dict(*args, **kwargs)
+        result = super().dict(*args, **kwargs)
+        result["modified_timestamp"] = datetime.utcnow()
+        return result
 
 
 class StatefulClassResourceDocument(BaseClassResourceDocument):

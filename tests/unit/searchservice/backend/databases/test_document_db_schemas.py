@@ -37,7 +37,7 @@ def test_base_class_resource_document_model():
     assert str(doc.id) == EXAMPLE_BASE_CLASS_RESOURCE_DOCUMENT["id"]
     assert str(doc.class_id) == EXAMPLE_BASE_CLASS_RESOURCE_DOCUMENT["class_id"]
     assert doc.full_resource_url == EXAMPLE_BASE_CLASS_RESOURCE_DOCUMENT["full_resource_url"]
-    assert doc.metadata.dict() == EXAMPLE_METADATA
+    assert doc.metadata.dict(serialize_nums=False) == EXAMPLE_METADATA
 
 def test_if_completed_must_have_chunk_ids():
     """Ensure that the chunk ids must not be empty if the status is completed."""
@@ -69,6 +69,7 @@ CLASS_RESOURCE_DOCUMENT = {
 }
 def test_class_resource_document_model():
     """Define test for ClassResourceDocument model."""
-    doc = ClassResourceDocument.parse_obj(CLASS_RESOURCE_DOCUMENT)
+    doc = ClassResourceDocument(**CLASS_RESOURCE_DOCUMENT)
     del CLASS_RESOURCE_DOCUMENT["modified_timestamp"]
-    assert doc.dict(serialize_dates=True, exclude={"modified_timestamp"}) == CLASS_RESOURCE_DOCUMENT
+    dict_ = doc.dict(serialize_dates=True, exclude={"modified_timestamp"}, serialize_nums=False)
+    assert dict_ == CLASS_RESOURCE_DOCUMENT
