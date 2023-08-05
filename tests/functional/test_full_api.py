@@ -8,7 +8,7 @@ import tempfile
 import pytest
 from taiservice.cdk.stacks.tai_api_stack import MODULES_TO_COPY_INTO_API_DIR
 
-def test_imports():
+def test_imports_for_lambda_api():
     """
     Test that the imports work.
 
@@ -37,6 +37,6 @@ def test_imports():
         try:
             # Use subprocess to run each file in the api directory
             # run the index.py file (which will subsequently import all the other files)
-            subprocess.run([str(temp_dir / 'bin' / 'python'), str(temp_api_dir / 'index.py')], check=True)
+            subprocess.run([str(temp_dir / 'bin' / 'python'), str(temp_api_dir / 'main.py')], check=True)
         except subprocess.CalledProcessError:
             pytest.fail("Failed to execute index.py in temporary venv. Rerun test in debug mode ot pinpoint the issue.")
