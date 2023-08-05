@@ -42,10 +42,10 @@ jobs:
         make full-test
     - name: Deploy to AWS
       env:
-        AWS_DEFAULT_REGION: ${{ vars.AWS_REGION }}
         AWS_ACCESS_KEY_ID: ${{ vars.DEV_AWS_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.DEV_AWS_SECRET_ACCESS_KEY }}
-        PINECONE_DB_ENVIRONMENT: ${{ vars.PINECONE_DB_ENVIRONMENT }}
+        PINECONE_DB_ENVIRONMENT: "us-east-1-aws"
+        AWS_DEFAULT_REGION: "us-east-1"
         AWS_DEPLOYMENT_ACCOUNT_ID: '645860363137'
         DEPLOYMENT_TYPE: 'dev'
         PINECONE_DB_API_KEY_SECRET_NAME: 'dev/tai_service/pinecone_db/api_key'
@@ -54,7 +54,7 @@ jobs:
         DOC_DB_ADMIN_USER_PASSWORD_SECRET_NAME: 'dev/tai_service/document_DB/admin_password'
       run: |
         aws configure list && \
-        make ecr-docker-login REGION=$AWS_DEFAULT_REGION && \
+        make ecr-docker-login && \
         source .venv/bin/activate && \
         export PATH=.venv/bin:$PATH && \
         make deploy-all
