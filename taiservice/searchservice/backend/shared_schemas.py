@@ -47,9 +47,9 @@ class BasePydanticModel(BaseModel):
             obj = serialize(obj)
         return obj
 
-    def dict(self, *args, serialize_dates: bool = True, serialize_nums: bool = True, **kwargs):
+    def dict(self, *, serialize_dates: bool = False, serialize_nums: bool = False, **kwargs):
         """Convert all objects to strs."""
-        super_result = super().dict(*args, **kwargs)
+        super_result = super().dict(**kwargs)
         types_to_serialize = (UUID, Enum, Path)
         if serialize_nums:
             types_to_serialize += (int, float)
@@ -180,10 +180,10 @@ class BaseClassResourceDocument(BasePydanticModel):
         """Return the string representation of the id."""
         return str(self.id)
 
-    def dict(self, *args, **kwargs) -> dict:
+    def dict(self, **kwargs) -> dict:
         """Convert all objects to strs."""
         self.modified_timestamp = datetime.utcnow()
-        return super().dict(*args, **kwargs)
+        return super().dict(**kwargs)
 
 
 class StatefulClassResourceDocument(BaseClassResourceDocument):
