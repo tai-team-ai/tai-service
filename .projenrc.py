@@ -123,7 +123,7 @@ make_file.add_rule(
 make_file.add_rule(
     targets=["ecr-docker-login"],
     recipe=[
-        "sudo aws ecr get-login-password --region us-east-1 | sudo docker login --username AWS --password-stdin 763104351884.dkr.ecr.us-east-1.amazonaws.com",
+        "sudo aws ecr get-login-password --region $(REGION) | sudo docker login --username AWS --password-stdin 763104351884.dkr.ecr.$(REGION).amazonaws.com",
     ],
 )
 def convert_dict_env_vars_to_docker_env_vars(env_vars: dict):
