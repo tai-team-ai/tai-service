@@ -1,5 +1,5 @@
 """Define Lambda properties builder."""
-from abc import ABC, abstractmethod
+from abc import abstractmethod
 from enum import Enum
 from os import chmod
 from pathlib import Path

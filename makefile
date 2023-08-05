@@ -18,7 +18,7 @@ start-docker:
 	sudo systemctl start docker
 
 ecr-docker-login:
-	aws ecr get-login-password | sudo docker login --username AWS --password-stdin 763104351884.dkr.ecr.$(REGION).amazonaws.com
+	aws ecr get-login-password --region=$(REGION) | docker login --username AWS --password-stdin 763104351884.dkr.ecr.$(REGION).amazonaws.com
 
 build-and-run-docker:
 	cdk synth && \
