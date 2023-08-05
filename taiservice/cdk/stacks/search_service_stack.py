@@ -1,7 +1,7 @@
 """Define the search database stack."""
 import os
+from typing import Optional
 from constructs import Construct
-from pathlib import Path
 from aws_cdk import (
     Stack,
     aws_ec2 as ec2,
@@ -61,6 +61,7 @@ class TaiSearchServiceStack(Stack):
             tags=config.tags,
             termination_protection=config.termination_protection,
         )
+        self._service_url = None
         self._search_service_settings = search_service_settings
         self._pinecone_db_settings = pinecone_db_settings
         self._doc_db_settings = doc_db_settings
@@ -73,6 +74,8 @@ class TaiSearchServiceStack(Stack):
         self._security_group_for_connecting_to_doc_db = self.document_db.security_group_for_connecting_to_cluster
         self.pinecone_db = self._get_pinecone_db()
         self.search_service = self._get_search_service(self._security_group_for_connecting_to_doc_db)
+        name_with_suffix = (search_service_settings.cold_store_bucket_name + config.stack_suffix)[:63]
+        search_service_settings.cold_store_bucket_name = name_with_suffix
         self._cold_store_bucket: VersionedBucket = VersionedBucket.create_bucket(
             scope=self,
             bucket_name=search_service_settings.cold_store_bucket_name,
@@ -80,6 +83,8 @@ class TaiSearchServiceStack(Stack):
             permissions=Permissions.READ_WRITE,
             removal_policy=config.removal_policy,
         )
+        name_with_suffix = (search_service_settings.documents_to_index_queue + config.stack_suffix)[:63]
+        search_service_settings.documents_to_index_queue = name_with_suffix
         self._documents_to_index_queue: VersionedBucket = VersionedBucket.create_bucket(
             scope=self,
             bucket_name=search_service_settings.documents_to_index_queue,
@@ -102,6 +107,11 @@ class TaiSearchServiceStack(Stack):
     def documents_to_index_queue(self) -> VersionedBucket:
         """Return the bucket for transferring documents to index."""
         return self._documents_to_index_queue
+
+    @property
+    def service_url(self) -> Optional[str]:
+        """Return the service url."""
+        return self._service_url
 
     def _create_vpc(self) -> ec2.Vpc:
         subnet_configurations = []
@@ -203,7 +213,7 @@ class TaiSearchServiceStack(Stack):
                 instance_type=instance_type,
                 max_capacity=1,
                 machine_image=deep_learning_ami,
-                spot_price="0.15",
+                spot_price="0.35",
             ),
         )
         return cluster
@@ -212,7 +222,7 @@ class TaiSearchServiceStack(Stack):
         container: ContainerDefinition = task_definition.add_container(
             self._namer("container"),
             image=ContainerImage.from_asset(directory=CWD, file=DOCKER_FILE_NAME),
-            memory_limit_mib=512,
+            memory_limit_mib=14000,
             environment=self._search_service_settings.dict(),
         )
         container.add_port_mappings(
@@ -255,6 +265,7 @@ class TaiSearchServiceStack(Stack):
             vpc=self.vpc,
             internet_facing=True
         )
+        self._service_url = alb.load_balancer_dns_name
         listener = alb.add_listener(
             self._namer("listener"),
             port=80,

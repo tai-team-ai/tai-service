@@ -72,5 +72,5 @@ SEARCH_SERVICE_SETTINGS = SearchServiceSettings(
     doc_db_class_resource_chunk_collection_name=DOCUMENT_DB_SETTINGS.collection_config[1].name,
     openAI_api_key_secret_name=os.environ.get("OPENAI_API_KEY_SECRET_NAME"),
     cold_store_bucket_name="tai-service-class-resource-cold-store",
-    documents_to_index_queue="tai-service-documents-to-index-transfer-bucket",
+    documents_to_index_queue="tai-service-documents-to-index-queue",
 )

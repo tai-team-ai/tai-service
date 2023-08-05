@@ -94,28 +94,31 @@ make_file.add_rule(
         "cdk deploy --all --require-approval never",
     ],
 )
+UNITTEST_TARGET_NAME = "unit-test"
+FUNCTIONAL_TEST_TARGET_NAME = "functional-test"
 make_file.add_rule(
-    targets=["unit-test"],
+    targets=[UNITTEST_TARGET_NAME],
     recipe=[
         "python3 -m pytest -vv tests/unit --cov=taiservice --cov-report=term-missing --cov-report=xml:test-reports/coverage.xml --cov-report=html:test-reports/coverage",
     ]
 )
 make_file.add_rule(
-    targets=["functional-test"],
+    targets=[FUNCTIONAL_TEST_TARGET_NAME],
     recipe=[
         "python3 -m pytest -vv tests/functional --cov=taiservice --cov-report=term-missing --cov-report=xml:test-reports/coverage.xml --cov-report=html:test-reports/coverage",
     ]
 )
+FULL_TEST_TARGET_NAME = "full-test"
 make_file.add_rule(
-    targets=["full-test"],
-    prerequisites=["unit-test", "functional-test"],
+    targets=[FULL_TEST_TARGET_NAME],
+    prerequisites=[UNITTEST_TARGET_NAME, FUNCTIONAL_TEST_TARGET_NAME],
 )
 make_file.add_rule(
-    targets=["test-deploy-all"],
+    targets=[FULL_TEST_TARGET_NAME],
     prerequisites=["full-test", "deploy-all"],
 )
 make_file.add_rule(
-    targets=["start-docker"],
+    targets=["docker-start"],
     recipe=[
         "sudo systemctl start docker",
     ],
@@ -123,7 +126,7 @@ make_file.add_rule(
 make_file.add_rule(
     targets=["ecr-docker-login"],
     recipe=[
-        "aws ecr get-login-password --region=$(REGION) | docker login --username AWS --password-stdin 763104351884.dkr.ecr.$(REGION).amazonaws.com",
+        "aws ecr get-login-password --region=$(REGION) | $(SUDO_DOCKER) docker login --username AWS --password-stdin 763104351884.dkr.ecr.$(REGION).amazonaws.com",
     ],
 )
 def convert_dict_env_vars_to_docker_env_vars(env_vars: dict):
