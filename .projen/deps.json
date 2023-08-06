@@ -120,6 +120,10 @@
       "type": "runtime"
     },
     {
+      "name": "tai-aws-account-bootstrap",
+      "type": "runtime"
+    },
+    {
       "name": "tiktoken",
       "type": "runtime"
     },

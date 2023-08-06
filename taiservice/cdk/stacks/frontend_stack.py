@@ -4,7 +4,7 @@ from aws_cdk import (
     Stack,
     aws_iam as iam,
 )
-from taiservice.cdk.stacks.stack_config_models import StackConfigBaseModel
+from tai_aws_account_bootstrap.stack_config_models import StackConfigBaseModel
 from taiservice.cdk.constructs.bucket_construct import VersionedBucket
 
 class TaiFrontendServerStack(Stack):

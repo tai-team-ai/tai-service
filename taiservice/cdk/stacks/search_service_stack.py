@@ -1,6 +1,6 @@
 """Define the search database stack."""
 import os
-from typing import Optional
+from typing import Optional, Any
 from constructs import Construct
 from aws_cdk import (
     Stack,
@@ -22,15 +22,16 @@ from aws_cdk.aws_elasticloadbalancingv2 import (
     ApplicationProtocol,
     ApplicationTargetGroup,
 )
+from tai_aws_account_bootstrap.stack_helpers import add_tags
+from tai_aws_account_bootstrap.stack_config_models import StackConfigBaseModel
 from taiservice.searchservice.runtime_settings import SearchServiceSettings
-from .stack_helpers import add_tags
-from .stack_config_models import StackConfigBaseModel
 from ..constructs.construct_config import Permissions
 from ..constructs.document_db_construct import (
     DocumentDatabase,
     ElasticDocumentDBConfigModel,
     DocumentDBSettings,
 )
+from ..constructs.construct_helpers import get_vpc
 from ..constructs.pinecone_db_construct import PineconeDatabase
 from ..constructs.bucket_construct import VersionedBucket
 from ..constructs.customresources.pinecone_db.pinecone_db_custom_resource import PineconeDBSettings
@@ -50,6 +51,7 @@ class TaiSearchServiceStack(Stack):
         pinecone_db_settings: PineconeDBSettings,
         doc_db_settings: DocumentDBSettings,
         search_service_settings: SearchServiceSettings,
+        vpc: Any,
     ) -> None:
         """Initialize the search database stack."""
         super().__init__(
@@ -68,7 +70,7 @@ class TaiSearchServiceStack(Stack):
         self._config = config
         self._namer = lambda name: f"{config.stack_name}-{name}"
         self._subnet_type_for_doc_db = ec2.SubnetType.PRIVATE_WITH_EGRESS
-        self.vpc = self._create_vpc()
+        self.vpc = get_vpc(scope=self, vpc=vpc)
         self.document_db = self._get_document_db(doc_db_settings=doc_db_settings)
         search_service_settings.doc_db_fully_qualified_domain_name = self.document_db.fully_qualified_domain_name
         self._security_group_for_connecting_to_doc_db = self.document_db.security_group_for_connecting_to_cluster
@@ -113,38 +115,6 @@ class TaiSearchServiceStack(Stack):
         """Return the service url."""
         return self._service_url
 
-    def _create_vpc(self) -> ec2.Vpc:
-        subnet_configurations = []
-        subnet_configurations.append(
-            ec2.SubnetConfiguration(
-                name=self._namer("subnet-isolated"),
-                subnet_type=ec2.SubnetType.PRIVATE_WITH_EGRESS,
-            )
-        )
-        subnet_configurations.append(
-            ec2.SubnetConfiguration(
-                name=self._namer("subnet-public"),
-                subnet_type=ec2.SubnetType.PUBLIC,
-            )
-        )
-        vpc = ec2.Vpc(
-            scope=self,
-            id=self._namer("vpc"),
-            vpc_name=self._namer("vpc"),
-            max_azs=3,
-            nat_gateways=1,
-            subnet_configuration=subnet_configurations,
-        )
-        subnets = ec2.SubnetSelection(one_per_az=True)
-        ec2.InterfaceVpcEndpoint(
-            scope=self,
-            id="secrets-manager-endpoint",
-            vpc=vpc,
-            service=ec2.InterfaceVpcEndpointAwsService.SECRETS_MANAGER,
-            subnets=subnets,
-        )
-        return vpc
-
     def _get_document_db(self, doc_db_settings: DocumentDBSettings) -> DocumentDatabase:
         db_config = ElasticDocumentDBConfigModel(
             cluster_name=self._doc_db_settings.cluster_name,
@@ -164,6 +134,7 @@ class TaiSearchServiceStack(Stack):
             scope=self,
             construct_id=self._namer("pinecone-db"),
             db_settings=self._pinecone_db_settings,
+            removal_policy=self._config.removal_policy,
         )
         return db
 

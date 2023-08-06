@@ -1,6 +1,12 @@
 """Define the search service app."""
+import os
 from aws_cdk import App, RemovalPolicy
 from dotenv import load_dotenv
+from tai_aws_account_bootstrap.stack_config_models import (
+    StackConfigBaseModel,
+    AWSDeploymentSettings,
+    DeploymentType,
+)
 from taiservice.cdk.stacks.search_service_stack import TaiSearchServiceStack
 from taiservice.cdk.stacks.tai_api_stack import TaiApiStack
 from taiservice.cdk.stacks.search_service_settings import (
@@ -9,16 +15,12 @@ from taiservice.cdk.stacks.search_service_settings import (
     SEARCH_SERVICE_SETTINGS,
 )
 from taiservice.cdk.stacks.tai_api_settings import TAI_API_SETTINGS
-from taiservice.cdk.stacks.stack_config_models import (
-    StackConfigBaseModel,
-    AWSDeploymentSettings,
-    DeploymentType,
-)
 from taiservice.cdk.stacks.frontend_stack import TaiFrontendServerStack
 
 app: App = App()
 load_dotenv()
 
+vpc_id = os.environ.get("VPC_ID")
 AWS_DEPLOYMENT_SETTINGS = AWSDeploymentSettings()
 is_prod_deployment = AWS_DEPLOYMENT_SETTINGS.deployment_type == DeploymentType.PROD
 TERMINATION_PROTECTION = True if is_prod_deployment else False
@@ -44,6 +46,7 @@ search_service: TaiSearchServiceStack = TaiSearchServiceStack(
     doc_db_settings=DOCUMENT_DB_SETTINGS,
     pinecone_db_settings=PINECONE_DB_SETTINGS,
     search_service_settings=SEARCH_SERVICE_SETTINGS,
+    vpc=vpc_id,
 )
 
 
@@ -59,7 +62,7 @@ tai_api: TaiApiStack = TaiApiStack(
     scope=app,
     config=tai_api_config,
     api_settings=TAI_API_SETTINGS,
-    vpc=search_service.vpc,
+    vpc=vpc_id,
 )
 
 

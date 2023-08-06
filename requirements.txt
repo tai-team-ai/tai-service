@@ -27,6 +27,7 @@ pytest
 pytest-cov
 requests
 selenium
+tai-aws-account-bootstrap
 tiktoken
 unstructured
 uvicorn

@@ -4,6 +4,9 @@ from typing import Any, Dict, List, Optional, TypedDict
 from loguru import logger
 from pydantic import BaseModel, Field, validator
 import pinecone
+from aws_cdk import (
+    RemovalPolicy,
+)
 
 # first imports are for local development, second imports are for deployment
 try:
@@ -140,6 +143,10 @@ class PineconeDBSettings(BasePineconeDBSettings):
         max_items=2,
         description="Config for the Pinecone indexes.",
     )
+    removal_policy: RemovalPolicy = Field(
+        default=RemovalPolicy.RETAIN,
+        description="The removal policy for the Pinecone indexes.",
+    )
 
     @validator("indexes")
     def ensure_no_duplicate_indexes(cls, indexes: List[PineconeIndexConfig]) -> List[PineconeIndexConfig]:
@@ -233,4 +240,5 @@ class PineconeDBSetupCustomResource(CustomResourceInterface):
         except Exception as e: # pylint: disable=broad-except
             logger.warning(f"Failed to get index stats for index {index}. Error: {e}")
             return
-        assert stats["total_vector_count"] == 0, f"Cannot delete index {index} because it is not empty."
+        if self._settings.removal_policy == RemovalPolicy.RETAIN:
+            assert stats["total_vector_count"] == 0, f"Cannot delete index {index} because it is not empty."

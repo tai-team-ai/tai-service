@@ -154,17 +154,20 @@ def vpc_interface_exists(service: ec2.InterfaceVpcEndpointAwsService, vpc: ec2.I
     # check if the endpoint already exists with boto3
     client = boto3.client("ec2")
     # get the name form the Tags of the VPC
-    vpc_name = vpc.to_string().split("/")[-1]
-    response = client.describe_vpcs(Filters=[{"Name": "tag:Name", "Values": [vpc_name]}])
-    vpcs = response["Vpcs"]
-    if vpcs and vpcs[0].get("VpcId"):
-        vpc_id = vpcs[0]["VpcId"]
-        response = client.describe_vpc_endpoints(Filters=[{"Name": "vpc-id", "Values": [vpc_id]}])
-        for endpoint in response["VpcEndpoints"]:
-            current_service_short_name = endpoint["ServiceName"].split(".")[-1]
-            if service.short_name == current_service_short_name:
-                logger.info(f"Interface VPC endpoint for {service.short_name} exists in '{vpc_name}' ({vpc_id})")
-                return True
-            return False
-    logger.warning(f"VPC ID not found for '{vpc_name}'. Cannot check if interface VPC endpoint exists.")
+    vpc_id = getattr(vpc, "vpc_id")
+    vpc_name = vpc.to_string().split("/")[0]
+    if not vpc_id:
+        response = client.describe_vpcs(Filters=[{"Name": "tag:Name", "Values": [vpc_name]}])
+        vpcs = response["Vpcs"]
+        if vpcs and vpcs[0].get("VpcId"):
+            vpc_id = vpcs[0]["VpcId"]
+        logger.warning(f"VPC ID not found for '{vpc_name}'. Cannot check if interface VPC endpoint exists.")
+    response = client.describe_vpc_endpoints(Filters=[{"Name": "vpc-id", "Values": [vpc_id]}])
+    for endpoint in response["VpcEndpoints"]:
+        current_service_short_name = endpoint["ServiceName"].split(".")[-1]
+        if service.short_name == current_service_short_name:
+            logger.info(f"Interface VPC endpoint for {service.short_name} exists in '{vpc_name}' ({vpc_id})")
+            return True
+        logger.warning(f"Interface VPC endpoint for {service.short_name} does NOT exist in '{vpc_name}' ({vpc_id})")
+        return False
     return True
