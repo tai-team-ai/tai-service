@@ -172,10 +172,10 @@ class TaiSearchServiceStack(Stack):
             name="Deep Learning Base GPU AMI (Ubuntu 20.04) *",
         )
         instance_type = ec2.InstanceType.of(
-            instance_class=ec2.InstanceClass.G4DN,
-            instance_size=ec2.InstanceSize.XLARGE,
-            # instance_class=ec2.InstanceClass.R5A,
+            # instance_class=ec2.InstanceClass.G4AD,
             # instance_size=ec2.InstanceSize.XLARGE,
+            instance_class=ec2.InstanceClass.R5A,
+            instance_size=ec2.InstanceSize.XLARGE,
         )
         cluster = Cluster(
             self,
