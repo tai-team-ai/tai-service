@@ -263,8 +263,4 @@ class TaiSearchServiceStack(Stack):
             protocol=target_protocol,
             targets=[service],
         )
-        target_group.configure_health_check(
-            enabled=True,
-            path="/health-check"
-        )
         return target_group
