@@ -139,15 +139,16 @@ class TaiSearchServiceStack(Stack):
         return db
 
     def _get_search_service(self, sg_for_connecting_to_db: ec2.SecurityGroup) -> Ec2Service:
-        target_port = 8080
-        self._create_docker_file(target_port)
+        target_port = 80
+        container_port = 8080
+        self._create_docker_file(container_port)
         cluster: Cluster = self._get_cluster()
         task_definition: Ec2TaskDefinition = Ec2TaskDefinition(
             self,
             self._namer("task"),
             network_mode=NetworkMode.AWS_VPC,
         )
-        self._get_container_definition(task_definition)
+        self._get_container_definition(task_definition, container_port)
         security_group = self._get_ec2_security_group(target_port)
         service: Ec2Service = Ec2Service(
             self,
@@ -155,7 +156,7 @@ class TaiSearchServiceStack(Stack):
             cluster=cluster,
             task_definition=task_definition,
             desired_count=1,
-            # security_groups=[security_group, sg_for_connecting_to_db],
+            security_groups=[security_group, sg_for_connecting_to_db],
         )
         target_group: ApplicationTargetGroup = self._get_target_group(service, target_port, target_protocol=ApplicationProtocol.HTTP)
         self._get_scalable_task(service, target_group)
@@ -204,7 +205,7 @@ class TaiSearchServiceStack(Stack):
         )
         return cluster
 
-    def _get_container_definition(self, task_definition: Ec2TaskDefinition) -> ContainerDefinition:
+    def _get_container_definition(self, task_definition: Ec2TaskDefinition, container_port: int) -> ContainerDefinition:
         container: ContainerDefinition = task_definition.add_container(
             self._namer("container"),
             image=ContainerImage.from_asset(directory=CWD, file=DOCKER_FILE_NAME),
@@ -212,7 +213,7 @@ class TaiSearchServiceStack(Stack):
             environment=self._search_service_settings.dict(),
         )
         container.add_port_mappings(
-            PortMapping(container_port=8080)
+            PortMapping(container_port=container_port),
         )
         return container
 
@@ -261,5 +262,9 @@ class TaiSearchServiceStack(Stack):
             port=target_port,
             protocol=target_protocol,
             targets=[service],
+        )
+        target_group.configure_health_check(
+            enabled=True,
+            path="/health-check"
         )
         return target_group
