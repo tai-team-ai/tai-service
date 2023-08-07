@@ -172,10 +172,10 @@ class TaiSearchServiceStack(Stack):
             name="Deep Learning Base GPU AMI (Ubuntu 20.04) *",
         )
         instance_type = ec2.InstanceType.of(
-            # instance_class=ec2.InstanceClass.G4AD,
-            # instance_size=ec2.InstanceSize.XLARGE,
-            instance_class=ec2.InstanceClass.R5A,
+            instance_class=ec2.InstanceClass.G4AD,
             instance_size=ec2.InstanceSize.XLARGE,
+            # instance_class=ec2.InstanceClass.R5A,
+            # instance_size=ec2.InstanceSize.XLARGE,
         )
         cluster = Cluster(
             self,
@@ -184,7 +184,7 @@ class TaiSearchServiceStack(Stack):
             capacity=AddCapacityOptions(
                 instance_type=instance_type,
                 max_capacity=1,
-                # machine_image=deep_learning_ami,
+                machine_image=deep_learning_ami,
                 # spot_price="0.35",
             ),
         )
