@@ -7,31 +7,32 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from loguru import logger
 import torch
-from .backend.backend import Backend
-from .runtime_settings import SearchServiceSettings, BACKEND_ATTRIBUTE_NAME
-from .routers import class_resources
+# from .backend.backend import Backend
+# from .runtime_settings import SearchServiceSettings, BACKEND_ATTRIBUTE_NAME
+# from .routers import class_resources
 
 TITLE = "T.A.I. Service"
 DESCRIPTION = "A service for the T.A.I. project."
 
 ROUTER = APIRouter()
 ROUTER.get("/health-check")(lambda: {"status": "ok"})
+ROUTER.get("/")(lambda: {"message": "Welcome to the T.A.I. Service API!"})
 ROUTER.get("/cuda", include_in_schema=False)(lambda: {"cuda available": torch.cuda.is_available()})
 ROUTERS = [
     ROUTER,
-    class_resources.ROUTER,
+    # class_resources.ROUTER,
 ]
 
 def create_app() -> FastAPI:
     """Create the FastAPI app."""
     # print the environment variables
-    runtime_settings = SearchServiceSettings()
+    # runtime_settings = SearchServiceSettings()
     app = FastAPI(
         title=TITLE,
         description=DESCRIPTION,
     )
-    backend = Backend(runtime_settings=runtime_settings)
-    setattr(app.state, BACKEND_ATTRIBUTE_NAME, backend)
+    # backend = Backend(runtime_settings=runtime_settings)
+    # setattr(app.state, BACKEND_ATTRIBUTE_NAME, backend)
     # add exception handlers
     # configure CORS
     # TODO make this environment specific for dev and prod (also use the same values in the stack config for the api)

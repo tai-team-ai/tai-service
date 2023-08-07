@@ -167,13 +167,30 @@ class TaiSearchServiceStack(Stack):
         with open(docker_file_path, "w", encoding="utf-8") as f:
             f.write(self._search_service_settings.get_docker_file_contents(target_port, FULLY_QUALIFIED_HANDLER_NAME))
 
+    def _get_cluster(self) -> Cluster:
+        deep_learning_ami = ec2.LookupMachineImage(
+            name="Deep Learning Base GPU AMI (Ubuntu 20.04) *",
+        )
+        instance_type = ec2.InstanceType.of(
+            instance_class=ec2.InstanceClass.G4DN,
+            instance_size=ec2.InstanceSize.XLARGE,
+            # instance_class=ec2.InstanceClass.R5A,
+            # instance_size=ec2.InstanceSize.XLARGE,
+        )
+        cluster = Cluster(
+            self,
+            self._namer("cluster"),
+            vpc=self.vpc,
+            capacity=AddCapacityOptions(
+                instance_type=instance_type,
+                max_capacity=1,
+                # machine_image=deep_learning_ami,
+                # spot_price="0.35",
+            ),
+        )
+        return cluster
     # def _get_cluster(self) -> Cluster:
-    #     deep_learning_ami = ec2.LookupMachineImage(
-    #         name="Deep Learning Base GPU AMI (Ubuntu 20.04) *",
-    #     )
     #     instance_type = ec2.InstanceType.of(
-    #         # instance_class=ec2.InstanceClass.G4AD,
-    #         # instance_size=ec2.InstanceSize.XLARGE,
     #         instance_class=ec2.InstanceClass.R5A,
     #         instance_size=ec2.InstanceSize.XLARGE,
     #     )
@@ -184,26 +201,9 @@ class TaiSearchServiceStack(Stack):
     #         capacity=AddCapacityOptions(
     #             instance_type=instance_type,
     #             max_capacity=1,
-    #             machine_image=deep_learning_ami,
-    #             # spot_price="0.35",
     #         ),
     #     )
     #     return cluster
-    def _get_cluster(self) -> Cluster:
-        instance_type = ec2.InstanceType.of(
-            instance_class=ec2.InstanceClass.BURSTABLE3,
-            instance_size=ec2.InstanceSize.SMALL,
-        )
-        cluster = Cluster(
-            self,
-            self._namer("cluster"),
-            vpc=self.vpc,
-            capacity=AddCapacityOptions(
-                instance_type=instance_type,
-                max_capacity=1,
-            ),
-        )
-        return cluster
 
     def _get_container_definition(self, task_definition: Ec2TaskDefinition, container_port: int) -> ContainerDefinition:
         container: ContainerDefinition = task_definition.add_container(
