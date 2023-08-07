@@ -122,7 +122,7 @@ make_file.add_rule(
 make_file.add_rule(
     targets=["docker-start"],
     recipe=[
-        "systemctl start docker",
+        "sudo systemctl start docker",
     ],
 )
 make_file.add_rule(

@@ -155,7 +155,7 @@ class TaiSearchServiceStack(Stack):
             cluster=cluster,
             task_definition=task_definition,
             desired_count=1,
-            security_groups=[security_group, sg_for_connecting_to_db],
+            # security_groups=[security_group, sg_for_connecting_to_db],
         )
         target_group: ApplicationTargetGroup = self._get_target_group(service, target_port, target_protocol=ApplicationProtocol.HTTP)
         self._get_scalable_task(service, target_group)
@@ -171,10 +171,10 @@ class TaiSearchServiceStack(Stack):
             name="Deep Learning Base GPU AMI (Ubuntu 20.04) *",
         )
         instance_type = ec2.InstanceType.of(
-            instance_class=ec2.InstanceClass.G4AD,
-            instance_size=ec2.InstanceSize.XLARGE,
-            # instance_class=ec2.InstanceClass.R5A,
+            # instance_class=ec2.InstanceClass.G4AD,
             # instance_size=ec2.InstanceSize.XLARGE,
+            instance_class=ec2.InstanceClass.R5A,
+            instance_size=ec2.InstanceSize.XLARGE,
         )
         cluster = Cluster(
             self,
@@ -184,7 +184,7 @@ class TaiSearchServiceStack(Stack):
                 instance_type=instance_type,
                 max_capacity=1,
                 machine_image=deep_learning_ami,
-                spot_price="0.35",
+                # spot_price="0.35",
             ),
         )
         return cluster
@@ -193,7 +193,7 @@ class TaiSearchServiceStack(Stack):
         container: ContainerDefinition = task_definition.add_container(
             self._namer("container"),
             image=ContainerImage.from_asset(directory=CWD, file=DOCKER_FILE_NAME),
-            memory_limit_mib=14000,
+            memory_limit_mib=500,
             environment=self._search_service_settings.dict(),
         )
         container.add_port_mappings(

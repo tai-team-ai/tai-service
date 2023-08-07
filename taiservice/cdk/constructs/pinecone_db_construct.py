@@ -32,7 +32,7 @@ class PineconeDatabase(Construct):
     ) -> None:
         """Initialize the Pinecone database construct."""
         super().__init__(scope, construct_id, **kwargs)
-        db_settings.removal_policy = removal_policy # We want to pass the removal policy to the custom resource
+        db_settings.pinecone_removal_policy = removal_policy.value # We want to pass the removal policy to the custom resource
         self._secret_arn = get_secret_arn_from_name(db_settings.api_key_secret_name)
         self._db_settings = db_settings
         self.custom_resource_provider = self._create_custom_resource()

@@ -15,7 +15,7 @@ full-test: unit-test functional-test
 full-test: full-test deploy-all
 
 docker-start:
-	systemctl start docker
+	sudo systemctl start docker
 
 ecr-docker-login:
 	aws ecr get-login-password --region=$(REGION) | $(SUDO) docker login --username AWS --password-stdin 763104351884.dkr.ecr.$(REGION).amazonaws.com
