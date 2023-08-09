@@ -16,6 +16,9 @@ from aws_cdk.aws_ecs import (
     AddCapacityOptions,
     ScalableTaskCount,
     NetworkMode,
+    EcsOptimizedImage,
+    AmiHardwareType,
+    LogDriver,
 )
 from aws_cdk.aws_elasticloadbalancingv2 import (
     ApplicationLoadBalancer,
@@ -168,14 +171,12 @@ class TaiSearchServiceStack(Stack):
             f.write(self._search_service_settings.get_docker_file_contents(target_port, FULLY_QUALIFIED_HANDLER_NAME))
 
     def _get_cluster(self) -> Cluster:
-        deep_learning_ami = ec2.LookupMachineImage(
-            name="Deep Learning Base GPU AMI (Ubuntu 20.04) *",
+        deep_learning_ami = EcsOptimizedImage.amazon_linux2(
+            hardware_type=AmiHardwareType.GPU,
         )
         instance_type = ec2.InstanceType.of(
-            instance_class=ec2.InstanceClass.G4AD,
+            instance_class=ec2.InstanceClass.G4DN, # will want to move to this, but 
             instance_size=ec2.InstanceSize.XLARGE,
-            # instance_class=ec2.InstanceClass.R5A,
-            # instance_size=ec2.InstanceSize.XLARGE,
         )
         cluster = Cluster(
             self,
@@ -183,34 +184,23 @@ class TaiSearchServiceStack(Stack):
             vpc=self.vpc,
             capacity=AddCapacityOptions(
                 instance_type=instance_type,
-                max_capacity=1,
+                max_capacity=2,
+                min_capacity=1,
                 machine_image=deep_learning_ami,
                 # spot_price="0.35",
             ),
         )
         return cluster
-    # def _get_cluster(self) -> Cluster:
-    #     instance_type = ec2.InstanceType.of(
-    #         instance_class=ec2.InstanceClass.R5A,
-    #         instance_size=ec2.InstanceSize.XLARGE,
-    #     )
-    #     cluster = Cluster(
-    #         self,
-    #         self._namer("cluster"),
-    #         vpc=self.vpc,
-    #         capacity=AddCapacityOptions(
-    #             instance_type=instance_type,
-    #             max_capacity=1,
-    #         ),
-    #     )
-    #     return cluster
 
     def _get_container_definition(self, task_definition: Ec2TaskDefinition, container_port: int) -> ContainerDefinition:
         container: ContainerDefinition = task_definition.add_container(
             self._namer("container"),
             image=ContainerImage.from_asset(directory=CWD, file=DOCKER_FILE_NAME),
-            memory_limit_mib=500,
+            memory_limit_mib=4000,
             environment=self._search_service_settings.dict(),
+            logging=LogDriver.aws_logs(stream_prefix=self._namer("log")),
+            gpu_count=1,
+            cpu=2,
         )
         container.add_port_mappings(
             PortMapping(container_port=container_port),
@@ -228,11 +218,13 @@ class TaiSearchServiceStack(Stack):
             peer=ec2.Peer.any_ipv4(),
             connection=ec2.Port.tcp(target_port),
         )
+        
         return target_sg
 
     def _get_scalable_task(self, service: Ec2Service, target_group: ApplicationTargetGroup) -> ScalableTaskCount:
         scaling_task = service.auto_scale_task_count(
-            max_capacity=1
+            max_capacity=2,
+            min_capacity=1,
         )
         scaling_task.scale_on_cpu_utilization(
             self._namer("cpu-scaling"),
