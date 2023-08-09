@@ -151,6 +151,6 @@ class SearchServiceSettings(EnvironmentSettings):
             "WORKDIR /app",
             "COPY . .",
             f"EXPOSE {port}",
-            f'CMD ["python", "-m", "uvicorn", "{fully_qualified_handler_path}", "--host", "0.0.0.0", "--port", "{port}", "--factory"]',
+            f'CMD [".venv/bin/python", "-m", "uvicorn", "{fully_qualified_handler_path}", "--host", "0.0.0.0", "--port", "{port}", "--factory"]',
         ]
         return "\n".join(docker_file)

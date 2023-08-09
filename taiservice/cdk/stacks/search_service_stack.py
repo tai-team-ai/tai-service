@@ -184,7 +184,7 @@ class TaiSearchServiceStack(Stack):
             vpc=self.vpc,
             capacity=AddCapacityOptions(
                 instance_type=instance_type,
-                max_capacity=2,
+                max_capacity=1,
                 min_capacity=1,
                 machine_image=deep_learning_ami,
                 # spot_price="0.35",
@@ -200,7 +200,7 @@ class TaiSearchServiceStack(Stack):
             environment=self._search_service_settings.dict(),
             logging=LogDriver.aws_logs(stream_prefix=self._namer("log")),
             gpu_count=1,
-            cpu=2,
+            # cpu=2,
         )
         container.add_port_mappings(
             PortMapping(container_port=container_port),
@@ -223,7 +223,7 @@ class TaiSearchServiceStack(Stack):
 
     def _get_scalable_task(self, service: Ec2Service, target_group: ApplicationTargetGroup) -> ScalableTaskCount:
         scaling_task = service.auto_scale_task_count(
-            max_capacity=2,
+            max_capacity=1,
             min_capacity=1,
         )
         scaling_task.scale_on_cpu_utilization(
