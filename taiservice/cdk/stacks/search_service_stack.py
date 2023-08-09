@@ -25,6 +25,11 @@ from aws_cdk.aws_elasticloadbalancingv2 import (
     ApplicationProtocol,
     ApplicationTargetGroup,
 )
+from aws_cdk.aws_autoscaling import (
+    BlockDevice,
+    BlockDeviceVolume,
+    EbsDeviceVolumeType,
+)
 from tai_aws_account_bootstrap.stack_helpers import add_tags
 from tai_aws_account_bootstrap.stack_config_models import StackConfigBaseModel
 from taiservice.searchservice.runtime_settings import SearchServiceSettings
@@ -189,10 +194,21 @@ class TaiSearchServiceStack(Stack):
                 min_capacity=1,
                 machine_image=deep_learning_ami,
                 # spot_price="0.35",
+                block_devices=[
+                    BlockDevice(
+                        device_name="/dev/xvda",
+                        volume=BlockDeviceVolume.ebs(
+                            volume_type=EbsDeviceVolumeType.IO1,
+                            delete_on_termination=True,
+                            volume_size=200,
+                            iops=10000, # must be 50x the volume size or less
+                        ),
+                    ),
+                ],
             ),
         )
         return cluster
-
+    
     def _get_container_definition(self, task_definition: Ec2TaskDefinition, container_port: int) -> ContainerDefinition:
         container: ContainerDefinition = task_definition.add_container(
             self._namer("container"),

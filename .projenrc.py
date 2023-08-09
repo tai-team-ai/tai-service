@@ -48,6 +48,8 @@ project:Project = AwsCdkPythonApp(
         "tiktoken",
         "aws-lambda-powertools",
         # "pinecone-text[splade]",
+        # "torch -f https://download.pytorch.org/whl/cpu",
+        # "transformers",
         "pymupdf",
         "pdf2image",
         "PyPDF2",
