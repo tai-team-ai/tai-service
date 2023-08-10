@@ -5,7 +5,7 @@ from fastapi import APIRouter, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from loguru import logger
-# import torch
+import torch
 # from .backend.backend import Backend
 # from .runtime_settings import SearchServiceSettings, BACKEND_ATTRIBUTE_NAME
 # from .routers import class_resources
@@ -16,7 +16,7 @@ DESCRIPTION = "A service for the T.A.I. project."
 ROUTER = APIRouter()
 ROUTER.get("/health-check")(lambda: {"status": "ok"})
 ROUTER.get("/")(lambda: {"message": "Welcome to the T.A.I. Service API!"})
-# ROUTER.get("/cuda", include_in_schema=False)(lambda: {"cuda available": torch.cuda.is_available()})
+ROUTER.get("/cuda", include_in_schema=False)(lambda: {"cuda available": torch.cuda.is_available()})
 ROUTERS = [
     ROUTER,
     # class_resources.ROUTER,

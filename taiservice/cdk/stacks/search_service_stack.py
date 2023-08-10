@@ -217,7 +217,7 @@ class TaiSearchServiceStack(Stack):
             environment=self._search_service_settings.dict(),
             logging=LogDriver.aws_logs(stream_prefix=self._namer("log")),
             # gpu_count=1,
-            cpu=2,
+            cpu=1,
         )
         container.add_port_mappings(
             PortMapping(container_port=container_port),
