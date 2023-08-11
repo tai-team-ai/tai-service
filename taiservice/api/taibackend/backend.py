@@ -266,6 +266,7 @@ class Backend:
     def get_class_resources(self, ids: list[UUID], from_class_ids: bool = False) -> list[ClassResource]:
         """Get the class resources."""
         url = f"{self._runtime_settings.search_service_api_url}/class_resources"
+        logger.info(f"Getting class resources from {url}")
         params = {
             'ids': ids,
             'from_class_ids': from_class_ids

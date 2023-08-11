@@ -57,7 +57,7 @@ project:Project = AwsCdkPythonApp(
         "selenium",
     ],
 )
-
+SEARCH_SERVICE_API_URL = "http://tai-s-taise-4mq43vlacxyh-2086925889.us-east-1.elb.amazonaws.com/"
 env_file: TextFile = TextFile(
     project,
     "./.env",
@@ -70,7 +70,6 @@ env_file: TextFile = TextFile(
         'DOC_DB_ADMIN_USER_PASSWORD_SECRET_NAME="dev/tai_service/document_DB/admin_password"',
         'AWS_DEPLOYMENT_ACCOUNT_ID="645860363137"',
         'DEPLOYMENT_TYPE="dev"',
-        'SEARCH_SERVICE_API_URL="tai-s-taise-AZC3PUQV8RIL-990860086.us-east-1.elb.amazonaws.com"',
         'VPC_ID="vpc-0fdc1f2e77f6dba96"',
     ]
 )
@@ -150,7 +149,7 @@ RUNTIME_ENV_VARS = {
     "DOCUMENTS_TO_INDEX_QUEUE": "frontend-data-transfer-[branch-name]",
     "NLTK_DATA": "/tmp/nltk_data",
     "MESSAGE_ARCHIVE_BUCKET_NAME": "tai-service-message-archive-dev",
-    "SEARCH_SERVICE_API_URL": "http://localhost:8080",
+    "SEARCH_SERVICE_API_URL": SEARCH_SERVICE_API_URL,
 }
 make_file.add_rule(
     targets=["build-and-run-docker"],

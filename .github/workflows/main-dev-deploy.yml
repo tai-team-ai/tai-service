@@ -62,6 +62,7 @@ jobs:
         AWS_DEFAULT_REGION: "us-east-1"
         AWS_DEPLOYMENT_ACCOUNT_ID: '645860363137'
         DEPLOYMENT_TYPE: 'dev'
+        VPC_ID: "vpc-0fdc1f2e77f6dba96"
         PINECONE_DB_API_KEY_SECRET_NAME: 'dev/tai_service/pinecone_db/api_key'
         DOC_DB_READ_ONLY_USER_PASSWORD_SECRET_NAME: 'dev/tai_service/document_DB/read_ONLY_user_password'
         DOC_DB_READ_WRITE_USER_PASSWORD_SECRET_NAME: 'dev/tai_service/document_DB/read_write_user_password'

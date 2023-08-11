@@ -28,7 +28,7 @@
         "DOCUMENTS_TO_INDEX_QUEUE": "frontend-data-transfer-[branch-name]",
         "NLTK_DATA": "/tmp/nltk_data",
         "MESSAGE_ARCHIVE_BUCKET_NAME": "tai-service-message-archive-dev",
-        "SEARCH_SERVICE_API_URL": "http://localhost:8080"
+        "SEARCH_SERVICE_API_URL": "http://tai-s-taise-4mq43vlacxyh-2086925889.us-east-1.elb.amazonaws.com"
       },
       "program": "${workspaceFolder}/.venv/bin/uvicorn"
     },
@@ -61,7 +61,7 @@
         "DOCUMENTS_TO_INDEX_QUEUE": "frontend-data-transfer-[branch-name]",
         "NLTK_DATA": "/tmp/nltk_data",
         "MESSAGE_ARCHIVE_BUCKET_NAME": "tai-service-message-archive-dev",
-        "SEARCH_SERVICE_API_URL": "http://localhost:8080"
+        "SEARCH_SERVICE_API_URL": "http://tai-s-taise-4mq43vlacxyh-2086925889.us-east-1.elb.amazonaws.com"
       },
       "program": "${workspaceFolder}/.venv/bin/uvicorn"
     }
