@@ -9,6 +9,7 @@ from loguru import logger
 import boto3
 from botocore.exceptions import ClientError
 try:
+    from .errors import DuplicateResourceError
     from .databases.archiver import Archive
     from .metrics import (
         Metrics,
@@ -43,6 +44,7 @@ try:
         ResourceSearchAnswer,
     )
 except (KeyError, ImportError):
+    from taibackend.errors import DuplicateResourceError
     from taibackend.databases.archiver import Archive
     from taibackend.metrics import (
         Metrics,
@@ -267,7 +269,8 @@ class Backend:
         if response.status_code != 200:
             error_message = f"Failed to create class resources. Status code: {response.status_code}"
             logger.error(error_message)
-        return response
+            if response.status_code == 409:
+                raise DuplicateResourceError(response.json()['message'])
 
     def get_class_resources(self, ids: list[UUID], from_class_ids: bool = False) -> list[ClassResource]:
         """Get the class resources."""
