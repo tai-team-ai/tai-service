@@ -70,7 +70,7 @@ env_file: TextFile = TextFile(
         'DOC_DB_ADMIN_USER_PASSWORD_SECRET_NAME="dev/tai_service/document_DB/admin_password"',
         'AWS_DEPLOYMENT_ACCOUNT_ID="645860363137"',
         'DEPLOYMENT_TYPE="dev"',
-        'SEARCH_SERVICE_API_URL=' + SEARCH_SERVICE_API_URL,
+        f'SEARCH_SERVICE_API_URL="{SEARCH_SERVICE_API_URL}"',
         'VPC_ID="vpc-0fdc1f2e77f6dba96"',
     ]
 )

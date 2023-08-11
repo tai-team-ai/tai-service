@@ -97,7 +97,7 @@ EXAMPLE_CLASS_RESOURCE = {
 class ClassResource(BaseClassResource):
     """Define the complete model of the class resource."""
     status: ClassResourceProcessingStatus = Field(
-        ...,
+        default=ClassResourceProcessingStatus.PENDING,
         description=f"The status of the class resource. Valid values are: {', '.join([status.value for status in ClassResourceProcessingStatus])}",
     )
 

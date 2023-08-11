@@ -47,7 +47,6 @@ class TaiApiStack(Stack):
         scope: Construct,
         config: StackConfigBaseModel,
         api_settings: TaiApiSettings,
-        vpc: Union[ec2.IVpc, ec2.Vpc, str],
     ) -> None:
         """Initialize the stack for the TAI API service."""
         super().__init__(
@@ -61,7 +60,6 @@ class TaiApiStack(Stack):
         )
         self._namer = lambda name: f"{config.stack_name}-{name}"
         self._settings = api_settings
-        self._vpc = get_vpc(self, vpc)
         self._removal_policy = config.removal_policy
         self._stack_suffix = config.stack_suffix
         name_with_suffix = (api_settings.message_archive_bucket_name + self._stack_suffix)[:63]
@@ -106,20 +104,6 @@ class TaiApiStack(Stack):
 
     def _get_lambda_config(self) -> BaseLambdaConfigModel:
         function_name = self._namer("handler")
-        security_group_secrets = create_restricted_security_group(
-            scope=self,
-            name=function_name + "-sg",
-            description="The security group for the DocumentDB lambda.",
-            vpc=self._vpc,
-        )
-        security_group_secrets.add_egress_rule(
-            peer=ec2.Peer.any_ipv4(),
-            connection=ec2.Port.tcp(443),
-            description="Allow outbound HTTPS traffic to Secrets Manager.",
-        )
-        subnet_type = ec2.SubnetType.PRIVATE_WITH_EGRESS
-        assert vpc_interface_exists(ec2.InterfaceVpcEndpointAwsService.SECRETS_MANAGER, self._vpc),\
-            "The VPC must have an interface endpoint for Secrets Manager."
         lambda_config = DockerLambdaConfigModel(
             function_name=function_name,
             description="The lambda for the TAI API service.",
@@ -133,9 +117,6 @@ class TaiApiStack(Stack):
             timeout=Duration.minutes(15),
             memory_size=10000,
             ephemeral_storage_size=StorageSize.gibibytes(3),
-            vpc=self._vpc,
-            subnet_selection=ec2.SubnetSelection(subnet_type=subnet_type),
-            security_groups=[security_group_secrets],
             function_url_config=LambdaURLConfigModel(
                 allowed_headers=["*"],
                 allowed_origins=["*"],
