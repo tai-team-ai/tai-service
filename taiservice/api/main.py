@@ -5,12 +5,15 @@ from fastapi import APIRouter, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from loguru import logger
+
+from .routers import common_resources
+
+from taiservice.api.routers import common_resources
 # first imports are for local development, second imports are for deployment
 try:
     from .routers import (
         tai,
         class_resources,
-        common_resources,
     )
     from .taibackend.backend import Backend
     from .runtime_settings import TaiApiSettings, BACKEND_ATTRIBUTE_NAME
@@ -18,7 +21,6 @@ except ImportError:
     from routers import (
         tai,
         class_resources,
-        common_resources,
     )
     from taibackend.backend import Backend
     from runtime_settings import TaiApiSettings, BACKEND_ATTRIBUTE_NAME

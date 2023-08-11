@@ -215,15 +215,6 @@ class Backend:
             )
         return api_questions
 
-    def get_frequently_accessed_class_resources(
-        self,
-        class_id: UUID,
-        start_date: Optional[date] = None,
-        end_date: Optional[date] = None,
-    ) -> APIFrequentlyAccessedResources:
-        """Get the most frequently accessed class resources."""
-        pass # TODO: call search service
-
 
     # TODO: Add a test to verify the archive method is called
     def get_tai_response(self, chat_session: APIChatSession, stream: bool=False) -> APIChatSession:
@@ -293,6 +284,23 @@ class Backend:
         logger.critical(error_message)
         raise RuntimeError(error_message)
 
+    def get_frequently_accessed_class_resources(
+        self,
+        class_id: UUID,
+    ) -> APIFrequentlyAccessedResources:
+        """Get the most frequently accessed class resources from the tai search service."""
+        url = f"{self._runtime_settings.search_service_api_url}/frequently_accessed_resources/{class_id}"
+        response = requests.get(url, timeout=4)
+        if response.status_code == 200:
+            try:
+                data = response.json()
+                return APIFrequentlyAccessedResources(**data)
+            except Exception as e: # pylint: disable=broad-except
+                error_message = f"Failed to parse frequently accessed resources. Exception: {e}"
+        else:
+            error_message = f"Failed to retrieve frequently accessed resources. Status code: {response.status_code}"
+        logger.critical(error_message)
+        raise RuntimeError(error_message)
 
     def update_class_resources(self, class_resources: list[ClassResource]) -> None:
         """Update a list of class resources."""
