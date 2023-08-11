@@ -37,6 +37,7 @@ def test_imports_for_lambda_api():
         try:
             # Use subprocess to run each file in the api directory
             # run the index.py file (which will subsequently import all the other files)
-            subprocess.run([str(temp_dir / 'bin' / 'python'), str(temp_api_dir / 'main.py')], check=True)
+            entry_point = str(temp_api_dir / 'main.py')
+            subprocess.run([str(temp_dir / 'bin' / 'python'), entry_point], check=True)
         except subprocess.CalledProcessError:
-            pytest.fail("Failed to execute index.py in temporary venv. Rerun test in debug mode ot pinpoint the issue.")
+            pytest.fail(f"Failed to execute {entry_point} in temporary venv. Rerun test in debug mode ot pinpoint the issue.")
