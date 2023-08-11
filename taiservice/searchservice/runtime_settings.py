@@ -129,17 +129,16 @@ class SearchServiceSettings(EnvironmentSettings):
             "FROM 763104351884.dkr.ecr.us-east-1.amazonaws.com/pytorch-inference:2.0.1-gpu-py310-cu118-ubuntu20.04-ec2 AS build",
             "RUN apt-get update && apt-get install -y curl",
             "RUN curl -sL https://deb.nodesource.com/setup_18.x | bash",
-            # # poppler-utils is used for the python pdf to image package
-            # "RUN apt-get update && \\\
-            #     \n\tapt-get install -y nodejs poppler-utils wget unzip",
-            "RUN apt-get update && apt-get install -y nodejs",
-            # # install chrome driver for selenium use
-            # # install extra dependencies for chrome driver
-            # f"RUN mkdir -p {self.chrome_driver_path}",
-            # f"RUN wget -O {self.chrome_driver_path}.zip https://chromedriver.storage.googleapis.com/90.0.4430.24/chromedriver_linux64.zip",
-            # # unzip to the self._settings.chrome_driver_path directory
-            # f"RUN unzip {self.chrome_driver_path}.zip -d {self.chrome_driver_path}",
-            # "RUN apt-get install -y libglib2.0-0 libnss3 libgconf-2-4 libfontconfig1 chromium-browser",
+            # poppler-utils is used for the python pdf to image package
+            "RUN apt-get update && \\\
+                \n\tapt-get install -y nodejs poppler-utils wget unzip",
+            # install chrome driver for selenium use
+            # install extra dependencies for chrome driver
+            f"RUN mkdir -p {self.chrome_driver_path}",
+            f"RUN wget -O {self.chrome_driver_path}.zip https://chromedriver.storage.googleapis.com/90.0.4430.24/chromedriver_linux64.zip",
+            # unzip to the self._settings.chrome_driver_path directory
+            f"RUN unzip {self.chrome_driver_path}.zip -d {self.chrome_driver_path}",
+            "RUN apt-get install -y libglib2.0-0 libnss3 libgconf-2-4 libfontconfig1 chromium-browser",
             "\nFROM build AS dependencies",
             "WORKDIR /app",
             "RUN pip install --upgrade pip && pip install nltk projen uvicorn",
