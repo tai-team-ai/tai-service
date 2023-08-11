@@ -26,8 +26,4 @@ def get_class_resources(ids: ClassResourceIds, request: Request, from_class_ids:
 def create_class_resource(class_resources: ClassResources, request: Request, response: Response):
     """Create a class resource."""
     backend: Backend = getattr(request.app.state, BACKEND_ATTRIBUTE_NAME)
-    # try:
-    backend.create_class_resources(class_resources)
-    # except DuplicateClassResourceError as error:
-    #     response.status_code = status.HTTP_409_CONFLICT
-    #     return {"message": error.message}
+    return backend.create_class_resources(class_resources)
