@@ -2,7 +2,7 @@
   "dependencies": [
     {
       "name": "projen",
-      "version": "0.72.5",
+      "version": "0.71.72",
       "type": "devenv"
     },
     {
@@ -69,10 +69,6 @@
     },
     {
       "name": "pinecone-client[grpc]",
-      "type": "runtime"
-    },
-    {
-      "name": "pinecone-text",
       "type": "runtime"
     },
     {

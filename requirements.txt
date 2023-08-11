@@ -15,7 +15,6 @@ loguru
 openai
 pdf2image
 pinecone-client[grpc]
-pinecone-text
 pinecone-text[splade]
 pydantic[dotenv]<=1.10.11
 pydantic<=1.10.11
