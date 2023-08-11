@@ -117,10 +117,6 @@ make_file.add_rule(
     prerequisites=[UNITTEST_TARGET_NAME, FUNCTIONAL_TEST_TARGET_NAME],
 )
 make_file.add_rule(
-    targets=[FULL_TEST_TARGET_NAME],
-    prerequisites=["full-test", "deploy-all"],
-)
-make_file.add_rule(
     targets=["docker-start"],
     recipe=[
         "sudo systemctl start docker",
