@@ -57,7 +57,7 @@ project:Project = AwsCdkPythonApp(
         "selenium",
     ],
 )
-SEARCH_SERVICE_API_URL = "http://tai-s-taise-4mq43vlacxyh-2086925889.us-east-1.elb.amazonaws.com/"
+SEARCH_SERVICE_API_URL = "http://tai-s-taise-4mq43vlacxyh-2086925889.us-east-1.elb.amazonaws.com"
 env_file: TextFile = TextFile(
     project,
     "./.env",
@@ -70,6 +70,7 @@ env_file: TextFile = TextFile(
         'DOC_DB_ADMIN_USER_PASSWORD_SECRET_NAME="dev/tai_service/document_DB/admin_password"',
         'AWS_DEPLOYMENT_ACCOUNT_ID="645860363137"',
         'DEPLOYMENT_TYPE="dev"',
+        'SEARCH_SERVICE_API_URL=' + SEARCH_SERVICE_API_URL,
         'VPC_ID="vpc-0fdc1f2e77f6dba96"',
     ]
 )
