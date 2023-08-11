@@ -5,6 +5,7 @@ from constructs import Construct
 from aws_cdk import (
     Stack,
     aws_ec2 as ec2,
+    aws_iam as iam,
 )
 from aws_cdk.aws_ecs import (
     Cluster,
@@ -92,6 +93,7 @@ class TaiSearchServiceStack(Stack):
             public_read_access=True,
             permissions=Permissions.READ_WRITE,
             removal_policy=config.removal_policy,
+            role=self.search_service.task_definition.task_role,
         )
         name_with_suffix = (search_service_settings.documents_to_index_queue + config.stack_suffix)[:63]
         search_service_settings.documents_to_index_queue = name_with_suffix
@@ -156,6 +158,16 @@ class TaiSearchServiceStack(Stack):
             self._namer("task"),
             network_mode=NetworkMode.AWS_VPC,
         )
+        task_definition.add_to_task_role_policy(
+            statement=iam.PolicyStatement(
+                actions=[
+                    "secretsmanager:GetSecretValue",
+                ],
+                resources=[
+                    "*",
+                ],
+            ),
+        )
         self._get_container_definition(task_definition, container_port)
         security_group = self._get_ec2_security_group(target_port)
         service: Ec2Service = Ec2Service(
@@ -180,9 +192,12 @@ class TaiSearchServiceStack(Stack):
             hardware_type=AmiHardwareType.GPU,
         )
         instance_type = ec2.InstanceType.of(
-            # instance_class=ec2.InstanceClass.G4DN, # will want to move to this, but 
-            instance_class=ec2.InstanceClass.G4DN,
-            instance_size=ec2.InstanceSize.XLARGE,
+            # using this in the stack is expensive. we want to be able to manually change 
+            # the instance type to gpu when needed in the console when needed to save on costs
+            # instance_class=ec2.InstanceClass.G4DN,
+            instance_class=ec2.InstanceClass.R6A,
+            instance_size=ec2.InstanceSize.LARGE,
+            # instance_size=ec2.InstanceSize.XLARGE, # smae here, this is for GPU
         )
         cluster = Cluster(
             self,
@@ -216,8 +231,8 @@ class TaiSearchServiceStack(Stack):
             memory_limit_mib=4000,
             environment=self._search_service_settings.dict(),
             logging=LogDriver.aws_logs(stream_prefix=self._namer("log")),
-            # gpu_count=1,
-            cpu=1,
+            gpu_count=0, # setting this to 0 so we can update the container as updates require 2 gpus during the overlap period.
+            cpu=1000, # 1024 = 1 vCPU
         )
         container.add_port_mappings(
             PortMapping(container_port=container_port),

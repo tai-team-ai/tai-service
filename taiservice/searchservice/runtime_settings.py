@@ -117,6 +117,10 @@ class SearchServiceSettings(EnvironmentSettings):
         default=240,
         description="The timeout for class resource processing.",
     )
+    AWS_DEFAULT_REGION: str = Field(
+        default="us-east-1",
+        description="The default AWS region.",
+    )
 
     def get_docker_file_contents(self, port: int, fully_qualified_handler_path: str) -> str:
         """Create and return the path to the Dockerfile."""
