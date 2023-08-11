@@ -9,6 +9,7 @@ from loguru import logger
 import boto3
 from botocore.exceptions import ClientError
 try:
+    from .errors import DuplicateResourceError
     from .databases.archiver import Archive
     from .metrics import (
         Metrics,
@@ -43,6 +44,7 @@ try:
         ResourceSearchAnswer,
     )
 except (KeyError, ImportError):
+    from taibackend.errors import DuplicateResourceError
     from taibackend.databases.archiver import Archive
     from taibackend.metrics import (
         Metrics,
@@ -213,15 +215,6 @@ class Backend:
             )
         return api_questions
 
-    def get_frequently_accessed_class_resources(
-        self,
-        class_id: UUID,
-        start_date: Optional[date] = None,
-        end_date: Optional[date] = None,
-    ) -> APIFrequentlyAccessedResources:
-        """Get the most frequently accessed class resources."""
-        pass # TODO: call search service
-
 
     # TODO: Add a test to verify the archive method is called
     def get_tai_response(self, chat_session: APIChatSession, stream: bool=False) -> APIChatSession:
@@ -260,13 +253,15 @@ class Backend:
         )
         return search_answer
 
-    def create_class_resources(self, class_resources: ClassResources) -> None:
+    def create_class_resources(self, class_resources: ClassResources) -> requests.Response:
         """Create a list of class resources."""
         url = f"{self._runtime_settings.search_service_api_url}/class_resources"
         response = requests.post(url, data=class_resources.json(), timeout=30)
         if response.status_code != 200:
             error_message = f"Failed to create class resources. Status code: {response.status_code}"
             logger.error(error_message)
+            if response.status_code == 409:
+                raise DuplicateResourceError(response.json()['message'])
 
     def get_class_resources(self, ids: list[UUID], from_class_ids: bool = False) -> list[ClassResource]:
         """Get the class resources."""
@@ -281,13 +276,31 @@ class Backend:
             try:
                 data = response.json()
                 class_resources = [ClassResource(**item) for item in data['classResources']]
+                return class_resources
             except Exception as e: # pylint: disable=broad-except
                 error_message = f"Failed to parse class resources. Exception: {e}"
-                logger.error(error_message)
         else:
             error_message = f"Failed to retrieve class resources. Status code: {response.status_code}"
-            logger.error(error_message)
-        return class_resources
+        logger.critical(error_message)
+        raise RuntimeError(error_message)
+
+    def get_frequently_accessed_class_resources(
+        self,
+        class_id: UUID,
+    ) -> APIFrequentlyAccessedResources:
+        """Get the most frequently accessed class resources from the tai search service."""
+        url = f"{self._runtime_settings.search_service_api_url}/frequently_accessed_resources/{class_id}"
+        response = requests.get(url, timeout=4)
+        if response.status_code == 200:
+            try:
+                data = response.json()
+                return APIFrequentlyAccessedResources(**data)
+            except Exception as e: # pylint: disable=broad-except
+                error_message = f"Failed to parse frequently accessed resources. Exception: {e}"
+        else:
+            error_message = f"Failed to retrieve frequently accessed resources. Status code: {response.status_code}"
+        logger.critical(error_message)
+        raise RuntimeError(error_message)
 
     def update_class_resources(self, class_resources: list[ClassResource]) -> None:
         """Update a list of class resources."""

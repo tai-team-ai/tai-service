@@ -8,7 +8,10 @@ from loguru import logger
 import torch
 from .backend.backend import Backend
 from .runtime_settings import SearchServiceSettings, BACKEND_ATTRIBUTE_NAME
-from .routers import class_resources
+from .routers import (
+    class_resources,
+    frequently_accessed_resources,
+)
 
 TITLE = "T.A.I. Service"
 DESCRIPTION = "A service for the T.A.I. project."
@@ -20,6 +23,7 @@ ROUTER.get("/cuda", include_in_schema=False)(lambda: {"cuda available": torch.cu
 ROUTERS = [
     ROUTER,
     class_resources.ROUTER,
+    frequently_accessed_resources.ROUTER,
 ]
 
 def create_app() -> FastAPI:
