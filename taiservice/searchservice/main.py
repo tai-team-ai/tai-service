@@ -1,5 +1,4 @@
 """Define the main entry point for the tai service API."""
-import os
 from http.client import HTTPException
 import traceback
 from fastapi import APIRouter, FastAPI, Request
@@ -16,6 +15,7 @@ DESCRIPTION = "A service for the T.A.I. project."
 
 ROUTER = APIRouter()
 ROUTER.get("/health-check")(lambda: {"status": "ok"})
+ROUTER.get("/")(lambda: {"message": "Welcome to the T.A.I. Service API!"})
 ROUTER.get("/cuda", include_in_schema=False)(lambda: {"cuda available": torch.cuda.is_available()})
 ROUTERS = [
     ROUTER,
@@ -24,7 +24,6 @@ ROUTERS = [
 
 def create_app() -> FastAPI:
     """Create the FastAPI app."""
-    # print the environment variables
     runtime_settings = SearchServiceSettings()
     app = FastAPI(
         title=TITLE,
@@ -45,7 +44,6 @@ def create_app() -> FastAPI:
     # add a logger to the middleware to log all requests
     @app.middleware("http")
     async def middleware(request: Request, call_next):
-        logger.info(f"Request: {request}")
         response = await call_next(request)
 
         # Check and remove 'access-control-allow-origin' if exists to avoid conflict with AWS adding it's own

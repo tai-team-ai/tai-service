@@ -1,10 +1,11 @@
 """Define the search database stack."""
 import os
-from typing import Optional
+from typing import Optional, Any
 from constructs import Construct
 from aws_cdk import (
     Stack,
     aws_ec2 as ec2,
+    aws_iam as iam,
 )
 from aws_cdk.aws_ecs import (
     Cluster,
@@ -16,21 +17,30 @@ from aws_cdk.aws_ecs import (
     AddCapacityOptions,
     ScalableTaskCount,
     NetworkMode,
+    EcsOptimizedImage,
+    AmiHardwareType,
+    LogDriver,
 )
 from aws_cdk.aws_elasticloadbalancingv2 import (
     ApplicationLoadBalancer,
     ApplicationProtocol,
     ApplicationTargetGroup,
 )
+from aws_cdk.aws_autoscaling import (
+    BlockDevice,
+    BlockDeviceVolume,
+    EbsDeviceVolumeType,
+)
+from tai_aws_account_bootstrap.stack_helpers import add_tags
+from tai_aws_account_bootstrap.stack_config_models import StackConfigBaseModel
 from taiservice.searchservice.runtime_settings import SearchServiceSettings
-from .stack_helpers import add_tags
-from .stack_config_models import StackConfigBaseModel
 from ..constructs.construct_config import Permissions
 from ..constructs.document_db_construct import (
     DocumentDatabase,
     ElasticDocumentDBConfigModel,
     DocumentDBSettings,
 )
+from ..constructs.construct_helpers import get_vpc
 from ..constructs.pinecone_db_construct import PineconeDatabase
 from ..constructs.bucket_construct import VersionedBucket
 from ..constructs.customresources.pinecone_db.pinecone_db_custom_resource import PineconeDBSettings
@@ -50,6 +60,7 @@ class TaiSearchServiceStack(Stack):
         pinecone_db_settings: PineconeDBSettings,
         doc_db_settings: DocumentDBSettings,
         search_service_settings: SearchServiceSettings,
+        vpc: Any,
     ) -> None:
         """Initialize the search database stack."""
         super().__init__(
@@ -68,20 +79,23 @@ class TaiSearchServiceStack(Stack):
         self._config = config
         self._namer = lambda name: f"{config.stack_name}-{name}"
         self._subnet_type_for_doc_db = ec2.SubnetType.PRIVATE_WITH_EGRESS
-        self.vpc = self._create_vpc()
+        self.vpc = get_vpc(scope=self, vpc=vpc)
         self.document_db = self._get_document_db(doc_db_settings=doc_db_settings)
-        search_service_settings.doc_db_fully_qualified_domain_name = self.document_db.fully_qualified_domain_name
-        self._security_group_for_connecting_to_doc_db = self.document_db.security_group_for_connecting_to_cluster
         self.pinecone_db = self._get_pinecone_db()
-        self.search_service = self._get_search_service(self._security_group_for_connecting_to_doc_db)
-        name_with_suffix = (search_service_settings.cold_store_bucket_name + config.stack_suffix)[:63]
+        search_service_settings.doc_db_fully_qualified_domain_name = self.document_db.fully_qualified_domain_name
         search_service_settings.cold_store_bucket_name = name_with_suffix
+        name_with_suffix = (search_service_settings.cold_store_bucket_name + config.stack_suffix)[:63]
+        self._security_group_for_connecting_to_doc_db = self.document_db.security_group_for_connecting_to_cluster
+        # this needs to occur before creating the search service so that the search service points to the correct bucket
+        self._search_service_settings.cold_store_bucket_name = name_with_suffix
+        self.search_service = self._get_search_service(self._security_group_for_connecting_to_doc_db)
         self._cold_store_bucket: VersionedBucket = VersionedBucket.create_bucket(
             scope=self,
             bucket_name=search_service_settings.cold_store_bucket_name,
             public_read_access=True,
             permissions=Permissions.READ_WRITE,
             removal_policy=config.removal_policy,
+            role=self.search_service.task_definition.task_role,
         )
         name_with_suffix = (search_service_settings.documents_to_index_queue + config.stack_suffix)[:63]
         search_service_settings.documents_to_index_queue = name_with_suffix
@@ -113,38 +127,6 @@ class TaiSearchServiceStack(Stack):
         """Return the service url."""
         return self._service_url
 
-    def _create_vpc(self) -> ec2.Vpc:
-        subnet_configurations = []
-        subnet_configurations.append(
-            ec2.SubnetConfiguration(
-                name=self._namer("subnet-isolated"),
-                subnet_type=ec2.SubnetType.PRIVATE_WITH_EGRESS,
-            )
-        )
-        subnet_configurations.append(
-            ec2.SubnetConfiguration(
-                name=self._namer("subnet-public"),
-                subnet_type=ec2.SubnetType.PUBLIC,
-            )
-        )
-        vpc = ec2.Vpc(
-            scope=self,
-            id=self._namer("vpc"),
-            vpc_name=self._namer("vpc"),
-            max_azs=3,
-            nat_gateways=1,
-            subnet_configuration=subnet_configurations,
-        )
-        subnets = ec2.SubnetSelection(one_per_az=True)
-        ec2.InterfaceVpcEndpoint(
-            scope=self,
-            id="secrets-manager-endpoint",
-            vpc=vpc,
-            service=ec2.InterfaceVpcEndpointAwsService.SECRETS_MANAGER,
-            subnets=subnets,
-        )
-        return vpc
-
     def _get_document_db(self, doc_db_settings: DocumentDBSettings) -> DocumentDatabase:
         db_config = ElasticDocumentDBConfigModel(
             cluster_name=self._doc_db_settings.cluster_name,
@@ -164,19 +146,31 @@ class TaiSearchServiceStack(Stack):
             scope=self,
             construct_id=self._namer("pinecone-db"),
             db_settings=self._pinecone_db_settings,
+            removal_policy=self._config.removal_policy,
         )
         return db
 
     def _get_search_service(self, sg_for_connecting_to_db: ec2.SecurityGroup) -> Ec2Service:
-        target_port = 8080
-        self._create_docker_file(target_port)
+        target_port = 80
+        container_port = 8080
+        self._create_docker_file(container_port)
         cluster: Cluster = self._get_cluster()
         task_definition: Ec2TaskDefinition = Ec2TaskDefinition(
             self,
             self._namer("task"),
             network_mode=NetworkMode.AWS_VPC,
         )
-        self._get_container_definition(task_definition)
+        task_definition.add_to_task_role_policy(
+            statement=iam.PolicyStatement(
+                actions=[
+                    "secretsmanager:GetSecretValue",
+                ],
+                resources=[
+                    "*",
+                ],
+            ),
+        )
+        self._get_container_definition(task_definition, container_port)
         security_group = self._get_ec2_security_group(target_port)
         service: Ec2Service = Ec2Service(
             self,
@@ -196,14 +190,16 @@ class TaiSearchServiceStack(Stack):
             f.write(self._search_service_settings.get_docker_file_contents(target_port, FULLY_QUALIFIED_HANDLER_NAME))
 
     def _get_cluster(self) -> Cluster:
-        deep_learning_ami = ec2.LookupMachineImage(
-            name="Deep Learning Base GPU AMI (Ubuntu 20.04) *",
+        deep_learning_ami = EcsOptimizedImage.amazon_linux2(
+            hardware_type=AmiHardwareType.GPU,
         )
         instance_type = ec2.InstanceType.of(
-            instance_class=ec2.InstanceClass.G4AD,
-            instance_size=ec2.InstanceSize.XLARGE,
-            # instance_class=ec2.InstanceClass.R5A,
-            # instance_size=ec2.InstanceSize.XLARGE,
+            # using this in the stack is expensive. we want to be able to manually change 
+            # the instance type to gpu when needed in the console when needed to save on costs
+            # instance_class=ec2.InstanceClass.G4DN,
+            instance_class=ec2.InstanceClass.R6A,
+            instance_size=ec2.InstanceSize.LARGE,
+            # instance_size=ec2.InstanceSize.XLARGE, # smae here, this is for GPU
         )
         cluster = Cluster(
             self,
@@ -211,22 +207,37 @@ class TaiSearchServiceStack(Stack):
             vpc=self.vpc,
             capacity=AddCapacityOptions(
                 instance_type=instance_type,
-                max_capacity=1,
+                max_capacity=2,
+                min_capacity=1,
                 machine_image=deep_learning_ami,
-                spot_price="0.35",
+                # spot_price="0.35",
+                block_devices=[
+                    BlockDevice(
+                        device_name="/dev/xvda",
+                        volume=BlockDeviceVolume.ebs(
+                            volume_type=EbsDeviceVolumeType.IO1,
+                            delete_on_termination=True,
+                            volume_size=200,
+                            iops=10000, # must be 50x the volume size or less
+                        ),
+                    ),
+                ],
             ),
         )
         return cluster
-
-    def _get_container_definition(self, task_definition: Ec2TaskDefinition) -> ContainerDefinition:
+    
+    def _get_container_definition(self, task_definition: Ec2TaskDefinition, container_port: int) -> ContainerDefinition:
         container: ContainerDefinition = task_definition.add_container(
             self._namer("container"),
             image=ContainerImage.from_asset(directory=CWD, file=DOCKER_FILE_NAME),
-            memory_limit_mib=14000,
+            memory_limit_mib=4000,
             environment=self._search_service_settings.dict(),
+            logging=LogDriver.aws_logs(stream_prefix=self._namer("log")),
+            gpu_count=0, # setting this to 0 so we can update the container as updates require 2 gpus during the overlap period.
+            cpu=1000, # 1024 = 1 vCPU
         )
         container.add_port_mappings(
-            PortMapping(container_port=8080)
+            PortMapping(container_port=container_port),
         )
         return container
 
@@ -241,11 +252,13 @@ class TaiSearchServiceStack(Stack):
             peer=ec2.Peer.any_ipv4(),
             connection=ec2.Port.tcp(target_port),
         )
+        
         return target_sg
 
     def _get_scalable_task(self, service: Ec2Service, target_group: ApplicationTargetGroup) -> ScalableTaskCount:
         scaling_task = service.auto_scale_task_count(
-            max_capacity=1
+            max_capacity=2,
+            min_capacity=1,
         )
         scaling_task.scale_on_cpu_utilization(
             self._namer("cpu-scaling"),

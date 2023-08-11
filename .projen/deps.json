@@ -72,10 +72,6 @@
       "type": "runtime"
     },
     {
-      "name": "pinecone-text",
-      "type": "runtime"
-    },
-    {
       "name": "pinecone-text[splade]",
       "type": "runtime"
     },
@@ -117,6 +113,10 @@
     },
     {
       "name": "selenium",
+      "type": "runtime"
+    },
+    {
+      "name": "tai-aws-account-bootstrap",
       "type": "runtime"
     },
     {

@@ -10,9 +10,9 @@ from aws_cdk import (
     Size as StorageSize,
     CfnOutput,
 )
+from tai_aws_account_bootstrap.stack_config_models import StackConfigBaseModel
+from tai_aws_account_bootstrap.stack_helpers import add_tags
 from ...api.runtime_settings import TaiApiSettings
-from .stack_config_models import StackConfigBaseModel
-from .stack_helpers  import add_tags
 from ..constructs.lambda_construct import (
     DockerLambda,
     DockerLambdaConfigModel,

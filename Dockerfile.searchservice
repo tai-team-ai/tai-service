@@ -1,13 +1,7 @@
 FROM 763104351884.dkr.ecr.us-east-1.amazonaws.com/pytorch-inference:2.0.1-gpu-py310-cu118-ubuntu20.04-ec2 AS build
-ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y curl
 RUN curl -sL https://deb.nodesource.com/setup_18.x | bash
-RUN apt-get update && \                
-	apt-get install -y nodejs poppler-utils wget unzip
-RUN mkdir -p /var/task/chromedriver
-RUN wget -O /var/task/chromedriver.zip https://chromedriver.storage.googleapis.com/90.0.4430.24/chromedriver_linux64.zip
-RUN unzip /var/task/chromedriver.zip -d /var/task/chromedriver
-RUN apt-get install -y libglib2.0-0 libnss3 libgconf-2-4 libfontconfig1 chromium-browser
+RUN apt-get update && apt-get install -y nodejs
 
 FROM build AS dependencies
 WORKDIR /app

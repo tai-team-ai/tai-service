@@ -47,6 +47,15 @@ class DistanceMetric(str, Enum):
     DOT_PRODUCT = "dotproduct"
 
 
+class RemovalPolicy(str, Enum):
+    """Define the removal policies."""
+
+    DESTROY = "DESTROY"
+    RETAIN = "RETAIN"
+    RETAIN_ON_UPDATE_OR_DELETE = "RETAIN_ON_UPDATE_OR_DELETE"
+    SNAPSHOT = "SNAPSHOT"
+
+
 class PineConeEnvironment(str, Enum):
     """Define the environments for the Pinecone project."""
 
@@ -140,6 +149,10 @@ class PineconeDBSettings(BasePineconeDBSettings):
         max_items=2,
         description="Config for the Pinecone indexes.",
     )
+    pinecone_removal_policy: RemovalPolicy = Field(
+        default=RemovalPolicy.RETAIN,
+        description="The removal policy for the Pinecone indexes.",
+    )
 
     @validator("indexes")
     def ensure_no_duplicate_indexes(cls, indexes: List[PineconeIndexConfig]) -> List[PineconeIndexConfig]:
@@ -219,13 +232,13 @@ class PineconeDBSetupCustomResource(CustomResourceInterface):
             self._delete_index(index)
 
     def _delete_index(self, index: str) -> None:
-        self._validate_can_delete_index(index)
-        self._run_operation_with_retry(
-            pinecone.delete_index,
-            index,
-        )
+        if self._can_delete_index(index):
+            self._run_operation_with_retry(
+                pinecone.delete_index,
+                index,
+            )
 
-    def _validate_can_delete_index(self, index: str) -> None:
+    def _can_delete_index(self, index: str) -> bool:
         """Validate that the index can be deleted."""
         try:
             index: pinecone.Index = pinecone.Index(index)
@@ -233,4 +246,17 @@ class PineconeDBSetupCustomResource(CustomResourceInterface):
         except Exception as e: # pylint: disable=broad-except
             logger.warning(f"Failed to get index stats for index {index}. Error: {e}")
             return
-        assert stats["total_vector_count"] == 0, f"Cannot delete index {index} because it is not empty."
+        if self._settings.pinecone_removal_policy == RemovalPolicy.RETAIN:
+            logger.info(f"Skipping deletion of index {index} because the removal policy is set to {self._settings.pinecone_removal_policy}.")
+            return False
+        elif self._settings.pinecone_removal_policy == RemovalPolicy.RETAIN_ON_UPDATE_OR_DELETE:
+            if stats["total_vector_count"] > 0:
+                logger.info(f"Skipping deletion of index {index} because the removal policy is set to {self._settings.pinecone_removal_policy} and the index is not empty.")
+                return False
+        elif self._settings.pinecone_removal_policy == RemovalPolicy.SNAPSHOT:
+            self._create_snapshot()
+        logger.info(f"Index {index} can be deleted.")
+        return True
+
+    def _create_snapshot(self) -> None:
+        logger.warning("Snapshot creation is not implemented yet.")

@@ -1,61 +1,59 @@
 {
-  "availability-zones:account=645860363137:region=us-east-1": [
-    "us-east-1a",
-    "us-east-1b",
-    "us-east-1c",
-    "us-east-1d",
-    "us-east-1e",
-    "us-east-1f"
-  ],
-  "vpc-provider:account=645860363137:filter.vpc-id=vpc-064f2ef4501aeafc8:region=us-east-1:returnAsymmetricSubnets=true": {
-    "vpcId": "vpc-064f2ef4501aeafc8",
-    "vpcCidrBlock": "172.31.0.0/16",
+  "vpc-provider:account=645860363137:filter.vpc-id=vpc-0fdc1f2e77f6dba96:region=us-east-1:returnAsymmetricSubnets=true": {
+    "vpcId": "vpc-0fdc1f2e77f6dba96",
+    "vpcCidrBlock": "10.0.0.0/16",
     "ownerAccountId": "645860363137",
     "availabilityZones": [],
     "subnetGroups": [
       {
-        "name": "Public",
+        "name": "account-bootstrap-subnet-public",
         "type": "Public",
         "subnets": [
           {
-            "subnetId": "subnet-0d33d0e2cf84c9dfd",
-            "cidr": "172.31.0.0/20",
+            "subnetId": "subnet-00badcd2cb4104a30",
+            "cidr": "10.0.96.0/19",
             "availabilityZone": "us-east-1a",
-            "routeTableId": "rtb-0607c7a688b087cce"
+            "routeTableId": "rtb-034f979827d5ec31c"
           },
           {
-            "subnetId": "subnet-018dd98a471f9f1f4",
-            "cidr": "172.31.80.0/20",
+            "subnetId": "subnet-0147583ec6348fc8c",
+            "cidr": "10.0.128.0/19",
             "availabilityZone": "us-east-1b",
-            "routeTableId": "rtb-0607c7a688b087cce"
+            "routeTableId": "rtb-0608f0668f3ac32b3"
           },
           {
-            "subnetId": "subnet-058918cc6e1c31802",
-            "cidr": "172.31.16.0/20",
+            "subnetId": "subnet-0ff65da37ffd93071",
+            "cidr": "10.0.160.0/19",
             "availabilityZone": "us-east-1c",
-            "routeTableId": "rtb-0607c7a688b087cce"
+            "routeTableId": "rtb-0da9265478b9d93b5"
+          }
+        ]
+      },
+      {
+        "name": "account-bootstrap-subnet-isolated",
+        "type": "Private",
+        "subnets": [
+          {
+            "subnetId": "subnet-09c2d911498765755",
+            "cidr": "10.0.0.0/19",
+            "availabilityZone": "us-east-1a",
+            "routeTableId": "rtb-09f41f05489107779"
           },
           {
-            "subnetId": "subnet-0c8c635aa6fdec078",
-            "cidr": "172.31.32.0/20",
-            "availabilityZone": "us-east-1d",
-            "routeTableId": "rtb-0607c7a688b087cce"
+            "subnetId": "subnet-095461dd9b4948d48",
+            "cidr": "10.0.32.0/19",
+            "availabilityZone": "us-east-1b",
+            "routeTableId": "rtb-05af8a31a536a3b9c"
           },
           {
-            "subnetId": "subnet-0b32538be3b6ad2b9",
-            "cidr": "172.31.48.0/20",
-            "availabilityZone": "us-east-1e",
-            "routeTableId": "rtb-0607c7a688b087cce"
-          },
-          {
-            "subnetId": "subnet-0c2dd4533762bf160",
-            "cidr": "172.31.64.0/20",
-            "availabilityZone": "us-east-1f",
-            "routeTableId": "rtb-0607c7a688b087cce"
+            "subnetId": "subnet-0a343b40679232125",
+            "cidr": "10.0.64.0/19",
+            "availabilityZone": "us-east-1c",
+            "routeTableId": "rtb-0a46887a0a3f8e8a6"
           }
         ]
       }
     ]
   },
-  "ami:account=645860363137:filters.image-type.0=machine:filters.name.0=Deep Learning Base GPU AMI (Ubuntu 20.04) *:filters.state.0=available:region=us-east-1": "ami-0d0ad37f1c3d46a93"
+  "ami:account=645860363137:filters.image-type.0=machine:filters.name.0=Deep Learning Base GPU AMI (Ubuntu 20.04) *:filters.state.0=available:region=us-east-1": "ami-05543abe7b00118ff"
 }

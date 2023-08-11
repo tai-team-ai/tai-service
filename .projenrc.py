@@ -21,6 +21,7 @@ project:Project = AwsCdkPythonApp(
     version="0.1.0",
     venv_options=VenvOptions(envdir=VENV_DIR),
     deps=[
+        "tai-aws-account-bootstrap",
         "pydantic<=1.10.11",
         "loguru",
         "boto3",
@@ -46,8 +47,9 @@ project:Project = AwsCdkPythonApp(
         "openai",
         "tiktoken",
         "aws-lambda-powertools",
-        "pinecone-text",
         "pinecone-text[splade]",
+        # "torch -f https://download.pytorch.org/whl/cpu",
+        # "transformers",
         "pymupdf",
         "pdf2image",
         "PyPDF2",
@@ -69,6 +71,7 @@ env_file: TextFile = TextFile(
         'AWS_DEPLOYMENT_ACCOUNT_ID="645860363137"',
         'DEPLOYMENT_TYPE="dev"',
         'SEARCH_SERVICE_API_URL="tai-s-taise-AZC3PUQV8RIL-990860086.us-east-1.elb.amazonaws.com"',
+        'VPC_ID="vpc-0fdc1f2e77f6dba96"',
     ]
 )
 docker_ignore_file: TextFile = TextFile(
@@ -114,10 +117,6 @@ make_file.add_rule(
     prerequisites=[UNITTEST_TARGET_NAME, FUNCTIONAL_TEST_TARGET_NAME],
 )
 make_file.add_rule(
-    targets=[FULL_TEST_TARGET_NAME],
-    prerequisites=["full-test", "deploy-all"],
-)
-make_file.add_rule(
     targets=["docker-start"],
     recipe=[
         "sudo systemctl start docker",
@@ -126,7 +125,8 @@ make_file.add_rule(
 make_file.add_rule(
     targets=["ecr-docker-login"],
     recipe=[
-        "aws ecr get-login-password --region=$(REGION) | $(SUDO_DOCKER) docker login --username AWS --password-stdin 763104351884.dkr.ecr.$(REGION).amazonaws.com",
+        "aws ecr get-login-password --region=$(REGION) | $(SUDO) docker login --username AWS --password-stdin 763104351884.dkr.ecr.$(REGION).amazonaws.com",
+        "aws ecr get-login-password --region=$(REGION) | $(SUDO) docker login --username AWS --password-stdin $(ACCOUNT_ID).dkr.ecr.$(REGION).amazonaws.com",
     ],
 )
 def convert_dict_env_vars_to_docker_env_vars(env_vars: dict):

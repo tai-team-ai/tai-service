@@ -7,6 +7,7 @@ from aws_cdk import (
     CustomResource,
     Duration,
     Size as StorageSize,
+    RemovalPolicy,
 )
 from .customresources.pinecone_db.pinecone_db_custom_resource import PineconeDBSettings
 from .construct_helpers import get_hash_for_all_files_in_dir, get_secret_arn_from_name
@@ -26,10 +27,12 @@ class PineconeDatabase(Construct):
         scope: Construct,
         construct_id: str,
         db_settings: PineconeDBSettings,
+        removal_policy: RemovalPolicy = RemovalPolicy.RETAIN,
         **kwargs,
     ) -> None:
         """Initialize the Pinecone database construct."""
         super().__init__(scope, construct_id, **kwargs)
+        db_settings.pinecone_removal_policy = removal_policy.value # We want to pass the removal policy to the custom resource
         self._secret_arn = get_secret_arn_from_name(db_settings.api_key_secret_name)
         self._db_settings = db_settings
         self.custom_resource_provider = self._create_custom_resource()

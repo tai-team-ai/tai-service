@@ -12,13 +12,12 @@ functional-test:
 
 full-test: unit-test functional-test
 
-test-deploy-all: full-test deploy-all
-
-start-docker:
+docker-start:
 	sudo systemctl start docker
 
 ecr-docker-login:
-	aws ecr get-login-password --region=$(REGION) | $(SUDO_DOCKER) docker login --username AWS --password-stdin 763104351884.dkr.ecr.$(REGION).amazonaws.com
+	aws ecr get-login-password --region=$(REGION) | $(SUDO) docker login --username AWS --password-stdin 763104351884.dkr.ecr.$(REGION).amazonaws.com
+	aws ecr get-login-password --region=$(REGION) | $(SUDO) docker login --username AWS --password-stdin $(ACCOUNT_ID).dkr.ecr.$(REGION).amazonaws.com
 
 build-and-run-docker:
 	cdk synth && \

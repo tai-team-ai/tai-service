@@ -13,7 +13,7 @@ from langchain import document_loaders
 from langchain.document_loaders.base import BaseLoader
 from langchain.text_splitter import TextSplitter
 from langchain.schema import Document
-from pinecone_text.sparse import SpladeEncoder
+# from pinecone_text.sparse import SpladeEncoder
 try:
     from .data_ingestors import (
         get_splitter_text_splitter,
@@ -256,8 +256,9 @@ class Indexer:
     @staticmethod
     def get_sparse_vectors(texts: list[str]) -> list[SparseVector]:
         """Add sparse vectors to pinecone."""
-        splade = SpladeEncoder()
-        vectors = splade.encode_documents(texts)
+        # splade = SpladeEncoder()
+        # vectors = splade.encode_documents(texts)
+        vectors = []
         sparse_vectors = []
         for vec in vectors:
             sparse_vector = SparseVector.parse_obj(vec)

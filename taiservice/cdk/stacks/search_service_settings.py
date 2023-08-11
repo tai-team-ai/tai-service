@@ -1,6 +1,9 @@
 """Define settings for instantiating search databases."""
 import os
 from dotenv import load_dotenv
+from aws_cdk import (
+    RemovalPolicy,
+)
 from taiservice.cdk.constructs.customresources.document_db.settings import (
     DocumentDBSettings,
     CollectionConfig,
