@@ -82,12 +82,11 @@ class TaiSearchServiceStack(Stack):
         self.vpc = get_vpc(scope=self, vpc=vpc)
         self.document_db = self._get_document_db(doc_db_settings=doc_db_settings)
         self.pinecone_db = self._get_pinecone_db()
+        self._security_group_for_connecting_to_doc_db = self.document_db.security_group_for_connecting_to_cluster
+        # these needs to occur before creating the search service so that the search service points to the correct bucket
+        name_with_suffix = (search_service_settings.cold_store_bucket_name + config.stack_suffix)[:63]
         search_service_settings.doc_db_fully_qualified_domain_name = self.document_db.fully_qualified_domain_name
         search_service_settings.cold_store_bucket_name = name_with_suffix
-        name_with_suffix = (search_service_settings.cold_store_bucket_name + config.stack_suffix)[:63]
-        self._security_group_for_connecting_to_doc_db = self.document_db.security_group_for_connecting_to_cluster
-        # this needs to occur before creating the search service so that the search service points to the correct bucket
-        self._search_service_settings.cold_store_bucket_name = name_with_suffix
         self.search_service = self._get_search_service(self._security_group_for_connecting_to_doc_db)
         self._cold_store_bucket: VersionedBucket = VersionedBucket.create_bucket(
             scope=self,
