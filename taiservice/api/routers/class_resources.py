@@ -28,6 +28,11 @@ def create_class_resource(class_resources: ClassResources, request: Request, res
     backend: Backend = getattr(request.app.state, BACKEND_ATTRIBUTE_NAME)
     try:
         backend.create_class_resources(class_resources)
-    except DuplicateResourceError as error:
-        response.status_code = status.HTTP_409_CONFLICT
-        return {"message": error.message}
+    except (DuplicateResourceError, RuntimeError) as error:
+        if isinstance(error, DuplicateResourceError):
+            response.status_code = status.HTTP_409_CONFLICT
+            message =  error.message
+        else:
+            response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
+            message = "Internal server error."
+        return {"message": message}

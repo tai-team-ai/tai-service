@@ -20,6 +20,7 @@ from aws_cdk.aws_ecs import (
     EcsOptimizedImage,
     AmiHardwareType,
     LogDriver,
+    AsgCapacityProvider,
 )
 from aws_cdk.aws_elasticloadbalancingv2 import (
     ApplicationLoadBalancer,
@@ -30,6 +31,7 @@ from aws_cdk.aws_autoscaling import (
     BlockDevice,
     BlockDeviceVolume,
     EbsDeviceVolumeType,
+    AutoScalingGroup,
 )
 from tai_aws_account_bootstrap.stack_helpers import add_tags
 from tai_aws_account_bootstrap.stack_config_models import StackConfigBaseModel
@@ -204,23 +206,36 @@ class TaiSearchServiceStack(Stack):
             self,
             self._namer("cluster"),
             vpc=self.vpc,
-            capacity=AddCapacityOptions(
-                instance_type=instance_type,
-                max_capacity=2,
-                min_capacity=1,
-                machine_image=deep_learning_ami,
-                # spot_price="0.35",
-                block_devices=[
-                    BlockDevice(
-                        device_name="/dev/xvda",
-                        volume=BlockDeviceVolume.ebs(
-                            volume_type=EbsDeviceVolumeType.IO1,
-                            delete_on_termination=True,
-                            volume_size=200,
-                            iops=10000, # must be 50x the volume size or less
-                        ),
+        )
+        auto_scaling_group = AutoScalingGroup(
+            self,
+            self._namer("asg"),
+            vpc=self.vpc,
+            instance_type=instance_type,
+            machine_image=deep_learning_ami,
+            instance_type=instance_type,
+            max_capacity=2,
+            min_capacity=1,
+            machine_image=deep_learning_ami,
+            # spot_price="0.35",
+            block_devices=[
+                BlockDevice(
+                    device_name="/dev/xvda",
+                    volume=BlockDeviceVolume.ebs(
+                        volume_type=EbsDeviceVolumeType.IO1,
+                        delete_on_termination=True,
+                        volume_size=200,
+                        iops=10000, # must be 50x the volume size or less
                     ),
-                ],
+                ),
+            ],
+        )
+        cluster.add_asg_capacity_provider(
+            provider=AsgCapacityProvider(
+                self,
+                self._namer("asg-provider"),
+                auto_scaling_group=auto_scaling_group,
+                capacity_provider_name=self._namer("asg-provider"),
             ),
         )
         return cluster

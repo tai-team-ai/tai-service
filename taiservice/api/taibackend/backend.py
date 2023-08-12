@@ -256,12 +256,13 @@ class Backend:
     def create_class_resources(self, class_resources: ClassResources) -> requests.Response:
         """Create a list of class resources."""
         url = f"{self._runtime_settings.search_service_api_url}/class_resources"
-        response = requests.post(url, data=class_resources.json(), timeout=30)
+        response = requests.post(url, data=class_resources.json(), timeout=180)
         if response.status_code != 200:
             error_message = f"Failed to create class resources. Status code: {response.status_code}"
             logger.error(error_message)
             if response.status_code == 409:
                 raise DuplicateResourceError(response.json()['message'])
+            raise RuntimeError(error_message)
 
     def get_class_resources(self, ids: list[UUID], from_class_ids: bool = False) -> list[ClassResource]:
         """Get the class resources."""
