@@ -246,9 +246,9 @@ class TaiSearchServiceStack(Stack):
             ),
         ]
         TIME_ZONE = "US/Mountain"
-        DAY_OF_WEEK = "SUN"
-        GPU_START_HOUR = 10
-        GPU_END_HOUR = 12
+        DAY_OF_WEEK = "MON,WED,FRI"
+        GPU_START_HOUR = 6
+        GPU_END_HOUR = 13
         BUFFER_FOR_SERVICE_SWITCH_MINUTES = 20
         if service_type == ECSServiceType.GPU:
             instance_type = ec2.InstanceType.of(
