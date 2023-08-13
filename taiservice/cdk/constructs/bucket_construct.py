@@ -121,7 +121,7 @@ class VersionedBucket(Construct):
         public_read_access: bool,
         permissions: Permissions,
         removal_policy: RemovalPolicy,
-        role: Optional[iam.Role] = None,
+        role: Optional[Union[iam.Role, list[iam.Role]]] = None,
     ) -> 'VersionedBucket':
         """Create a versioned bucket."""
         config = VersionedBucketConfigModel(
@@ -136,12 +136,17 @@ class VersionedBucket(Construct):
             config=config,
         )
         if role:
-            if permissions == Permissions.READ:
-                bucket.grant_read_access(role)
-            elif permissions == Permissions.READ_WRITE:
-                bucket.grant_read_write_access(role)
+            if isinstance(role, list):
+                roles = role
             else:
-                raise ValueError(f"Invalid permissions: {permissions} for bucket {bucket_name}")
+                roles = [role]
+            for role in roles:
+                if permissions == Permissions.READ:
+                    bucket.grant_read_access(role)
+                elif permissions == Permissions.READ_WRITE:
+                    bucket.grant_read_write_access(role)
+                else:
+                    raise ValueError(f"Invalid permissions: {permissions} for bucket {bucket_name}")
         return bucket
 
 
