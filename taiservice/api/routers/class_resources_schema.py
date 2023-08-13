@@ -22,11 +22,13 @@ class ClassResourceProcessingStatus(str, Enum):
     FAILED = "failed"
     COMPLETED = "completed"
 
-
 class ClassResourceType(str, Enum):
     """Define the type of the class resource."""
     TEXTBOOK = "textbook"
-    WEBSITE = "website"
+    EXAMPLE_PROBLEMS = "example problems"
+    STUDY_GUIDE = "study guide"
+    LECTURE = "lecture"
+    ARTICLE = "article"
 
 
 class Metadata(BasePydanticModel):

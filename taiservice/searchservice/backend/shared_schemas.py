@@ -20,9 +20,12 @@ HASH_FIELD_OBJECT = Field(
 )
 
 class ClassResourceType(str, Enum):
-    """Define the class resource types to use as a filter."""
+    """Define the type of the class resource."""
     TEXTBOOK = "textbook"
-    WEBSITE = "website"
+    EXAMPLE_PROBLEMS = "example problems"
+    STUDY_GUIDE = "study guide"
+    LECTURE = "lecture"
+    ARTICLE = "article"
 
 
 class BasePydanticModel(BaseModel):

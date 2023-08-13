@@ -1,4 +1,5 @@
 """Define the search database stack."""
+from enum import Enum
 import os
 from typing import Optional, Any
 from constructs import Construct
@@ -14,12 +15,12 @@ from aws_cdk.aws_ecs import (
     PortMapping,
     ContainerImage,
     ContainerDefinition,
-    AddCapacityOptions,
     ScalableTaskCount,
     NetworkMode,
     EcsOptimizedImage,
     AmiHardwareType,
     LogDriver,
+    AsgCapacityProvider,
 )
 from aws_cdk.aws_elasticloadbalancingv2 import (
     ApplicationLoadBalancer,
@@ -30,6 +31,8 @@ from aws_cdk.aws_autoscaling import (
     BlockDevice,
     BlockDeviceVolume,
     EbsDeviceVolumeType,
+    AutoScalingGroup,
+    Schedule,
 )
 from tai_aws_account_bootstrap.stack_helpers import add_tags
 from tai_aws_account_bootstrap.stack_config_models import StackConfigBaseModel
@@ -49,6 +52,13 @@ from ..constructs.customresources.pinecone_db.pinecone_db_custom_resource import
 DOCKER_FILE_NAME = "Dockerfile.searchservice"
 FULLY_QUALIFIED_HANDLER_NAME = "taiservice.searchservice.main:create_app"
 CWD = os.getcwd()
+
+
+class ECSServiceType(str, Enum):
+    """Define the ECS service type."""
+    NO_GPU = "NO_GPU"
+    GPU = "GPU"
+
 
 class TaiSearchServiceStack(Stack):
     """Define the search service for indexing and searching."""
@@ -87,14 +97,14 @@ class TaiSearchServiceStack(Stack):
         name_with_suffix = (search_service_settings.cold_store_bucket_name + config.stack_suffix)[:63]
         search_service_settings.doc_db_fully_qualified_domain_name = self.document_db.fully_qualified_domain_name
         search_service_settings.cold_store_bucket_name = name_with_suffix
-        self.search_service = self._get_search_service(self._security_group_for_connecting_to_doc_db)
+        self.search_services: list[Ec2Service] = self._get_search_services(self._security_group_for_connecting_to_doc_db)
         self._cold_store_bucket: VersionedBucket = VersionedBucket.create_bucket(
             scope=self,
             bucket_name=search_service_settings.cold_store_bucket_name,
             public_read_access=True,
             permissions=Permissions.READ_WRITE,
             removal_policy=config.removal_policy,
-            role=self.search_service.task_definition.task_role,
+            role=[service.task_definition.task_role for service in self.search_services],
         )
         name_with_suffix = (search_service_settings.documents_to_index_queue + config.stack_suffix)[:63]
         search_service_settings.documents_to_index_queue = name_with_suffix
@@ -149,14 +159,29 @@ class TaiSearchServiceStack(Stack):
         )
         return db
 
-    def _get_search_service(self, sg_for_connecting_to_db: ec2.SecurityGroup) -> Ec2Service:
+    def _get_search_services(self, sg_for_connecting_to_db: ec2.SecurityGroup) -> list[Ec2Service]:
         target_port = 80
         container_port = 8080
         self._create_docker_file(container_port)
-        cluster: Cluster = self._get_cluster()
+        non_gpu_service: Ec2Service = self._create_ecs_service(ECSServiceType.NO_GPU, container_port, target_port, sg_for_connecting_to_db)
+        gpu_service: Ec2Service = self._create_ecs_service(ECSServiceType.GPU, container_port, target_port, sg_for_connecting_to_db)
+        services = [non_gpu_service, gpu_service]
+        target_group: ApplicationTargetGroup = self._get_target_group(services, target_port, target_protocol=ApplicationProtocol.HTTP)
+        for service in services:
+            self._get_scalable_task(service, target_group)
+        return services
+
+    def _create_ecs_service(
+        self,
+        service_type: ECSServiceType,
+        container_port: int,
+        target_port: int,
+        sg_for_connecting_to_db: ec2.SecurityGroup,
+    ) -> Ec2Service:
+        """Create an ECS service."""
         task_definition: Ec2TaskDefinition = Ec2TaskDefinition(
             self,
-            self._namer("task"),
+            self._namer(f"task-{service_type.value}"),
             network_mode=NetworkMode.AWS_VPC,
         )
         task_definition.add_to_task_role_policy(
@@ -169,18 +194,17 @@ class TaiSearchServiceStack(Stack):
                 ],
             ),
         )
-        self._get_container_definition(task_definition, container_port)
-        security_group = self._get_ec2_security_group(target_port)
+        cluster: Cluster = self._get_cluster(service_type)
+        self._get_container_definition(service_type, task_definition, container_port)
+        security_group = self._get_ec2_security_group(service_type, target_port)
         service: Ec2Service = Ec2Service(
             self,
-            self._namer("service"),
+            self._namer(f"service-{service_type.value}"),
             cluster=cluster,
             task_definition=task_definition,
             desired_count=1,
             security_groups=[security_group, sg_for_connecting_to_db],
         )
-        target_group: ApplicationTargetGroup = self._get_target_group(service, target_port, target_protocol=ApplicationProtocol.HTTP)
-        self._get_scalable_task(service, target_group)
         return service
 
     def _create_docker_file(self, target_port: int) -> None:
@@ -188,62 +212,125 @@ class TaiSearchServiceStack(Stack):
         with open(docker_file_path, "w", encoding="utf-8") as f:
             f.write(self._search_service_settings.get_docker_file_contents(target_port, FULLY_QUALIFIED_HANDLER_NAME))
 
-    def _get_cluster(self) -> Cluster:
-        deep_learning_ami = EcsOptimizedImage.amazon_linux2(
-            hardware_type=AmiHardwareType.GPU,
-        )
-        instance_type = ec2.InstanceType.of(
-            # using this in the stack is expensive. we want to be able to manually change 
-            # the instance type to gpu when needed in the console when needed to save on costs
-            # instance_class=ec2.InstanceClass.G4DN,
-            instance_class=ec2.InstanceClass.R6A,
-            instance_size=ec2.InstanceSize.LARGE,
-            # instance_size=ec2.InstanceSize.XLARGE, # smae here, this is for GPU
-        )
+    def _get_cluster(self, cluster_type: ECSServiceType) -> Cluster:
         cluster = Cluster(
             self,
-            self._namer("cluster"),
+            self._namer(f"cluster-{cluster_type.value}"),
             vpc=self.vpc,
-            capacity=AddCapacityOptions(
-                instance_type=instance_type,
-                max_capacity=2,
-                min_capacity=1,
-                machine_image=deep_learning_ami,
-                # spot_price="0.35",
-                block_devices=[
-                    BlockDevice(
-                        device_name="/dev/xvda",
-                        volume=BlockDeviceVolume.ebs(
-                            volume_type=EbsDeviceVolumeType.IO1,
-                            delete_on_termination=True,
-                            volume_size=200,
-                            iops=10000, # must be 50x the volume size or less
-                        ),
-                    ),
-                ],
+        )
+        asg = self._get_auto_scaling_group(cluster_type)
+        cluster.add_asg_capacity_provider(
+            provider=AsgCapacityProvider(
+                self,
+                self._namer(f"asg-provider-{cluster_type.value}"),
+                auto_scaling_group=asg,
+                capacity_provider_name=self._namer(f"capacity-provider-{cluster_type.value}"),
+                enable_managed_termination_protection=False,
             ),
         )
         return cluster
-    
-    def _get_container_definition(self, task_definition: Ec2TaskDefinition, container_port: int) -> ContainerDefinition:
+
+    def _get_auto_scaling_group(self, service_type: ECSServiceType) -> AutoScalingGroup:
+        deep_learning_ami = EcsOptimizedImage.amazon_linux2(
+            hardware_type=AmiHardwareType.GPU,
+        )
+        block_devices = [
+            BlockDevice(
+                device_name="/dev/xvda",
+                volume=BlockDeviceVolume.ebs(
+                    volume_type=EbsDeviceVolumeType.IO1,
+                    delete_on_termination=True,
+                    volume_size=200,
+                    iops=10000, # must be 50x the volume size or less
+                ),
+            ),
+        ]
+        TIME_ZONE = "US/Mountain"
+        DAY_OF_WEEK = "MON,WED,FRI"
+        GPU_START_HOUR = 6
+        GPU_END_HOUR = 13
+        BUFFER_FOR_SERVICE_SWITCH_MINUTES = 20
+        if service_type == ECSServiceType.GPU:
+            instance_type = ec2.InstanceType.of(
+                instance_class=ec2.InstanceClass.G4DN,
+                instance_size=ec2.InstanceSize.XLARGE,
+            )
+            asg = AutoScalingGroup(
+                self,
+                self._namer("gpu-asg"),
+                vpc=self.vpc,
+                instance_type=instance_type,
+                machine_image=deep_learning_ami,
+                max_capacity=1,
+                min_capacity=1,
+                # spot_price="0.35",
+                block_devices=block_devices,
+            )
+            asg.scale_on_schedule(
+                self._namer("gpu-scale-up"),
+                schedule=Schedule.cron(hour=str(GPU_START_HOUR), week_day=DAY_OF_WEEK),
+                min_capacity=1,
+                max_capacity=1,
+                time_zone=TIME_ZONE,
+            )
+            asg.scale_on_schedule(
+                self._namer("gpu-scale-down"),
+                schedule=Schedule.cron(hour=str(GPU_END_HOUR), week_day=DAY_OF_WEEK),
+                min_capacity=0,
+                max_capacity=0,
+                time_zone=TIME_ZONE,
+            )
+        else:
+            instance_type = ec2.InstanceType.of(
+                instance_class=ec2.InstanceClass.R6A,
+                instance_size=ec2.InstanceSize.LARGE,
+            )
+            asg = AutoScalingGroup(
+                self,
+                self._namer(f"asg-{service_type.value}"),
+                vpc=self.vpc,
+                instance_type=instance_type,
+                machine_image=deep_learning_ami,
+                max_capacity=1,
+                min_capacity=1,
+                # spot_price="0.35",
+                block_devices=block_devices,
+            )
+            asg.scale_on_schedule(
+                self._namer("scale-up"),
+                schedule=Schedule.cron(hour=str(GPU_END_HOUR - 1), minute=str(60 - BUFFER_FOR_SERVICE_SWITCH_MINUTES), week_day=DAY_OF_WEEK),
+                min_capacity=1,
+                max_capacity=1,
+                time_zone=TIME_ZONE,
+            )
+            asg.scale_on_schedule(
+                self._namer("scale-down"),
+                schedule=Schedule.cron(hour=str(GPU_START_HOUR), minute=str(BUFFER_FOR_SERVICE_SWITCH_MINUTES), week_day=DAY_OF_WEEK),
+                min_capacity=0,
+                max_capacity=0,
+                time_zone=TIME_ZONE,
+            )
+        return asg
+
+    def _get_container_definition(self, container_type: ECSServiceType, task_definition: Ec2TaskDefinition, container_port: int) -> ContainerDefinition:
         container: ContainerDefinition = task_definition.add_container(
-            self._namer("container"),
+            self._namer(f"container-{container_type.value}"),
             image=ContainerImage.from_asset(directory=CWD, file=DOCKER_FILE_NAME),
-            memory_limit_mib=4000,
             environment=self._search_service_settings.dict(),
             logging=LogDriver.aws_logs(stream_prefix=self._namer("log")),
-            gpu_count=0, # setting this to 0 so we can update the container as updates require 2 gpus during the overlap period.
-            cpu=1000, # 1024 = 1 vCPU
+            gpu_count=1 if container_type == ECSServiceType.GPU else 0,
+            memory_limit_mib=32000,
+            memory_reservation_mib=8000,
         )
         container.add_port_mappings(
             PortMapping(container_port=container_port),
         )
         return container
 
-    def _get_ec2_security_group(self, target_port: int) -> ec2.SecurityGroup:
+    def _get_ec2_security_group(self, service_type: ECSServiceType, target_port: int) -> ec2.SecurityGroup:
         target_sg: ec2.SecurityGroup = ec2.SecurityGroup(
             self,
-            self._namer("sg"),
+            self._namer(f"target-sg-{service_type.value}"),
             vpc=self.vpc,
             allow_all_outbound=True,
         )
@@ -256,7 +343,7 @@ class TaiSearchServiceStack(Stack):
 
     def _get_scalable_task(self, service: Ec2Service, target_group: ApplicationTargetGroup) -> ScalableTaskCount:
         scaling_task = service.auto_scale_task_count(
-            max_capacity=2,
+            max_capacity=1,
             min_capacity=1,
         )
         scaling_task.scale_on_cpu_utilization(
@@ -270,7 +357,7 @@ class TaiSearchServiceStack(Stack):
         )
         return scaling_task
 
-    def _get_target_group(self, service: Ec2Service, target_port: int, target_protocol: ApplicationProtocol) -> ApplicationTargetGroup:
+    def _get_target_group(self, services: list[Ec2Service], target_port: int, target_protocol: ApplicationProtocol) -> ApplicationTargetGroup:
         alb: ApplicationLoadBalancer = ApplicationLoadBalancer(
             self,
             self._namer("alb"),
@@ -286,6 +373,6 @@ class TaiSearchServiceStack(Stack):
             self._namer("target-group"),
             port=target_port,
             protocol=target_protocol,
-            targets=[service],
+            targets=services,
         )
         return target_group
