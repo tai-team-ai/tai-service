@@ -57,7 +57,7 @@ tai_api_config = StackConfigBaseModel(
     duplicate_stack_for_development=True,
     **BASE_SETTINGS,
 )
-TAI_API_SETTINGS.search_service_api_url = f"http://{search_service.service_url}"
+# TAI_API_SETTINGS.search_service_api_url = f"http://{search_service.service_url}"
 print(TAI_API_SETTINGS.search_service_api_url)
 tai_api: TaiApiStack = TaiApiStack(
     scope=app,
