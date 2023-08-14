@@ -10,6 +10,7 @@ from langchain import PromptTemplate
 from langchain.chat_models.base import BaseChatModel
 from langchain.chains.openai_functions.base import create_openai_fn_chain
 from loguru import logger
+import traceback
 # first imports are for local development, second imports are for deployment
 try:
     from .llm_functions import (
@@ -28,13 +29,13 @@ try:
         SUMMARIZER_SYSTEM_PROMPT,
         SUMMARIZER_USER_PROMPT,
         STUDENT_COMMON_QUESTIONS_SYSTEM_PROMPT,
-        HARD_CODED_CLASS_NAME,
         STUDENT_COMMON_DISCUSSION_TOPICS_SYSTEM_PROMPT,
         FINAL_STAGE_STUDENT_TOPIC_SUMMARY_SYSTEM_PROMPT,
         STEERING_PROMPT,
         ValidatedFormatString,
     )
 except (KeyError, ImportError):
+    print(traceback.format_exc())
     from routers.tai_schemas import ClassResourceSnippet
     from taibackend.taitutors.llm_functions import (
         get_relevant_class_resource_chunks,
@@ -51,7 +52,6 @@ except (KeyError, ImportError):
         SUMMARIZER_SYSTEM_PROMPT,
         SUMMARIZER_USER_PROMPT,
         STUDENT_COMMON_QUESTIONS_SYSTEM_PROMPT,
-        HARD_CODED_CLASS_NAME,
         STUDENT_COMMON_DISCUSSION_TOPICS_SYSTEM_PROMPT,
         FINAL_STAGE_STUDENT_TOPIC_SUMMARY_SYSTEM_PROMPT,
         STEERING_PROMPT,
@@ -96,10 +96,6 @@ class ChatOpenAIConfig(BaseModel):
         ...,
         description="The archive to use for archiving messages.",
     )
-    class_name: str = Field(
-        default=HARD_CODED_CLASS_NAME,
-        description="The name of the class that the llm is tutoring for.",
-    )
 
     class Config:
         """Define the pydantic config."""
@@ -132,7 +128,7 @@ class TaiLLM:
             **base_config,
         )
         self._archive = config.message_archive
-        self._class_name = config.class_name
+
 
     def add_tai_tutor_chat_response(
         self,
@@ -154,7 +150,7 @@ class TaiLLM:
         if relevant_chunks is not None and len(relevant_chunks) == 0:
             format_str = ValidatedFormatString(
                 format_string=STEERING_PROMPT,
-                kwargs={"class_name": self._class_name},
+                kwargs={"class_name": chat_session.class_name},
             )
             chat_session.append_chat_messages([TaiTutorMessage(
                 content=format_str.format(),
