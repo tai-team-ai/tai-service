@@ -97,14 +97,14 @@ class TaiSearchServiceStack(Stack):
         name_with_suffix = (search_service_settings.cold_store_bucket_name + config.stack_suffix)[:63]
         search_service_settings.doc_db_fully_qualified_domain_name = self.document_db.fully_qualified_domain_name
         search_service_settings.cold_store_bucket_name = name_with_suffix
-        self.search_services: list[Ec2Service] = self._get_search_services(self._security_group_for_connecting_to_doc_db)
+        # self.search_services: list[Ec2Service] = self._get_search_services(self._security_group_for_connecting_to_doc_db)
         self._cold_store_bucket: VersionedBucket = VersionedBucket.create_bucket(
             scope=self,
             bucket_name=search_service_settings.cold_store_bucket_name,
             public_read_access=True,
             permissions=Permissions.READ_WRITE,
             removal_policy=config.removal_policy,
-            role=[service.task_definition.task_role for service in self.search_services],
+            # role=[service.task_definition.task_role for service in self.search_services],
         )
         name_with_suffix = (search_service_settings.documents_to_index_queue + config.stack_suffix)[:63]
         search_service_settings.documents_to_index_queue = name_with_suffix
@@ -202,7 +202,7 @@ class TaiSearchServiceStack(Stack):
             self._namer(f"service-{service_type.value}"),
             cluster=cluster,
             task_definition=task_definition,
-            desired_count=1,
+            daemon=True,
             security_groups=[security_group, sg_for_connecting_to_db],
         )
         return service
