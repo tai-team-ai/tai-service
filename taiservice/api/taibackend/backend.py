@@ -101,9 +101,8 @@ class Backend:
         for chat in chat_session.chats:
             converted_chats.append(cls.to_backend_chat_message(chat))
         chat_session = BEChatSession(
-            id=chat_session.id,
-            class_id=chat_session.class_id,
             messages=converted_chats,
+            **chat_session.dict(exclude={"chats"}),
         )
         return chat_session
 
@@ -148,9 +147,8 @@ class Backend:
             if chat:
                 converted_chats.append(chat)
         chat_session = APIChatSession(
-            id=chat_session.id,
-            class_id=chat_session.class_id,
             chats=converted_chats,
+            **chat_session.dict(exclude={"messages"}),
         )
         return chat_session
 
@@ -226,7 +224,11 @@ class Backend:
         snippets = []
         tai_llm = TaiLLM(self._get_tai_llm_config(stream))
         student_msg = chat_session.last_student_message
-        prompt = BETaiProfile.get_system_prompt(name=student_msg.tai_tutor_name, technical_level=student_msg.technical_level)
+        prompt = BETaiProfile.get_system_prompt(
+            name=student_msg.tai_tutor_name,
+            technical_level=student_msg.technical_level,
+            class_id=chat_session.class_id,
+        )
         chat_session.insert_system_prompt(prompt)
         tai_llm.add_tai_tutor_chat_response(chat_session, snippets, ModelToUse=tai_llm.large_context_chat_model)
         chat_session.remove_system_prompt()

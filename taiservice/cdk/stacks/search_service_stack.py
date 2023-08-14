@@ -261,8 +261,8 @@ class TaiSearchServiceStack(Stack):
                 vpc=self.vpc,
                 instance_type=instance_type,
                 machine_image=deep_learning_ami,
-                max_capacity=1,
-                min_capacity=1,
+                max_capacity=0,
+                min_capacity=0,
                 # spot_price="0.35",
                 block_devices=block_devices,
             )

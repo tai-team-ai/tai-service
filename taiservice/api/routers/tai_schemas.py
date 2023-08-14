@@ -169,6 +169,18 @@ class BaseChatSession(BasePydanticModel):
         ...,
         description="The ID of the class that the chat session is for.",
     )
+    class_name: str = Field(
+        ...,
+        max_length=100,
+        min_length=1,
+        description="The name of the class that the chat session is for.",
+    )
+    course_description: str = Field(
+        ...,
+        max_length=400,
+        min_length=1,
+        description="The description of the course that the chat session is for.",
+    )
     chats: list[Chat] = Field(
         ...,
         description="The chat session message history.",
@@ -177,6 +189,8 @@ class BaseChatSession(BasePydanticModel):
 EXAMPLE_CHAT_SESSION_REQUEST = {
     "id": EXAMPLE_UUID,
     "classId": EXAMPLE_UUID,
+    "className": "Intro to Python",
+    "courseDescription": "Learn the basics of Python in a fun class.",
     "chats": [
         {
             "message": "I'm stuck on this problem about dummy pdfs.",

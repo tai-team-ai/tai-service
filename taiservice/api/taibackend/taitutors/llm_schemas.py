@@ -184,6 +184,18 @@ class TaiChatSession(BasePydanticModel):
         ...,
         description="The class ID to which this chat session belongs.",
     )
+    class_name: str = Field(
+        ...,
+        max_length=100,
+        min_length=1,
+        description="The name of the class that the chat session is for.",
+    )
+    course_description: str = Field(
+        ...,
+        max_length=400,
+        min_length=1,
+        description="The description of the course that the chat session is for.",
+    )
     messages: list[BaseMessage] = Field(
         default_factory=list,
         description="The messages in the chat session.",
@@ -282,9 +294,6 @@ class ValidatedFormatString(BasePydanticModel):
         return self.format_string.format(**self.kwargs)
 
 
-HARD_CODED_CLASS_NAME = "MECH320, Statics Engineering"
-
-
 MARKDOWN_PROMPT = """\
 Respond in markdown format with inline LaTeX support using these delimiters:
     inline: $...$ or $$...$$
@@ -350,10 +359,10 @@ Please condense this list by grouping by topic, using 'and' where necessary to c
 
 
 STEERING_PROMPT = """\
-Thought: I don't know anything about what the user is asking because I am a tutor for {class_name}. \
+Thought: I don't know anything about what the user is asking because I am a tutor for '{class_name}'. \
 I must be honest with the student and tell them that I don't know about that concept \
-and suggest that they check out Google for info or reach \
-out to their Instructor or TA\
+because it is not related to '{class_name}' and I should suggest that they use Google to find more info or instruct them to ask \
+their Instructor or TA for further help.\
 """
 
 BASE_SYSTEM_MESSAGE = f"""\
@@ -436,7 +445,7 @@ class TaiProfile(BasePydanticModel):
             raise ValueError(f"Invalid tutor name {name}.")
 
     @staticmethod
-    def get_system_prompt(name: TaiTutorName, technical_level: ResponseTechnicalLevel) -> str:
+    def get_system_prompt(name: TaiTutorName, technical_level: ResponseTechnicalLevel, class_name: str) -> str:
         """Get the system prompt for the given name."""
         tai_profile = TaiProfile.get_profile(name)
         technical_level_str = RESPONSE_TECHNICAL_LEVEL_MAPPING[technical_level]
@@ -444,7 +453,7 @@ class TaiProfile(BasePydanticModel):
             format_string=BASE_SYSTEM_MESSAGE,
             kwargs={
                 "technical_level": technical_level_str,
-                "class_name": HARD_CODED_CLASS_NAME,
+                "class_name": class_name,
                 **tai_profile.dict(),
             },
         )
