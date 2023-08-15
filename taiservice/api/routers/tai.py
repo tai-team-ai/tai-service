@@ -39,7 +39,7 @@ def search(search_query: ResourceSearchQuery, request: Request):
 
 
 @ROUTER.post("/search-summary")
-def search(search_query: ResourceSearchQuery, request: Request) -> str:
+def search_summary(search_query: ResourceSearchQuery, request: Request) -> str:
     """Define the search endpoint."""
     backend: Backend = getattr(request.app.state, BACKEND_ATTRIBUTE_NAME)
     return backend.search(search_query, result_type="summary")
