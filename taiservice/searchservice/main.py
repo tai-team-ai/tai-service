@@ -13,7 +13,7 @@ from .routers import (
     frequently_accessed_resources,
 )
 
-TITLE = "T.A.I. Service"
+TITLE = "T.A.I. Service!"
 DESCRIPTION = "A service for the T.A.I. project."
 
 ROUTER = APIRouter()

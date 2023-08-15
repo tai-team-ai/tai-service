@@ -1,6 +1,7 @@
 """Define the schemas for the TAI endpoints."""
 from enum import Enum
 import copy
+from textwrap import dedent
 from uuid import uuid4, UUID
 from typing import Optional, Union
 
@@ -62,6 +63,19 @@ class ClassResourceSnippet(BaseClassResource):
         default=0.0,
         description="The relevance score of the class resource snippet.",
     )
+
+    @property
+    def simplified_string(self) -> str:
+        """Return the simplified schema."""
+        simplified_schema = dedent(f"""\
+        Title:
+            {self.metadata.title}
+        Resource Snippet:
+            {self.resource_snippet}
+        Resource Type:
+            {self.metadata.resource_type}
+        """)
+        return str(simplified_schema)
 
 
 class Chat(BasePydanticModel):
@@ -175,7 +189,7 @@ class BaseChatSession(BasePydanticModel):
         min_length=1,
         description="The name of the class that the chat session is for.",
     )
-    course_description: str = Field(
+    class_description: str = Field(
         ...,
         max_length=400,
         min_length=1,

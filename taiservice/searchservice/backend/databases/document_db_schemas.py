@@ -105,16 +105,6 @@ class ClassResourceChunkDocument(BaseClassResourceDocument):
         description="The metadata of the class resource chunk.",
     )
 
-    @property
-    def simplified_string(self) -> str:
-        """Return the simplified schema."""
-        simplified_schema = {
-            "title": self.metadata.title,
-            "chunk": self.chunk,
-            "resource_type": self.metadata.resource_type,
-        }
-        return str(simplified_schema)
-
     @staticmethod
     def _ensure_same_class_id(metadata_class_id: UUID, class_id: UUID) -> None:
         """Ensure the same class id."""

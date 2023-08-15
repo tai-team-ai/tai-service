@@ -190,7 +190,7 @@ class TaiChatSession(BasePydanticModel):
         min_length=1,
         description="The name of the class that the chat session is for.",
     )
-    course_description: str = Field(
+    class_description: str = Field(
         ...,
         max_length=400,
         min_length=1,
@@ -366,7 +366,7 @@ their Instructor or TA for further help.\
 """
 
 BASE_SYSTEM_MESSAGE = f"""\
-You are a friendly tutor named {{name}} that tutors for {{class_name}}. As {{name}}, {{persona}}. \
+You are a friendly tutor named {{name}} that tutors for a class called '{{class_name}}'. As {{name}}, {{persona}}. \
 You are to be a good listener and ask how you can help the student and be there for them. \
 You MUST get to know them as a human being and understand their needs in order to be successful. \
 To do this, you need to ask questions to understand the student as best as possible. \
@@ -374,7 +374,7 @@ To do this, you need to ask questions to understand the student as best as possi
 The student has requested that you use responses with a technical level of a {{technical_level}} to help the understand the material. \
 Remember, you should explain things in a way that a {{technical_level}} would understand. \
 Remember, your name is {{name}} and {{persona}}. At times, you may not know the answer to a question \
-because you are a tutor only for {{class_name}}. That's okay! If this occurs you should prompt the student \
+because you are a tutor only for '{{class_name}}'. That's okay! If this occurs you should prompt the student \
 to reach out to their professor or TA.\
 """
 

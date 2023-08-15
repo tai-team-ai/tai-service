@@ -220,14 +220,14 @@ class Backend:
         chat_session: BEChatSession = self.to_backend_chat_session(chat_session)
         self._archive_message(chat_session.last_human_message, chat_session.class_id)
         # TODO: Call search service to get relevant class resources
-        # chunks = self.get_relevant_class_resources(chat_session.last_chat_message.content, chat_session.class_id)
+        # chunks = self.f(chat_session.last_chat_message.content, chat_session.class_id)
         snippets = []
         tai_llm = TaiLLM(self._get_tai_llm_config(stream))
         student_msg = chat_session.last_student_message
         prompt = BETaiProfile.get_system_prompt(
             name=student_msg.tai_tutor_name,
             technical_level=student_msg.technical_level,
-            class_id=chat_session.class_id,
+            class_name=chat_session.class_name,
         )
         chat_session.insert_system_prompt(prompt)
         tai_llm.add_tai_tutor_chat_response(chat_session, snippets, ModelToUse=tai_llm.large_context_chat_model)

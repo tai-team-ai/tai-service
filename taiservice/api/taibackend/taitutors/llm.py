@@ -18,6 +18,7 @@ try:
         save_student_conversation_topics,
         save_student_questions,
     )
+    # TODO need to create a separate backend schema for the resources snippet and not use the api def.
     from ...routers.tai_schemas import ClassResourceSnippet
     from ..databases.archiver import Archive
     from .llm_schemas import (
@@ -166,7 +167,7 @@ class TaiLLM:
             llm_kwargs = chain.llm_kwargs
         # function_to_call = {'name': function_to_call.__name__} if function_to_call else "none"
         # llm_kwargs['function_call'] = function_to_call
-        # langchain does the above line for us, but it's left here for reference
+        # IMPORTANT: langchain does the above line for us, but it's left here for reference
         self._append_model_response(chat_session, chunks=relevant_chunks, ModelToUse=ModelToUse, **llm_kwargs)
 
     def create_search_result_summary_snippet(
