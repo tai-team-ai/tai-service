@@ -349,8 +349,8 @@ class TaiSearchServiceStack(Stack):
             environment=self._search_service_settings.dict(),
             logging=LogDriver.aws_logs(stream_prefix=self._namer("log")),
             gpu_count=0,
-            memory_limit_mib=32000,
-            memory_reservation_mib=8000,
+            memory_limit_mib=32000, # instance memory is only 16GB, this will force containers to fight for memory
+            memory_reservation_mib=4000,
         )
         container.add_port_mappings(
             PortMapping(container_port=container_port),
