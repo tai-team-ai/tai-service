@@ -299,16 +299,21 @@ EXAMPLE_SEARCH_QUERY = {
         ],
     },
 }
-EXAMPLE_SEARCH_ANSWER = copy.deepcopy(EXAMPLE_SEARCH_QUERY)
+EXAMPLE_BASE_SEARCH_RESPONSE = copy.deepcopy(EXAMPLE_SEARCH_QUERY)
+EXAMPLE_BASE_SEARCH_RESPONSE.update(
+    {
+        "suggestedResources": [
+            copy.deepcopy(EXAMPLE_CLASS_RESOURCE_SNIPPET),
+        ],
+        "otherResources": [
+            copy.deepcopy(EXAMPLE_CLASS_RESOURCE_SNIPPET),
+        ],
+    }
+)
+EXAMPLE_SEARCH_ANSWER = copy.deepcopy(EXAMPLE_BASE_SEARCH_RESPONSE)
 EXAMPLE_SEARCH_ANSWER.update(
     {
         "summary_snippet": "Python is a programming language.",
-        "suggested_resources": [
-            copy.deepcopy(EXAMPLE_CLASS_RESOURCE_SNIPPET),
-        ],
-        "other_resources": [
-            copy.deepcopy(EXAMPLE_CLASS_RESOURCE_SNIPPET),
-        ],
     }
 )
 
@@ -345,12 +350,9 @@ class ResourceSearchQuery(BasePydanticModel):
             "example": EXAMPLE_SEARCH_QUERY,
         }
 
-class ResourceSearchAnswer(ResourceSearchQuery):
+
+class SearchResults(ResourceSearchQuery):
     """Define the response model for the search endpoint."""
-    summary_snippet: str = Field(
-        ...,
-        description="The summary snippet of the search results.",
-    )
     suggested_resources: list[ClassResourceSnippet] = Field(
         ...,
         description="The suggested resources that should appear at the top of the search results.",
@@ -358,6 +360,20 @@ class ResourceSearchAnswer(ResourceSearchQuery):
     other_resources: list[ClassResourceSnippet] = Field(
         ...,
         description="The other resources. These can be grouped by class resource type.",
+    )
+
+    class Config:
+        """Define the configuration for the search response."""
+        schema_extra = {
+            "example": EXAMPLE_BASE_SEARCH_RESPONSE,
+        }
+
+
+class SearchAnswer(SearchResults):
+    """Define the response model for the search endpoint."""
+    summary_snippet: str = Field(
+        ...,
+        description="The summary snippet of the search results.",
     )
 
     class Config:

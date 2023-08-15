@@ -41,7 +41,7 @@ try:
         TaiTutorChat as APITaiTutorChat,
         FunctionChat as APIFunctionChat,
         ResourceSearchQuery,
-        ResourceSearchAnswer,
+        SearchAnswer,
     )
 except (KeyError, ImportError):
     from taibackend.errors import DuplicateResourceError
@@ -76,7 +76,7 @@ except (KeyError, ImportError):
         TaiTutorChat as APITaiTutorChat,
         FunctionChat as APIFunctionChat,
         ResourceSearchQuery,
-        ResourceSearchAnswer,
+        SearchAnswer,
     )
 
 
@@ -220,7 +220,7 @@ class Backend:
         chat_session: BEChatSession = self.to_backend_chat_session(chat_session)
         self._archive_message(chat_session.last_human_message, chat_session.class_id)
         # TODO: Call search service to get relevant class resources
-        # chunks = self.f(chat_session.last_chat_message.content, chat_session.class_id)
+        # chunks = self.get_relevant_class_resources(chat_session.last_chat_message.content, chat_session.class_id)
         snippets = []
         tai_llm = TaiLLM(self._get_tai_llm_config(stream))
         student_msg = chat_session.last_student_message
@@ -236,7 +236,7 @@ class Backend:
         return self.to_api_chat_session(chat_session)
 
     # TODO: Add a test to verify the archive method is called
-    def search(self, query: ResourceSearchQuery) -> ResourceSearchAnswer:
+    def search(self, query: ResourceSearchQuery) -> SearchAnswer:
         """Search for class resources."""
         student_message = BEStudentMessage(content=query.query)
         self._archive_message(student_message, query.class_id)
@@ -247,7 +247,7 @@ class Backend:
         if snippets:
             tai_llm = TaiLLM(self._get_tai_llm_config())
             snippet = tai_llm.create_search_result_summary_snippet(query.class_id, query.query, snippets)
-        search_answer = ResourceSearchAnswer(
+        search_answer = SearchAnswer(
             summary_snippet=snippet,
             suggested_resources=snippets,
             other_resources=[],
