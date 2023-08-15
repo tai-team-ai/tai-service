@@ -22,6 +22,7 @@ try:
     from ...routers.tai_schemas import ClassResourceSnippet
     from ..databases.archiver import Archive
     from .llm_schemas import (
+        BaseLLMChatSession,
         TaiChatSession,
         TaiTutorMessage,
         SearchQuery,
@@ -46,6 +47,7 @@ except (KeyError, ImportError):
     )
     from taibackend.databases.archiver import Archive
     from taibackend.taitutors.llm_schemas import (
+        BaseLLMChatSession,
         TaiChatSession,
         TaiTutorMessage,
         SearchQuery,
@@ -135,10 +137,8 @@ class TaiLLM:
 
     def add_tai_tutor_chat_response(
         self,
-        chat_session: TaiChatSession,
+        chat_session: BaseLLMChatSession,
         relevant_chunks: Optional[list[ClassResourceSnippet]] = None,
-        function_to_call: Optional[callable] = None,
-        functions: Optional[list[callable]] = None,
         ModelToUse: Optional[BaseChatModel] = None,
         return_without_system_prompt: bool = True,
     ) -> None:
@@ -150,35 +150,11 @@ class TaiLLM:
             class_name=chat_session.class_name,
         )
         chat_session.insert_system_prompt(prompt)
-        llm_kwargs ={}
-        if relevant_chunks:
-            self._append_synthetic_function_call_to_chat(
-                chat_session,
-                function_to_call=get_relevant_class_resource_chunks,
-                function_kwargs={'student_message': chat_session.last_student_message.content},
-                relevant_chunks=relevant_chunks,
-            )
-        if relevant_chunks is not None and len(relevant_chunks) == 0:
-            format_str = ValidatedFormatString(
-                format_string=STEERING_PROMPT,
-                kwargs={"class_name": chat_session.class_name},
-            )
-            chat_session.append_chat_messages([TaiTutorMessage(
-                content=format_str.format(),
-                render_chat=False,
-            )])
-        if function_to_call:
-            assert functions, "Must provide functions if function_to_call is provided."
-            chain = create_openai_fn_chain(
-                functions=[function_to_call],
-                llm=self.large_context_chat_model,
-                prompt=PromptTemplate(input_variables=[], template=""),
-            )
-            llm_kwargs = chain.llm_kwargs
-        # function_to_call = {'name': function_to_call.__name__} if function_to_call else "none"
-        # llm_kwargs['function_call'] = function_to_call
-        # IMPORTANT: langchain does the above line for us, but it's left here for reference
-        self._append_model_response(chat_session, chunks=relevant_chunks, ModelToUse=ModelToUse, **llm_kwargs)
+        self._add_tai_tutor_chat_response(
+            chat_session,
+            relevant_chunks=relevant_chunks,
+            ModelToUse=ModelToUse,
+        )
         if return_without_system_prompt:
             chat_session.remove_system_prompt()
 
@@ -191,7 +167,7 @@ class TaiLLM:
         """Create a snippet of the search result summary."""
         if not chunks:
             return ""
-        session: TaiChatSession = TaiChatSession.from_message(
+        session: BaseLLMChatSession = BaseLLMChatSession.from_message(
             SearchQuery(content=search_query),
             class_id=class_id,
         )
@@ -205,18 +181,18 @@ class TaiLLM:
             name="get_search_results_for_query",
         )])
         session.insert_system_prompt(SUMMARIZER_SYSTEM_PROMPT)
-        self.add_tai_tutor_chat_response(session)
+        self._append_model_response(session)
         return session.last_chat_message.content
 
     def summarize_student_messages(self, messages: list[str], as_questions: bool = False) -> list[str]:
         """Summarize the student messages."""
         def get_summaries(messages: list[str], system_prompt: str, function: callable, ModelToUse: BaseChatModel = None) -> list[str]:
-            session: TaiChatSession = TaiChatSession.from_message(
+            session: BaseLLMChatSession = BaseLLMChatSession.from_message(
                 SearchQuery(content="\n".join(messages)),
                 class_id=uuid4(),
             )
             session.insert_system_prompt(system_prompt)
-            self.add_tai_tutor_chat_response(
+            self._add_tai_tutor_chat_response(
                 session,
                 function_to_call=function,
                 functions=[function],
@@ -247,9 +223,48 @@ class TaiLLM:
             )
         return summaries
 
+    def _add_tai_tutor_chat_response(
+        self,
+        chat_session: BaseLLMChatSession,
+        relevant_chunks: Optional[list[ClassResourceSnippet]] = None,
+        function_to_call: Optional[callable] = None,
+        functions: Optional[list[callable]] = None,
+        ModelToUse: Optional[BaseChatModel] = None,
+    ) -> None:
+        """Get the response from the LLM."""
+        llm_kwargs ={}
+        if relevant_chunks:
+            self._append_synthetic_function_call_to_chat(
+                chat_session,
+                function_to_call=get_relevant_class_resource_chunks,
+                function_kwargs={'student_message': chat_session.last_student_message.content},
+                relevant_chunks=relevant_chunks,
+            )
+        if relevant_chunks is not None and len(relevant_chunks) == 0:
+            format_str = ValidatedFormatString(
+                format_string=STEERING_PROMPT,
+                kwargs={"class_name": chat_session.class_name},
+            )
+            chat_session.append_chat_messages([TaiTutorMessage(
+                content=format_str.format(),
+                render_chat=False,
+            )])
+        if function_to_call:
+            assert functions, "Must provide functions if function_to_call is provided."
+            chain = create_openai_fn_chain(
+                functions=[function_to_call],
+                llm=self.large_context_chat_model,
+                prompt=PromptTemplate(input_variables=[], template=""),
+            )
+            llm_kwargs = chain.llm_kwargs
+        # function_to_call = {'name': function_to_call.__name__} if function_to_call else "none"
+        # llm_kwargs['function_call'] = function_to_call
+        # IMPORTANT: langchain does the above line for us, but it's left here for reference
+        self._append_model_response(chat_session, chunks=relevant_chunks, ModelToUse=ModelToUse, **llm_kwargs)
+
     def _append_model_response(
         self,
-        chat_session: TaiChatSession,
+        chat_session: BaseLLMChatSession,
         chunks: list[ClassResourceSnippet] = None,
         ModelToUse: Optional[BaseChatModel] = None,
         **kwargs: Dict[str, Any],

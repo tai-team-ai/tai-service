@@ -223,12 +223,13 @@ class Backend:
             class_id=chat_session.class_id,
             query=chat_session.last_student_message.content,
         )
-        search_results = self._get_search_results(search_query, 'tutor_search')
+        search_results = self._get_search_results(search_query, "tutor-search")
         tai_llm = TaiLLM(self._get_tai_llm_config(stream))
         tai_llm.add_tai_tutor_chat_response(chat_session, search_results.suggested_resources, ModelToUse=tai_llm.large_context_chat_model)
         return self.to_api_chat_session(chat_session)
 
     # TODO: Add a test to verify the archive method is called
+    # TODO: need to refactor this so it doesn't use the api layer sshema
     def search(self, query: ResourceSearchQuery, result_type: Literal['summary', 'results']) -> Union[SearchResults, str]:
         """Search for class resources."""
         student_message = BEStudentMessage(content=query.query)
@@ -238,16 +239,20 @@ class Backend:
             class_id=query.class_id,
             query=query.query,
         )
-        search_results = self._get_search_results(search_query, 'search_engine')
+        search_results = self._get_search_results(search_query, "search-engine")
         if search_results and result_type == 'summary':
             tai_llm = TaiLLM(self._get_tai_llm_config())
-            snippet = tai_llm.create_search_result_summary_snippet(query.class_id, query.query, search_results.suggested_resources)
+            snippet = tai_llm.create_search_result_summary_snippet(
+                class_id=search_query.class_id,
+                search_query=search_query.query,
+                chunks=search_results.suggested_resources
+            )
             return snippet
         return search_results
 
     def create_class_resources(self, class_resources: ClassResources) -> requests.Response:
         """Create a list of class resources."""
-        url = f"{self._runtime_settings.search_service_api_url}/class_resources"
+        url = f"{self._runtime_settings.search_service_api_url}/class-resources"
         response = requests.post(url, data=class_resources.json(), timeout=30)
         if response.status_code != 200:
             error_message = f"Failed to create class resources. Status code: {response.status_code}"
@@ -257,7 +262,7 @@ class Backend:
 
     def get_class_resources(self, ids: list[UUID], from_class_ids: bool = False) -> list[ClassResource]:
         """Get the class resources."""
-        url = f"{self._runtime_settings.search_service_api_url}/class_resources"
+        url = f"{self._runtime_settings.search_service_api_url}/class-resources"
         logger.info(f"Getting class resources from {url}")
         params = {
             'ids': ids,
@@ -282,7 +287,7 @@ class Backend:
         class_id: UUID,
     ) -> APIFrequentlyAccessedResources:
         """Get the most frequently accessed class resources from the tai search service."""
-        url = f"{self._runtime_settings.search_service_api_url}/frequently_accessed_resources/{class_id}"
+        url = f"{self._runtime_settings.search_service_api_url}/frequently-accessed-resources/{class_id}"
         response = requests.get(url, timeout=4)
         if response.status_code == 200:
             try:
