@@ -20,7 +20,7 @@ from taiservice.api.taibackend.taitutors.llm_schemas import (
 )
 from taiservice.api.routers.class_resources_schema import ClassResource, ClassResourceType
 from taiservice.searchservice.backend.databases.document_db_schemas import ClassResourceChunkDocument, ClassResourceDocument
-from taiservice.searchservice.backend.indexer.data_ingestor_schema import InputDocument
+from taiservice.searchservice.backend.tai_search.data_ingestor_schema import InputDocument
 
 def get_valid_metadata_dict():
     """Get a valid metadata dictionary"""

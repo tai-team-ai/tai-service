@@ -11,6 +11,7 @@ from .runtime_settings import SearchServiceSettings, BACKEND_ATTRIBUTE_NAME
 from .routers import (
     class_resources,
     frequently_accessed_resources,
+    search,
 )
 
 TITLE = "T.A.I. Service!"
@@ -24,6 +25,7 @@ ROUTERS = [
     ROUTER,
     class_resources.ROUTER,
     frequently_accessed_resources.ROUTER,
+    search.ROUTER,
 ]
 
 def create_app() -> FastAPI:

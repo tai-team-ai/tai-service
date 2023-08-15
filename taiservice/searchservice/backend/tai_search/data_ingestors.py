@@ -1,4 +1,4 @@
-"""Define data ingestors used by the indexer."""
+"""Define data ingestors used by the tai_search."""
 from typing import Callable, Optional, Union, Any
 from abc import ABC, abstractmethod
 from uuid import uuid4
@@ -35,7 +35,7 @@ try:
     from .resource_utilities import ResourceUtility, PDF, HTML
     from ..databases.document_db_schemas import ClassResourceChunkDocument
 except ImportError:
-    from taibackend.indexer.data_ingestor_schema import (
+    from taibackend.tai_search.data_ingestor_schema import (
         IngestedDocument,
         LatexExtension,
         MarkdownExtension,
@@ -48,7 +48,7 @@ except ImportError:
         InputFormat,
         InputDataIngestStrategy,
     )
-    from taibackend.indexer.resource_utilities import ResourceUtility, PDF, HTML
+    from taibackend.tai_search.resource_utilities import ResourceUtility, PDF, HTML
     from taibackend.databases.document_db_schemas import ClassResourceChunkDocument
 
 def number_tokens(text: str) -> int:

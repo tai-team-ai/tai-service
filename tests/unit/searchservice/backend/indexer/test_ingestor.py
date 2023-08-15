@@ -8,7 +8,7 @@ from taiservice.searchservice.backend.databases.document_db_schemas import (
 from taiservice.searchservice.backend.shared_schemas import (
     ClassResourceType,
 )
-from taiservice.searchservice.backend.indexer.data_ingestor_schema import(
+from taiservice.searchservice.backend.tai_search.data_ingestor_schema import(
     IngestedDocument,
     LoadingStrategy,
     InputFormat,

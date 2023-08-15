@@ -325,7 +325,8 @@ class SearchFilters(BasePydanticModel):
         description="The resource types to filter by.",
     )
 
-class ResourceSearchQuery(BasePydanticModel):
+
+class SearchQuery(BasePydanticModel):
     """Define the request model for the search endpoint."""
     id: UUID = Field(
         default_factory=uuid4,
@@ -339,6 +340,11 @@ class ResourceSearchQuery(BasePydanticModel):
         ...,
         description="The search query from the student.",
     )
+
+
+class ResourceSearchQuery(SearchQuery):
+    """Define the request model for the resource search endpoint."""
+
     filters: SearchFilters = Field(
         default_factory=SearchFilters,
         description="The search filters.",

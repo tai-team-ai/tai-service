@@ -9,6 +9,7 @@ from taiservice.api.routers.tai import (
 from taiservice.api.routers.tai_schemas import (
     ChatSessionRequest,
     ChatSessionResponse,
+    SearchQuery,
     ResourceSearchQuery,
     SearchResults,
     SearchAnswer,
@@ -34,6 +35,14 @@ def test_chat_session_response_example_schemas():
     example_schema = ChatSessionResponse.Config.schema_extra["example"]
     try:
         ChatSessionResponse(**example_schema)
+    except ValidationError as e:
+        pytest.fail(f"Failed to validate example schema: {example_schema}. Error: {str(e)}")
+
+def test_search_query_example_schemas():
+    """Test that the example schemas for the SearchQuery model are valid."""
+    example_schema = SearchQuery.Config.schema_extra["example"]
+    try:
+        SearchQuery.parse_obj(example_schema)
     except ValidationError as e:
         pytest.fail(f"Failed to validate example schema: {example_schema}. Error: {str(e)}")
 

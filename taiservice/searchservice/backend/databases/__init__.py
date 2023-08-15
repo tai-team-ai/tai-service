@@ -1,1 +1,1 @@
-"""Define the indexer subpackage."""
+"""Define the tai_search subpackage."""

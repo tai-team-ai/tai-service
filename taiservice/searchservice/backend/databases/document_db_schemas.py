@@ -4,23 +4,13 @@ from typing import Optional
 from uuid import UUID
 from uuid import uuid4
 from pydantic import Field, HttpUrl, validator
-# first imports are for local development, second imports are for deployment
-try:
-    from ..shared_schemas import (
-        ChunkMetadata,
-        Metadata,
-        BaseClassResourceDocument,
-        StatefulClassResourceDocument,
-    )
-    from ..indexer.data_ingestor_schema import IngestedDocument
-except ImportError:
-    from taibackend.shared_schemas import (
-        ChunkMetadata,
-        Metadata,
-        BaseClassResourceDocument,
-        StatefulClassResourceDocument,
-    )
-    from taibackend.indexer.data_ingestor_schema import IngestedDocument
+from ..shared_schemas import (
+    ChunkMetadata,
+    Metadata,
+    BaseClassResourceDocument,
+    StatefulClassResourceDocument,
+)
+from ..tai_search.data_ingestor_schema import IngestedDocument
 
 
 class ClassResourceProcessingStatus(str, Enum):
