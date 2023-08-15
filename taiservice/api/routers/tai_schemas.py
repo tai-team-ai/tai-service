@@ -204,7 +204,7 @@ EXAMPLE_CHAT_SESSION_REQUEST = {
     "id": EXAMPLE_UUID,
     "classId": EXAMPLE_UUID,
     "className": "Intro to Python",
-    "courseDescription": "Learn the basics of Python in a fun class.",
+    "classDescription": "Learn the basics of Python in a fun class.",
     "chats": [
         {
             "message": "I'm stuck on this problem about dummy pdfs.",
@@ -293,12 +293,17 @@ class ChatSessionResponse(BaseChatSession):
 EXAMPLE_SEARCH_QUERY = {
     "classId": EXAMPLE_UUID,
     "query": "dummy pdf",
-    "filters": {
-        "resourceTypes": [
-            ClassResourceType.TEXTBOOK,
-        ],
-    },
 }
+EXAMPLE_RESOURCE_SEARCH_QUERY = copy.deepcopy(EXAMPLE_SEARCH_QUERY)
+EXAMPLE_RESOURCE_SEARCH_QUERY.update(
+    {
+        "filters": {
+            "resourceTypes": [
+                ClassResourceType.TEXTBOOK,
+            ],
+        },
+    }
+)
 EXAMPLE_BASE_SEARCH_RESPONSE = copy.deepcopy(EXAMPLE_SEARCH_QUERY)
 EXAMPLE_BASE_SEARCH_RESPONSE.update(
     {
@@ -341,6 +346,12 @@ class SearchQuery(BasePydanticModel):
         description="The search query from the student.",
     )
 
+    class Config:
+        """Define the configuration for the search query."""
+        schema_extra = {
+            "example": EXAMPLE_SEARCH_QUERY,
+        }
+
 
 class ResourceSearchQuery(SearchQuery):
     """Define the request model for the resource search endpoint."""
@@ -353,7 +364,7 @@ class ResourceSearchQuery(SearchQuery):
     class Config:
         """Define the configuration for the search query."""
         schema_extra = {
-            "example": EXAMPLE_SEARCH_QUERY,
+            "example": EXAMPLE_RESOURCE_SEARCH_QUERY,
         }
 
 
@@ -372,18 +383,4 @@ class SearchResults(ResourceSearchQuery):
         """Define the configuration for the search response."""
         schema_extra = {
             "example": EXAMPLE_BASE_SEARCH_RESPONSE,
-        }
-
-
-class SearchAnswer(SearchResults):
-    """Define the response model for the search endpoint."""
-    summary_snippet: str = Field(
-        ...,
-        description="The summary snippet of the search results.",
-    )
-
-    class Config:
-        """Define the configuration for the search answer."""
-        schema_extra = {
-            "example": EXAMPLE_SEARCH_ANSWER,
         }

@@ -3,7 +3,7 @@ import json
 import traceback
 from datetime import datetime, date, timedelta
 from uuid import UUID
-from typing import Union, Any, Optional
+from typing import Literal, Union, Any, Optional
 import requests
 from loguru import logger
 import boto3
@@ -30,7 +30,6 @@ try:
         TaiChatSession as BEChatSession,
         FunctionMessage as BEFunctionMessage,
         SystemMessage as BESystemMessage,
-        TaiProfile as BETaiProfile,
     )
     from ..runtime_settings import TaiApiSettings
     from ..routers.class_resources_schema import ClassResource, ClassResources
@@ -41,7 +40,8 @@ try:
         TaiTutorChat as APITaiTutorChat,
         FunctionChat as APIFunctionChat,
         ResourceSearchQuery,
-        SearchAnswer,
+        SearchQuery,
+        SearchResults,
     )
 except (KeyError, ImportError):
     from taibackend.errors import DuplicateResourceError
@@ -59,7 +59,6 @@ except (KeyError, ImportError):
         TaiChatSession as BEChatSession,
         FunctionMessage as BEFunctionMessage,
         SystemMessage as BESystemMessage,
-        TaiProfile as BETaiProfile,
     )
     from runtime_settings import TaiApiSettings
     from routers.common_resources_schema import (
@@ -76,7 +75,8 @@ except (KeyError, ImportError):
         TaiTutorChat as APITaiTutorChat,
         FunctionChat as APIFunctionChat,
         ResourceSearchQuery,
-        SearchAnswer,
+        SearchQuery,
+        SearchResults,
     )
 
 
@@ -213,47 +213,37 @@ class Backend:
             )
         return api_questions
 
-
     # TODO: Add a test to verify the archive method is called
     def get_tai_response(self, chat_session: APIChatSession, stream: bool=False) -> APIChatSession:
         """Get and add the tai tutor response to the chat session."""
         chat_session: BEChatSession = self.to_backend_chat_session(chat_session)
         self._archive_message(chat_session.last_human_message, chat_session.class_id)
-        # TODO: Call search service to get relevant class resources
-        # chunks = self.get_relevant_class_resources(chat_session.last_chat_message.content, chat_session.class_id)
-        snippets = []
-        tai_llm = TaiLLM(self._get_tai_llm_config(stream))
-        student_msg = chat_session.last_student_message
-        prompt = BETaiProfile.get_system_prompt(
-            name=student_msg.tai_tutor_name,
-            technical_level=student_msg.technical_level,
-            class_name=chat_session.class_name,
+        search_query = SearchQuery(
+            id=chat_session.id,
+            class_id=chat_session.class_id,
+            query=chat_session.last_student_message.content,
         )
-        chat_session.insert_system_prompt(prompt)
-        tai_llm.add_tai_tutor_chat_response(chat_session, snippets, ModelToUse=tai_llm.large_context_chat_model)
-        chat_session.remove_system_prompt()
-        logger.info(chat_session.dict())
+        search_results = self._get_search_results(search_query, 'tutor_search')
+        tai_llm = TaiLLM(self._get_tai_llm_config(stream))
+        tai_llm.add_tai_tutor_chat_response(chat_session, search_results.suggested_resources, ModelToUse=tai_llm.large_context_chat_model)
         return self.to_api_chat_session(chat_session)
 
     # TODO: Add a test to verify the archive method is called
-    def search(self, query: ResourceSearchQuery) -> SearchAnswer:
+    def search(self, query: ResourceSearchQuery, result_type: Literal['summary', 'results']) -> Union[SearchResults, str]:
         """Search for class resources."""
         student_message = BEStudentMessage(content=query.query)
         self._archive_message(student_message, query.class_id)
-        # TODO: Call search service to get relevant class resources
-        # snippets = self.get_relevant_class_resources(query.query, query.class_id, is_search=True)
-        snippets = []
-        snippet = ""
-        if snippets:
-            tai_llm = TaiLLM(self._get_tai_llm_config())
-            snippet = tai_llm.create_search_result_summary_snippet(query.class_id, query.query, snippets)
-        search_answer = SearchAnswer(
-            summary_snippet=snippet,
-            suggested_resources=snippets,
-            other_resources=[],
-            **query.dict(),
+        search_query = SearchQuery(
+            id=query.id,
+            class_id=query.class_id,
+            query=query.query,
         )
-        return search_answer
+        search_results = self._get_search_results(search_query, 'search_engine')
+        if search_results and result_type == 'summary':
+            tai_llm = TaiLLM(self._get_tai_llm_config())
+            snippet = tai_llm.create_search_result_summary_snippet(query.class_id, query.query, search_results.suggested_resources)
+            return snippet
+        return search_results
 
     def create_class_resources(self, class_resources: ClassResources) -> requests.Response:
         """Create a list of class resources."""
@@ -312,6 +302,18 @@ class Backend:
     def delete_class_resources(self, ids: list[UUID]) -> None:
         """Delete a list of class resources."""
         pass #TODO call new tai search service
+
+    def _get_search_results(self, query: ResourceSearchQuery, endpoint_name: str) -> SearchResults:
+        url = f"{self._runtime_settings.search_service_api_url}/{endpoint_name}"
+        response = requests.post(url, data=query.json(), timeout=10)
+        logger.info(f"Search response status code: {response.status_code}")
+        if response.status_code == 200:
+            try:
+                data = response.json()
+                return SearchResults(**data)
+            except Exception as e: # pylint: disable=broad-except
+                RuntimeError(f"Failed to parse class resources. Exception: {e}")
+        RuntimeError(f"Failed to retrieve class resources. Status code: {response.status_code}")
 
     def _archive_message(self, message: BEBaseMessage, class_id: UUID) -> None:
         """Archive the message."""

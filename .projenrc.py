@@ -57,7 +57,7 @@ project:Project = AwsCdkPythonApp(
         "selenium",
     ],
 )
-SEARCH_SERVICE_API_URL = "http://tai-s-taise-4mq43vlacxyh-2086925889.us-east-1.elb.amazonaws.com"
+SEARCH_SERVICE_API_URL = "http://tai-s-taise-2873VFS6UC2M-223101750.us-east-1.elb.amazonaws.com"
 env_file: TextFile = TextFile(
     project,
     "./.env",
@@ -132,7 +132,7 @@ make_file.add_rule(
 def convert_dict_env_vars_to_docker_env_vars(env_vars: dict):
     return " ".join([f"-e {key}=\"{value}\"" for key, value in env_vars.items()])
 
-RUNTIME_ENV_VARS = {
+SEARCH_SERVICE_RUNTIME_ENV_VARS = {
     "PINECONE_DB_API_KEY_SECRET_NAME": "dev/tai_service/pinecone_db/api_key",
     "PINECONE_DB_ENVIRONMENT": "us-east-1-aws",
     "PINECONE_DB_INDEX_NAME": "tai-index",
@@ -144,21 +144,34 @@ RUNTIME_ENV_VARS = {
     "DOC_DB_DATABASE_NAME": "class_resources",
     "DOC_DB_CLASS_RESOURCE_COLLECTION_NAME": "class_resource",
     "DOC_DB_CLASS_RESOURCE_CHUNK_COLLECTION_NAME": "class_resource_chunk",
-    "OPENAI_API_KEY_SECRET_NAME": "dev/tai_service/openai/api_key",
     "AWS_DEFAULT_REGION": "us-east-1",
     "COLD_STORE_BUCKET_NAME": "tai-service-class-resource-cold-store-dev",
     "DOCUMENTS_TO_INDEX_QUEUE": "frontend-data-transfer-[branch-name]",
     "NLTK_DATA": "/tmp/nltk_data",
-    "MESSAGE_ARCHIVE_BUCKET_NAME": "tai-service-message-archive-dev",
-    "SEARCH_SERVICE_API_URL": SEARCH_SERVICE_API_URL,
 }
+API_RUNTIME_ENV_VARS = {
+    "MESSAGE_ARCHIVE_BUCKET_NAME": "tai-service-message-archive-dev",
+    "OPENAI_API_KEY_SECRET_NAME": "dev/tai_service/openai/api_key",
+    "SEARCH_SERVICE_API_URL": SEARCH_SERVICE_API_URL,
+    "AWS_DEFAULT_REGION": "us-east-1",
+}
+base_docker_run_recipe = [
+    "cdk synth && \\",
+    "cd $(DIR) && \\",
+    "sudo docker build -t test-container -f $(DOCKER_FILE) . && \\",
+]
 make_file.add_rule(
-    targets=["build-and-run-docker"],
+    targets=["build-and-run-docker-api"],
     recipe=[
-        "cdk synth && \\",
-        "cd $(DIR) && \\",
-        "sudo docker build -t test-container -f $(DOCKER_FILE) . && \\",
-        f"sudo docker run --network host {convert_dict_env_vars_to_docker_env_vars(RUNTIME_ENV_VARS)} test-container",
+        *base_docker_run_recipe,
+        f"sudo docker run --network host {convert_dict_env_vars_to_docker_env_vars(API_RUNTIME_ENV_VARS)} test-container",
+    ],
+)
+make_file.add_rule(
+    targets=["build-and-run-docker-search-service"],
+    recipe=[
+        *base_docker_run_recipe,
+        f"sudo docker run --network host {convert_dict_env_vars_to_docker_env_vars(SEARCH_SERVICE_RUNTIME_ENV_VARS)} test-container",
     ],
 )
 make_file.add_rule(
@@ -185,7 +198,7 @@ vscode_launch_config.add_configuration(
         "--reload",
         "--factory",
     ],
-    env=RUNTIME_ENV_VARS,
+    env=API_RUNTIME_ENV_VARS,
 )
 vscode_launch_config.add_configuration(
     name="TAI Search Service",
@@ -199,7 +212,7 @@ vscode_launch_config.add_configuration(
         "--port",
         "8080",
     ],
-    env=RUNTIME_ENV_VARS,
+    env=SEARCH_SERVICE_RUNTIME_ENV_VARS,
 )
 
 vscode_settings: VsCodeSettings = VsCodeSettings(vscode)

@@ -12,7 +12,6 @@ from taiservice.api.routers.tai_schemas import (
     SearchQuery,
     ResourceSearchQuery,
     SearchResults,
-    SearchAnswer,
     TaiTutorChat,
     TaiTutorName as ApiTaiTutorName,
     ResponseTechnicalLevel as ApiTechnicalLevel,
@@ -62,14 +61,6 @@ def test_search_results_example_schemas():
     except ValidationError as e:
         pytest.fail(f"Failed to validate example schema: {example_schema}. Error: {str(e)}")
 
-def test_resource_search_answer_example_schemas():
-    """Test that the example schemas for the SearchAnswer model are valid."""
-    example_schema = SearchAnswer.Config.schema_extra["example"]
-    try:
-        SearchAnswer.parse_obj(example_schema)
-    except ValidationError as e:
-        pytest.fail(f"Failed to validate example schema: {example_schema}. Error: {str(e)}")
-
 def test_chat_endpoint():
     """Test that the chat endpoint works."""
     example_schema = ChatSessionRequest.Config.schema_extra["example"]
@@ -95,8 +86,7 @@ def test_search_endpoint():
     """Test that the search endpoint works."""
     example_schema = ResourceSearchQuery.Config.schema_extra["example"]
     mock_request = MagicMock()
-    mock_response = SearchAnswer(
-        summary_snippet="This is a summary snippet.",
+    mock_response = SearchResults(
         suggested_resources=[],
         other_resources=[],
         **example_schema,
@@ -104,6 +94,17 @@ def test_search_endpoint():
     mock_request.app.state.tai_backend.search = MagicMock(return_value=mock_response)
     try:
         search(ResourceSearchQuery.parse_obj(example_schema), mock_request)
+    except ValidationError as e:
+        pytest.fail(f"Endpoint {search} failed with example schema: {example_schema}. Error: {str(e)}")
+
+def test_search_summary_endpoint():
+    """Test that the search endpoint works."""
+    example_schema = SearchQuery.Config.schema_extra["example"]
+    mock_request = MagicMock()
+    mock_response = "Summary of results"
+    mock_request.app.state.tai_backend.search = MagicMock(return_value=mock_response)
+    try:
+        search(SearchQuery.parse_obj(example_schema), mock_request)
     except ValidationError as e:
         pytest.fail(f"Endpoint {search} failed with example schema: {example_schema}. Error: {str(e)}")
 

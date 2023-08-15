@@ -325,6 +325,21 @@ class TaiSearchServiceStack(Stack):
             #     max_capacity=0,
             #     time_zone=TIME_ZONE,
             # )
+            # create a schedule that schedules the service to run between 6am and midnight
+            asg.scale_on_schedule(
+                self._namer("scale-up"),
+                schedule=Schedule.cron(hour="8", minute="0", week_day="*"),
+                min_capacity=1,
+                max_capacity=1,
+                time_zone=TIME_ZONE,
+            )
+            asg.scale_on_schedule(
+                self._namer("scale-down"),
+                schedule=Schedule.cron(hour="23", minute="0", week_day="*"),
+                min_capacity=0,
+                max_capacity=0,
+                time_zone=TIME_ZONE,
+            )
         return asg
 
     def _get_container_definition(self, task_definition: Ec2TaskDefinition, container_port: int) -> ContainerDefinition:

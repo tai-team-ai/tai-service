@@ -25,6 +25,7 @@ try:
         TaiChatSession,
         TaiTutorMessage,
         SearchQuery,
+        TaiProfile,
         FunctionMessage,
         AIResponseCallingFunction,
         SUMMARIZER_SYSTEM_PROMPT,
@@ -48,6 +49,7 @@ except (KeyError, ImportError):
         TaiChatSession,
         TaiTutorMessage,
         SearchQuery,
+        TaiProfile,
         FunctionMessage,
         AIResponseCallingFunction,
         SUMMARIZER_SYSTEM_PROMPT,
@@ -138,8 +140,16 @@ class TaiLLM:
         function_to_call: Optional[callable] = None,
         functions: Optional[list[callable]] = None,
         ModelToUse: Optional[BaseChatModel] = None,
+        return_without_system_prompt: bool = True,
     ) -> None:
         """Get the response from the LLMs."""
+        student_msg = chat_session.last_student_message
+        prompt = TaiProfile.get_system_prompt(
+            name=student_msg.tai_tutor_name,
+            technical_level=student_msg.technical_level,
+            class_name=chat_session.class_name,
+        )
+        chat_session.insert_system_prompt(prompt)
         llm_kwargs ={}
         if relevant_chunks:
             self._append_synthetic_function_call_to_chat(
@@ -169,6 +179,8 @@ class TaiLLM:
         # llm_kwargs['function_call'] = function_to_call
         # IMPORTANT: langchain does the above line for us, but it's left here for reference
         self._append_model_response(chat_session, chunks=relevant_chunks, ModelToUse=ModelToUse, **llm_kwargs)
+        if return_without_system_prompt:
+            chat_session.remove_system_prompt()
 
     def create_search_result_summary_snippet(
         self,
@@ -177,6 +189,8 @@ class TaiLLM:
         chunks: list[ClassResourceSnippet]
     ) -> str:
         """Create a snippet of the search result summary."""
+        if not chunks:
+            return ""
         session: TaiChatSession = TaiChatSession.from_message(
             SearchQuery(content=search_query),
             class_id=class_id,

@@ -2,7 +2,7 @@
 from fastapi import APIRouter, Request
 try:
     from .tai_schemas import(
-        SearchAnswer,
+        SearchResults,
         ResourceSearchQuery,
         ChatSessionRequest,
         ChatSessionResponse,
@@ -11,7 +11,7 @@ try:
     from ..runtime_settings import BACKEND_ATTRIBUTE_NAME
 except ImportError:
     from routers.tai_schemas import (
-        SearchAnswer,
+        SearchResults,
         ResourceSearchQuery,
         ChatSessionRequest,
         ChatSessionResponse,
@@ -31,8 +31,15 @@ def chat(chat_session: ChatSessionRequest, request: Request):
     return ChatSessionResponse.parse_obj(chat_session)
 
 
-@ROUTER.post("/search", response_model=SearchAnswer)
+@ROUTER.post("/search", response_model=SearchResults)
 def search(search_query: ResourceSearchQuery, request: Request):
     """Define the search endpoint."""
     backend: Backend = getattr(request.app.state, BACKEND_ATTRIBUTE_NAME)
-    return backend.search(search_query)
+    return backend.search(search_query, result_type="results")
+
+
+@ROUTER.post("/search_summary")
+def search(search_query: ResourceSearchQuery, request: Request) -> str:
+    """Define the search endpoint."""
+    backend: Backend = getattr(request.app.state, BACKEND_ATTRIBUTE_NAME)
+    return backend.search(search_query, result_type="summary")

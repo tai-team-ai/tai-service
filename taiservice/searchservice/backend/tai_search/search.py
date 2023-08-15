@@ -114,7 +114,7 @@ class TAISearch:
             )
             logger.info(f"Finished uploading chunks to cold store: {ingested_document.id}")
             logger.info(f"Embedding chunks: {ingested_document.id}")
-            vector_documents = self.embed_documents(chunk_documents, class_resource_document.class_id)
+            vector_documents = self.embed_documents(chunk_documents)
             logger.info(f"Finished embedding chunks: {ingested_document.id}")
             logger.info(f"Loading chunks to db: {ingested_document.id}")
             self._load_class_resources_to_db(class_resource_document, chunk_documents)
@@ -160,7 +160,7 @@ class TAISearch:
         is_search = True if len(query.split()) < 15 else False # assume search if the query is less than 15 words
         alpha = 0.4 if is_search else 0.7 # this is gut feel, we can tune this later, search is likely to use more precise terms
         docs_to_return = 5 if is_search else 3
-        pinecone_docs = self.embed_documents(documents=[chunk_doc], class_id=class_id)
+        pinecone_docs = self.embed_documents(documents=[chunk_doc])
         similar_docs = self._pinecone_db.get_similar_documents(document=pinecone_docs.documents[0], alpha=alpha, doc_to_return=docs_to_return)
         uuids = [doc.metadata.chunk_id for doc in similar_docs.documents]
         chunk_docs = self._document_db.get_class_resources(uuids, ClassResourceChunkDocument, count_towards_metrics=True)
