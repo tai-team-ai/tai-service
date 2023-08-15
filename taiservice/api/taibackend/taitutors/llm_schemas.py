@@ -174,8 +174,8 @@ class FunctionMessage(langchainFunctionMessage, BaseMessage):
     )
 
 
-class TaiChatSession(BasePydanticModel):
-    """Define the model for the TAI chat session. Compatible with LangChain."""
+class BaseLLMChatSession(BasePydanticModel):
+    """Define the base model for the LLM chat session."""
     id: UUID = Field(
         ...,
         description="The ID of the chat session.",
@@ -183,18 +183,6 @@ class TaiChatSession(BasePydanticModel):
     class_id: UUID = Field(
         ...,
         description="The class ID to which this chat session belongs.",
-    )
-    class_name: str = Field(
-        ...,
-        max_length=100,
-        min_length=1,
-        description="The name of the class that the chat session is for.",
-    )
-    class_description: str = Field(
-        ...,
-        max_length=400,
-        min_length=1,
-        description="The description of the course that the chat session is for.",
     )
     messages: list[BaseMessage] = Field(
         default_factory=list,
@@ -257,13 +245,30 @@ class TaiChatSession(BasePydanticModel):
             self.messages.pop(0)
 
     @staticmethod
-    def from_message(message: BaseMessage, class_id: UUID) -> "TaiChatSession":
+    def from_message(message: BaseMessage, class_id: UUID) -> "BaseLLMChatSession":
         """Create a new chat session from a message."""
-        return TaiChatSession(
+        return BaseLLMChatSession(
             id=uuid4(),
             class_id=class_id,
             messages=[message],
         )
+
+
+class TaiChatSession(BaseLLMChatSession):
+    """Define the model for the TAI chat session. Compatible with LangChain."""
+
+    class_name: str = Field(
+        ...,
+        max_length=100,
+        min_length=1,
+        description="The name of the class that the chat session is for.",
+    )
+    class_description: str = Field(
+        ...,
+        max_length=400,
+        min_length=1,
+        description="The description of the course that the chat session is for.",
+    )
 
 
 class ValidatedFormatString(BasePydanticModel):

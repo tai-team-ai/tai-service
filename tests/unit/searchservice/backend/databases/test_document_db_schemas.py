@@ -1,4 +1,4 @@
-"""Define tests for testing the indexer."""
+"""Define tests for testing the tai_search."""
 from hashlib import sha1
 import pytest
 from pydantic import ValidationError

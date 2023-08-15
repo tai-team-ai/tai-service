@@ -8,7 +8,7 @@ from ...api.routers.common_resources_schema import FrequentlyAccessedResources
 ROUTER = APIRouter()
 
 
-@ROUTER.get("/frequently_accessed_resources/{class_id}", response_model=FrequentlyAccessedResources)
+@ROUTER.get("/frequently-accessed-resources/{class_id}", response_model=FrequentlyAccessedResources)
 def get_frequently_accessed_resources(request: Request, class_id: str):
     """
     Get frequently accessed resources for a specific class."""

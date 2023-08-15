@@ -8,12 +8,9 @@ from uuid import UUID
 from loguru import logger
 from pydantic import BaseModel, Field
 import pinecone
-# from pinecone_text.hybrid import hybrid_convex_scale
-# first imports are for local development, second imports are for deployment
-try:
-    from .pinecone_db_schemas import PineconeDocuments, PineconeDocument
-except ImportError:
-    from taibackend.databases.pinecone_db_schemas import PineconeDocuments, PineconeDocument
+from pinecone_text.hybrid import hybrid_convex_scale
+from .pinecone_db_schemas import PineconeDocuments, PineconeDocument
+
 
 class Environment(str, Enum):
     """Define the environment of the pinecone db."""
@@ -93,14 +90,18 @@ class PineconeDB:
             alpha: The alpha value for the hybrid convex scale  
             between 0 and 1 where 0 == sparse only and 1 == dense only
         """
-        assert 0 <= alpha <= 1, "alpha must be between 0 and 1"
-        # dense, sparse = hybrid_convex_scale(document.values, document.sparse_values.dict(), alpha)
+        if document.sparse_values:
+            assert 0 <= alpha <= 1, "alpha must be between 0 and 1"
+            dense, sparse = hybrid_convex_scale(document.values, document.sparse_values.dict(), alpha)
+        else:
+            dense = document.values
+            sparse = None
         results = self.index.query(
             namespace=str(document.metadata.class_id),
             include_values=True,
             include_metadata=True,
-            # vector=dense,
-            # sparse_vector=sparse,
+            vector=dense,
+            sparse_vector=sparse,
             top_k=doc_to_return,
         )
         docs = PineconeDocuments(class_id=document.metadata.class_id, documents=[])

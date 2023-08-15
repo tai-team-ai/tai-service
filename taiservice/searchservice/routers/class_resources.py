@@ -9,7 +9,7 @@ from ..runtime_settings import BACKEND_ATTRIBUTE_NAME
 ROUTER = APIRouter()
 
 
-@ROUTER.get("/class_resources", response_model=ClassResources)
+@ROUTER.get("/class-resources", response_model=ClassResources)
 def get_class_resources(ids: ClassResourceIds, request: Request, from_class_ids: bool = True):
     """Get all class resources."""
     backend: Backend = getattr(request.app.state, BACKEND_ATTRIBUTE_NAME)
@@ -17,7 +17,7 @@ def get_class_resources(ids: ClassResourceIds, request: Request, from_class_ids:
     return ClassResources(class_resources=class_resource_docs)
 
 
-@ROUTER.post("/class_resources")
+@ROUTER.post("/class-resources")
 def create_class_resource(class_resources: ClassResources, request: Request, response: Response):
     """Create a class resource."""
     backend: Backend = getattr(request.app.state, BACKEND_ATTRIBUTE_NAME)

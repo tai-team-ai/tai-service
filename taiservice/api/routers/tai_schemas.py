@@ -204,7 +204,7 @@ EXAMPLE_CHAT_SESSION_REQUEST = {
     "id": EXAMPLE_UUID,
     "classId": EXAMPLE_UUID,
     "className": "Intro to Python",
-    "courseDescription": "Learn the basics of Python in a fun class.",
+    "classDescription": "Learn the basics of Python in a fun class.",
     "chats": [
         {
             "message": "I'm stuck on this problem about dummy pdfs.",
@@ -293,22 +293,32 @@ class ChatSessionResponse(BaseChatSession):
 EXAMPLE_SEARCH_QUERY = {
     "classId": EXAMPLE_UUID,
     "query": "dummy pdf",
-    "filters": {
-        "resourceTypes": [
-            ClassResourceType.TEXTBOOK,
-        ],
-    },
 }
-EXAMPLE_SEARCH_ANSWER = copy.deepcopy(EXAMPLE_SEARCH_QUERY)
+EXAMPLE_RESOURCE_SEARCH_QUERY = copy.deepcopy(EXAMPLE_SEARCH_QUERY)
+EXAMPLE_RESOURCE_SEARCH_QUERY.update(
+    {
+        "filters": {
+            "resourceTypes": [
+                ClassResourceType.TEXTBOOK,
+            ],
+        },
+    }
+)
+EXAMPLE_BASE_SEARCH_RESPONSE = copy.deepcopy(EXAMPLE_SEARCH_QUERY)
+EXAMPLE_BASE_SEARCH_RESPONSE.update(
+    {
+        "suggestedResources": [
+            copy.deepcopy(EXAMPLE_CLASS_RESOURCE_SNIPPET),
+        ],
+        "otherResources": [
+            copy.deepcopy(EXAMPLE_CLASS_RESOURCE_SNIPPET),
+        ],
+    }
+)
+EXAMPLE_SEARCH_ANSWER = copy.deepcopy(EXAMPLE_BASE_SEARCH_RESPONSE)
 EXAMPLE_SEARCH_ANSWER.update(
     {
         "summary_snippet": "Python is a programming language.",
-        "suggested_resources": [
-            copy.deepcopy(EXAMPLE_CLASS_RESOURCE_SNIPPET),
-        ],
-        "other_resources": [
-            copy.deepcopy(EXAMPLE_CLASS_RESOURCE_SNIPPET),
-        ],
     }
 )
 
@@ -320,7 +330,8 @@ class SearchFilters(BasePydanticModel):
         description="The resource types to filter by.",
     )
 
-class ResourceSearchQuery(BasePydanticModel):
+
+class SearchQuery(BasePydanticModel):
     """Define the request model for the search endpoint."""
     id: UUID = Field(
         default_factory=uuid4,
@@ -334,6 +345,17 @@ class ResourceSearchQuery(BasePydanticModel):
         ...,
         description="The search query from the student.",
     )
+
+    class Config:
+        """Define the configuration for the search query."""
+        schema_extra = {
+            "example": EXAMPLE_SEARCH_QUERY,
+        }
+
+
+class ResourceSearchQuery(SearchQuery):
+    """Define the request model for the resource search endpoint."""
+
     filters: SearchFilters = Field(
         default_factory=SearchFilters,
         description="The search filters.",
@@ -342,15 +364,12 @@ class ResourceSearchQuery(BasePydanticModel):
     class Config:
         """Define the configuration for the search query."""
         schema_extra = {
-            "example": EXAMPLE_SEARCH_QUERY,
+            "example": EXAMPLE_RESOURCE_SEARCH_QUERY,
         }
 
-class ResourceSearchAnswer(ResourceSearchQuery):
+
+class SearchResults(ResourceSearchQuery):
     """Define the response model for the search endpoint."""
-    summary_snippet: str = Field(
-        ...,
-        description="The summary snippet of the search results.",
-    )
     suggested_resources: list[ClassResourceSnippet] = Field(
         ...,
         description="The suggested resources that should appear at the top of the search results.",
@@ -361,7 +380,7 @@ class ResourceSearchAnswer(ResourceSearchQuery):
     )
 
     class Config:
-        """Define the configuration for the search answer."""
+        """Define the configuration for the search response."""
         schema_extra = {
-            "example": EXAMPLE_SEARCH_ANSWER,
+            "example": EXAMPLE_BASE_SEARCH_RESPONSE,
         }

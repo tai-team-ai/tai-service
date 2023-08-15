@@ -9,8 +9,9 @@ from taiservice.api.routers.tai import (
 from taiservice.api.routers.tai_schemas import (
     ChatSessionRequest,
     ChatSessionResponse,
+    SearchQuery,
     ResourceSearchQuery,
-    ResourceSearchAnswer,
+    SearchResults,
     TaiTutorChat,
     TaiTutorName as ApiTaiTutorName,
     ResponseTechnicalLevel as ApiTechnicalLevel,
@@ -36,6 +37,14 @@ def test_chat_session_response_example_schemas():
     except ValidationError as e:
         pytest.fail(f"Failed to validate example schema: {example_schema}. Error: {str(e)}")
 
+def test_search_query_example_schemas():
+    """Test that the example schemas for the SearchQuery model are valid."""
+    example_schema = SearchQuery.Config.schema_extra["example"]
+    try:
+        SearchQuery.parse_obj(example_schema)
+    except ValidationError as e:
+        pytest.fail(f"Failed to validate example schema: {example_schema}. Error: {str(e)}")
+
 def test_resource_search_query_example_schemas():
     """Test that the example schemas for the ResourceSearchQuery model are valid."""
     example_schema = ResourceSearchQuery.Config.schema_extra["example"]
@@ -44,11 +53,11 @@ def test_resource_search_query_example_schemas():
     except ValidationError as e:
         pytest.fail(f"Failed to validate example schema: {example_schema}. Error: {str(e)}")
 
-def test_resource_search_answer_example_schemas():
-    """Test that the example schemas for the ResourceSearchAnswer model are valid."""
-    example_schema = ResourceSearchAnswer.Config.schema_extra["example"]
+def test_search_results_example_schemas():
+    """Test that the example schemas for the SearchResults model are valid."""
+    example_schema = SearchResults.Config.schema_extra["example"]
     try:
-        ResourceSearchAnswer.parse_obj(example_schema)
+        SearchResults.parse_obj(example_schema)
     except ValidationError as e:
         pytest.fail(f"Failed to validate example schema: {example_schema}. Error: {str(e)}")
 
@@ -77,8 +86,7 @@ def test_search_endpoint():
     """Test that the search endpoint works."""
     example_schema = ResourceSearchQuery.Config.schema_extra["example"]
     mock_request = MagicMock()
-    mock_response = ResourceSearchAnswer(
-        summary_snippet="This is a summary snippet.",
+    mock_response = SearchResults(
         suggested_resources=[],
         other_resources=[],
         **example_schema,
@@ -86,6 +94,17 @@ def test_search_endpoint():
     mock_request.app.state.tai_backend.search = MagicMock(return_value=mock_response)
     try:
         search(ResourceSearchQuery.parse_obj(example_schema), mock_request)
+    except ValidationError as e:
+        pytest.fail(f"Endpoint {search} failed with example schema: {example_schema}. Error: {str(e)}")
+
+def test_search_summary_endpoint():
+    """Test that the search endpoint works."""
+    example_schema = SearchQuery.Config.schema_extra["example"]
+    mock_request = MagicMock()
+    mock_response = "Summary of results"
+    mock_request.app.state.tai_backend.search = MagicMock(return_value=mock_response)
+    try:
+        search(SearchQuery.parse_obj(example_schema), mock_request)
     except ValidationError as e:
         pytest.fail(f"Endpoint {search} failed with example schema: {example_schema}. Error: {str(e)}")
 

@@ -20,6 +20,8 @@ from taiservice.api.routers.common_resources_schema import (
 )
 from taiservice.api.routers.tai_schemas import (
     ClassResourceSnippet as APIClassResourceSnippet,
+    ResourceSearchQuery,
+    SearchResults,
 )
 from ..runtime_settings import SearchServiceSettings
 from .databases.document_db import DocumentDB, DocumentDBConfig
@@ -37,11 +39,15 @@ from .metrics import (
     DateRange as BEDateRange,
 )
 from .databases.errors import DuplicateClassResourceError
-from .shared_schemas import Metadata as DBResourceMetadata
-from .indexer import indexer
+from .shared_schemas import (
+    Metadata as DBResourceMetadata,
+) 
+from .tai_search import search as tai_search
+
 
 class Backend:
     """Class to handle the class resources backend."""
+
     def __init__(self, runtime_settings: SearchServiceSettings) -> None:
         """Initialize the class resources backend."""
         self._runtime_settings = runtime_settings
@@ -64,19 +70,19 @@ class Backend:
         )
         self._doc_db = DocumentDB(self._doc_db_config)
         self._openai_api_key = self._get_secret_value(runtime_settings.openAI_api_key_secret_name)
-        openAI_config = indexer.OpenAIConfig(
+        openAI_config = tai_search.OpenAIConfig(
             api_key=self._openai_api_key,
             batch_size=runtime_settings.openAI_batch_size,
             request_timeout=runtime_settings.openAI_request_timeout,
         )
-        self._indexer_config = indexer.IndexerConfig(
+        self._tai_search_config = tai_search.IndexerConfig(
             pinecone_db_config=self._pinecone_db_config,
             document_db_config=self._doc_db_config,
             openai_config=openAI_config,
             cold_store_bucket_name=runtime_settings.cold_store_bucket_name,
             chrome_driver_path=runtime_settings.chrome_driver_path,
         )
-        self._indexer = indexer.Indexer(self._indexer_config)
+        self._tai_search = tai_search.TAISearch(self._tai_search_config)
         self._metrics = Metrics(
             MetricsConfig(
                 document_db_instance=self._doc_db,
@@ -84,12 +90,12 @@ class Backend:
         )
 
     @staticmethod
-    def to_backend_input_docs(resources: ClassResources) -> list[indexer.InputDocument]:
+    def to_backend_input_docs(resources: ClassResources) -> list[tai_search.InputDocument]:
         """Convert the API documents to database documents."""
         input_documents = []
         for resource in resources:
             metadata = resource.metadata
-            input_doc = indexer.InputDocument(
+            input_doc = tai_search.InputDocument(
                 id=resource.id,
                 class_id=resource.class_id,
                 full_resource_url=resource.full_resource_url,
@@ -176,9 +182,9 @@ class Backend:
     def create_class_resources(self, class_resources: ClassResources) -> None:
         """Create the class resources."""
         input_docs = self.to_backend_input_docs(class_resources)
-        doc_pairs: list[tuple[indexer.Indexer, ClassResourceDocument]] = []
+        doc_pairs: list[tuple[tai_search.TAISearch, ClassResourceDocument]] = []
         for input_doc in input_docs:
-            ingested_doc = self._indexer.ingest_document(input_doc)
+            ingested_doc = self._tai_search.ingest_document(input_doc)
             if self._is_stuck_processing(ingested_doc): # if it's stuck, we should continue as the operations are idempotent
                 pass
             elif self._is_duplicate_class_resource(ingested_doc):
@@ -189,7 +195,7 @@ class Backend:
         for ingested_doc, class_resource in doc_pairs:
             try:
                 self._coerce_and_update_status(class_resource, ClassResourceProcessingStatus.PROCESSING)
-                class_resource = self._indexer.index_resource(ingested_doc, class_resource)
+                class_resource = self._tai_search.index_resource(ingested_doc, class_resource)
                 self._coerce_and_update_status(class_resource, ClassResourceProcessingStatus.COMPLETED)
             except Exception as e: # pylint: disable=broad-except
                 logger.critical(f"Failed to create class resources: {e}")
@@ -247,6 +253,17 @@ class Backend:
         )
         return resources
 
+    def search(self, search_query: ResourceSearchQuery, for_tai_tutor: bool) -> SearchResults:
+        """Search for class resources."""
+        docs = self._tai_search.get_relevant_class_resources(search_query.query, search_query.class_id, for_tai_tutor)
+        docs = self.to_api_resources(docs)
+        search_results = SearchResults(
+            suggested_resources=docs[:4],
+            other_resources=docs[4:],
+            **search_query.dict(),
+        )
+        return search_results
+
     def _get_secret_value(self, secret_name: str) -> Union[dict[str, Any], str]:
         session = boto3.session.Session()
         client = session.client(service_name='secretsmanager')
@@ -280,7 +297,7 @@ class Backend:
                 return True
         return False
 
-    def _is_duplicate_class_resource(self, doc: indexer.IngestedDocument) -> bool:
+    def _is_duplicate_class_resource(self, doc: tai_search.IngestedDocument) -> bool:
         """Check if the document can be created."""
         class_resource_docs = self._doc_db.get_class_resources(
             doc.class_id,
