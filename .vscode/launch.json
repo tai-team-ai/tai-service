@@ -5,7 +5,13 @@
       "name": "TAI API",
       "request": "launch",
       "type": "python",
-      "args": ["taiservice.api.main:create_app", "--reload", "--factory"],
+      "args": [
+        "taiservice.api.main:create_app",
+        "--reload",
+        "--factory",
+        "--port",
+        "8081"
+      ],
       "env": {
         "MESSAGE_ARCHIVE_BUCKET_NAME": "llm-message-archive-dev",
         "OPENAI_API_KEY_SECRET_NAME": "dev/tai_service/openai/api_key",

@@ -12,13 +12,13 @@ ROUTER = APIRouter()
 
 
 @ROUTER.post("/search-engine", response_model=SearchResults)
-def search(search_query: SearchQuery, request: Request):
+def search(search_query: ResourceSearchQuery, request: Request):
     """Define the search endpoint."""
     backend: Backend = getattr(request.app.state, BACKEND_ATTRIBUTE_NAME)
     return backend.search(search_query, for_tai_tutor=False)
 
 @ROUTER.post("/tutor-search", response_model=SearchResults)
-def tutor_search(search_query: ResourceSearchQuery, request: Request):
+def tutor_search(search_query: SearchQuery, request: Request):
     """Define the search endpoint."""
     backend: Backend = getattr(request.app.state, BACKEND_ATTRIBUTE_NAME)
     return backend.search(search_query, for_tai_tutor=True)
