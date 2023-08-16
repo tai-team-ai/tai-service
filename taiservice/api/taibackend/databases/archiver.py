@@ -48,7 +48,7 @@ class Archive:
         for obj in objects:
             # load the object as it's in json format
             archive_record = RecordClass.parse_raw(obj.get()['Body'].read())
-            if date_range.start_date <= archive_record.timestamp <= date_range.end_date:
+            if date_range.start_dateb <= archive_record.timestamp <= date_range.end_date:
                 archive_records.append(archive_record)
         return archive_records
 
