@@ -1,6 +1,5 @@
 """Define settings for instantiating the TAI API."""
 import os
-from pydantic import Field
 from ...api.runtime_settings import TaiApiSettings
 from ..constructs.construct_config import BaseDeploymentSettings
 
