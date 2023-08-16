@@ -1,10 +1,12 @@
 """Define the schema for the class resource endpoints."""
+import copy
 from enum import Enum
 from textwrap import dedent
 from typing import Optional, Annotated
 from uuid import UUID
 from pydantic import Field, HttpUrl
 from fastapi import Query
+
 # first imports are for local development, second imports are for deployment
 try:
     from ..routers.base_schema import BasePydanticModel, EXAMPLE_UUID
@@ -21,6 +23,12 @@ class ClassResourceProcessingStatus(str, Enum):
     DELETING = "deleting"
     FAILED = "failed"
     COMPLETED = "completed"
+
+class ResourceUploadFailureReason(str, Enum):
+    """Define the possible failures when uploading a resource."""
+    DUPLICATE_RESOURCE = "duplicate"
+    INVALID_RESOURCE_TYPE = "invalid"
+    UNPROCESSABLE_RESOURCE = "unprocessable"
 
 class ClassResourceType(str, Enum):
     """Define the type of the class resource."""
@@ -128,3 +136,48 @@ class ClassResources(BasePydanticModel):
     def __iter__(self):
         """Permit iteration over class resources."""
         return iter(self.class_resources)
+
+
+FAILED_RESOURCE_EXAMPLE = copy.deepcopy(EXAMPLE_CLASS_RESOURCE)
+FAILED_RESOURCE_EXAMPLE["failure_reason"] = ResourceUploadFailureReason.DUPLICATE_RESOURCE
+FAILED_RESOURCE_EXAMPLE["message"] = "This resource already exists in the class."
+
+
+class FailedResource(ClassResource):
+    """Define the base model of the failed resources."""
+    failure_reason: ResourceUploadFailureReason = Field(
+        ...,
+        description=f"The reason why the resource failed to upload. Valid values are: {', '.join([failure.value for failure in ResourceUploadFailureReason])}",
+    )
+    message: str = Field(
+        ...,
+        description="The message of the failed resource.",
+    )
+
+    class Config:
+        """Configure the Pydantic model."""
+        schema_extra = {
+            "example": FAILED_RESOURCE_EXAMPLE,
+        }
+
+
+EXAMPLE_FAILED_RESOURCES = {
+    "failed_resources": [FAILED_RESOURCE_EXAMPLE],
+}
+
+class FailedResources(BasePydanticModel):
+    """Define the base model of the failed resources."""
+    failed_resources: list[FailedResource] = Field(
+        default_factory=list,
+        description="The list of failed resources.",
+    )
+
+    class Config:
+        """Configure the Pydantic model."""
+        schema_extra = {
+            "example": EXAMPLE_FAILED_RESOURCES,
+        }
+
+    def __iter__(self):
+        """Permit iteration over failed resources."""
+        return iter(self.failed_resources)

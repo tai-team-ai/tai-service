@@ -7,6 +7,7 @@ from taiservice.searchservice.backend.databases import document_db_schemas as ba
 from taiservice.api.routers.class_resources import (
     ClassResources,
     create_class_resource,
+    FailedResources,
 )
 from taiservice.api.routers import class_resources_schema
 
@@ -16,6 +17,14 @@ def test_class_resource_example_schemas():
     example_schema = ClassResources.Config.schema_extra["example"]
     try:
         ClassResources.parse_obj(example_schema)
+    except ValidationError as e:
+        pytest.fail(f"Failed to validate example schema: {example_schema}. Error: {str(e)}")
+
+def test_failed_resources_example_schemas():
+    """Test that the example schemas for the ChatSession model are valid."""
+    example_schema = FailedResources.Config.schema_extra["example"]
+    try:
+        FailedResources.parse_obj(example_schema)
     except ValidationError as e:
         pytest.fail(f"Failed to validate example schema: {example_schema}. Error: {str(e)}")
 

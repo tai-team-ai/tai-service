@@ -98,7 +98,7 @@ class TAISearch:
         self,
         ingested_document: IngestedDocument,
         class_resource_document: ClassResourceDocument
-    ) -> ClassResourceDocument:
+    ) -> None:
         """Index a document."""
         try:
             self._s3_prefix = f"{ingested_document.class_id}/{ingested_document.id}/"
@@ -125,7 +125,6 @@ class TAISearch:
         except Exception as e:
             logger.error(traceback.format_exc())
             raise RuntimeError("Failed to index resource.") from e
-        return class_resource_document
 
     def get_relevant_class_resources(self, query: str, class_id: UUID, for_tai_tutor: bool = True) -> list[ClassResourceChunkDocument]:
         """

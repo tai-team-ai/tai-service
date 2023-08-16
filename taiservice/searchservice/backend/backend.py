@@ -3,10 +3,12 @@ from datetime import date, datetime, timedelta
 import json
 from typing import Any, Optional, Union
 from uuid import UUID
+import psutil
 import boto3
 from botocore.exceptions import ClientError
 from loguru import logger
 
+from .errors import ServerOverloadedError
 from taiservice.api.routers.class_resources_schema import (
     ClassResource,
     ClassResources,
@@ -90,9 +92,15 @@ class Backend:
         )
 
     @staticmethod
-    def to_backend_input_docs(resources: ClassResources) -> list[tai_search.InputDocument]:
+    def to_backend_input_docs(resources: Union[ClassResources, ClassResource]) -> list[tai_search.InputDocument]:
         """Convert the API documents to database documents."""
         input_documents = []
+        if isinstance(resources, ClassResource):
+            resources = [resources]
+        elif isinstance(resources, ClassResources):
+            resources = resources.class_resources
+        else:
+            raise RuntimeError(f"Unknown document type: {resources}")
         for resource in resources:
             metadata = resource.metadata
             input_doc = tai_search.InputDocument(
@@ -179,27 +187,28 @@ class Backend:
             output_documents.append(output_doc)
         return output_documents
 
-    def create_class_resources(self, class_resources: ClassResources) -> None:
+    def create_class_resource(self, class_resource: ClassResource) -> callable:
         """Create the class resources."""
-        input_docs = self.to_backend_input_docs(class_resources)
-        doc_pairs: list[tuple[tai_search.TAISearch, ClassResourceDocument]] = []
-        for input_doc in input_docs:
-            ingested_doc = self._tai_search.ingest_document(input_doc)
-            if self._is_stuck_processing(ingested_doc): # if it's stuck, we should continue as the operations are idempotent
-                pass
-            elif self._is_duplicate_class_resource(ingested_doc):
-                raise DuplicateClassResourceError(f"Duplicate class resource: {ingested_doc.id} in class {ingested_doc.class_id}")
-            doc = ClassResourceDocument.from_ingested_doc(ingested_doc)
-            self._coerce_and_update_status(doc, ClassResourceProcessingStatus.PENDING)
-            doc_pairs.append((ingested_doc, doc))
-        for ingested_doc, class_resource in doc_pairs:
+        if not self._is_server_ready():
+            raise ServerOverloadedError("Server is overloaded, please try again later.")
+        input_doc = self.to_backend_input_docs(class_resource)[0]
+        ingested_doc = self._tai_search.ingest_document(input_doc)
+        if self._is_stuck_processing(ingested_doc): # if it's stuck, we should continue as the operations are idempotent
+            pass
+        elif self._is_duplicate_class_resource(ingested_doc):
+            raise DuplicateClassResourceError(f"Duplicate class resource: {ingested_doc.id} in class {ingested_doc.class_id}")
+        class_resource = ClassResourceDocument.from_ingested_doc(ingested_doc)
+        self._coerce_and_update_status(class_resource, ClassResourceProcessingStatus.PENDING)
+        def index_resource() -> None:
             try:
                 self._coerce_and_update_status(class_resource, ClassResourceProcessingStatus.PROCESSING)
-                class_resource = self._tai_search.index_resource(ingested_doc, class_resource)
+                self._tai_search.index_resource(ingested_doc, class_resource)
                 self._coerce_and_update_status(class_resource, ClassResourceProcessingStatus.COMPLETED)
+                logger.info(f"Completed indexing class resource: {class_resource.id}")
             except Exception as e: # pylint: disable=broad-except
                 logger.critical(f"Failed to create class resources: {e}")
                 self._coerce_and_update_status(class_resource, ClassResourceProcessingStatus.FAILED)
+        return index_resource
 
     def get_class_resources(self, ids: list[UUID], from_class_ids: bool=False) -> list[ClassResource]:
         """Get the class resources."""
@@ -263,6 +272,15 @@ class Backend:
             **search_query.dict(),
         )
         return search_results
+
+    def _is_server_ready(self) -> bool:
+        cpu_load = psutil.cpu_percent(interval=1)
+        svmem = psutil.virtual_memory()
+        mem_available_MB = svmem.available / 1024 ** 2
+        mem_percent = svmem.percent
+        if cpu_load > 90 or mem_percent > 90 or mem_available_MB < 4000:
+            return False
+        return True
 
     def _get_secret_value(self, secret_name: str) -> Union[dict[str, Any], str]:
         session = boto3.session.Session()

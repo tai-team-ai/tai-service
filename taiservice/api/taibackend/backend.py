@@ -1,6 +1,7 @@
 """Define the class resources backend."""
 import json
 import traceback
+from collections import deque
 from datetime import datetime, date, timedelta
 from uuid import UUID
 from typing import Literal, Union, Any, Optional
@@ -32,7 +33,13 @@ try:
         SystemMessage as BESystemMessage,
     )
     from ..runtime_settings import TaiApiSettings
-    from ..routers.class_resources_schema import ClassResource, ClassResources
+    from ..routers.class_resources_schema import (
+        ClassResource,
+        ClassResources,
+        FailedResources,
+        ResourceUploadFailureReason,
+        FailedResource,
+    )
     from ..routers.tai_schemas import (
         BaseChatSession as APIChatSession,
         Chat as APIChat,
@@ -67,7 +74,13 @@ except (KeyError, ImportError):
         FrequentlyAccessedResources as APIFrequentlyAccessedResources,
         DateRange as APIDateRange,
     )
-    from routers.class_resources_schema import ClassResource, ClassResources
+    from routers.class_resources_schema import (
+        ClassResource,
+        ClassResources,
+        FailedResources,
+        ResourceUploadFailureReason,
+        FailedResource,
+    )
     from routers.tai_schemas import (
         BaseChatSession as APIChatSession,
         Chat as APIChat,
@@ -250,15 +263,32 @@ class Backend:
             return snippet
         return search_results
 
-    def create_class_resources(self, class_resources: ClassResources) -> requests.Response:
+    def create_class_resources(self, class_resources: ClassResources) -> FailedResources:
         """Create a list of class resources."""
         url = f"{self._runtime_settings.search_service_api_url}/class-resources"
-        response = requests.post(url, data=class_resources.json(), timeout=60)
-        if response.status_code != 200:
-            error_message = f"Failed to create class resources. Status code: {response.status_code}"
-            logger.error(error_message)
-            if response.status_code == 409:
-                raise DuplicateResourceError(response.json()['message'])
+        failed_resources = FailedResources()
+        resource_queue = deque(class_resources.class_resources)
+        while resource_queue:
+            resource = resource_queue.popleft()
+            response = requests.post(url, data=resource.json(), timeout=10)
+            if response.status_code not in {200, 201, 202}:
+                error_message = f"Failed to create class resources. Status code: {response.status_code}"
+                logger.error(error_message)
+                if response.status_code == 409:
+                    reason = ResourceUploadFailureReason.DUPLICATE_RESOURCE
+                elif response.status_code == 429:
+                    reason = ResourceUploadFailureReason.UNPROCESSABLE_RESOURCE
+                else:
+                    reason = ResourceUploadFailureReason.UNPROCESSABLE_RESOURCE
+                failed_resources.failed_resources.append(
+                    FailedResource(
+                        failure_reason=reason,
+                        message=error_message,
+                        **resource.dict(),
+                    )
+                )
+        return failed_resources
+
 
     def get_class_resources(self, ids: list[UUID], from_class_ids: bool = False) -> list[ClassResource]:
         """Get the class resources."""
