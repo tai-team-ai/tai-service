@@ -57,7 +57,7 @@ project:Project = AwsCdkPythonApp(
         "selenium",
     ],
 )
-SEARCH_SERVICE_API_URL = "http://tai-s-taise-2873VFS6UC2M-223101750.us-east-1.elb.amazonaws.com"
+SEARCH_SERVICE_API_URL = "http://tai-s-taise-125N3549KKY44-808887776.us-east-1.elb.amazonaws.com"
 env_file: TextFile = TextFile(
     project,
     "./.env",
@@ -150,7 +150,7 @@ SEARCH_SERVICE_RUNTIME_ENV_VARS = {
     "NLTK_DATA": "/tmp/nltk_data",
 }
 API_RUNTIME_ENV_VARS = {
-    "MESSAGE_ARCHIVE_BUCKET_NAME": "tai-service-message-archive-dev",
+    "MESSAGE_ARCHIVE_BUCKET_NAME": "llm-message-archive-dev",
     "OPENAI_API_KEY_SECRET_NAME": "dev/tai_service/openai/api_key",
     "SEARCH_SERVICE_API_URL": SEARCH_SERVICE_API_URL,
     "AWS_DEFAULT_REGION": "us-east-1",

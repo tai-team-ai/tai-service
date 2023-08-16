@@ -362,6 +362,12 @@ FINAL_STAGE_STUDENT_TOPIC_SUMMARY_SYSTEM_PROMPT = """\
 Please condense this list by grouping by topic, using 'and' where necessary to combine:\
 """
 
+STEERING_WHEN_RESULTS_PROMPT = """\
+Thought: I found some great results for the student! I should remember to answer in a \
+friendly tone and help them understand the concept they are asking about. \
+I need to remember that I am {name} and {persona}. \
+Here's my response:\
+"""
 
 STEERING_PROMPT = """\
 Thought: I don't know anything about what the user is asking because I am a tutor for '{class_name}'. \
@@ -460,6 +466,19 @@ class TaiProfile(BasePydanticModel):
                 "technical_level": technical_level_str,
                 "class_name": class_name,
                 **tai_profile.dict(),
+            },
+        )
+        return format_string.format()
+
+    @staticmethod
+    def get_results_steering_prompt(name: TaiTutorName) -> str:
+        """Get the steering prompt for the given name."""
+        tai_profile = TaiProfile.get_profile(name)
+        format_string = ValidatedFormatString(
+            format_string=STEERING_WHEN_RESULTS_PROMPT,
+            kwargs={
+                "name": tai_profile.name,
+                "persona": tai_profile.persona,
             },
         )
         return format_string.format()

@@ -275,7 +275,7 @@ class TaiSearchServiceStack(Stack):
                 vpc=self.vpc,
                 instance_type=instance_type,
                 machine_image=ami,
-                max_capacity=1,
+                max_capacity=2,
                 min_capacity=1,
                 # spot_price="0.35",
                 block_devices=block_devices,

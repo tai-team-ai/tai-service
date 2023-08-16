@@ -14,7 +14,7 @@ from .routers import (
     search,
 )
 
-TITLE = "T.A.I. Service!"
+TITLE = "T.A.I. Service!!"
 DESCRIPTION = "A service for the T.A.I. project."
 
 ROUTER = APIRouter()
