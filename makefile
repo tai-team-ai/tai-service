@@ -23,7 +23,7 @@ build-and-run-docker-api:
 	cdk synth && \
 	cd $(DIR) && \
 	sudo docker build -t test-container -f $(DOCKER_FILE) . && \
-	sudo docker run --network host -e MESSAGE_ARCHIVE_BUCKET_NAME="tai-service-message-archive-dev" -e OPENAI_API_KEY_SECRET_NAME="dev/tai_service/openai/api_key" -e SEARCH_SERVICE_API_URL="http://0.0.0.0:8080" -e AWS_DEFAULT_REGION="us-east-1" test-container
+	sudo docker run --network host -e MESSAGE_ARCHIVE_BUCKET_NAME="llm-message-archive-dev" -e OPENAI_API_KEY_SECRET_NAME="dev/tai_service/openai/api_key" -e SEARCH_SERVICE_API_URL="http://tai-s-taise-2873VFS6UC2M-223101750.us-east-1.elb.amazonaws.com" -e AWS_DEFAULT_REGION="us-east-1" test-container
 
 build-and-run-docker-search-service:
 	cdk synth && \

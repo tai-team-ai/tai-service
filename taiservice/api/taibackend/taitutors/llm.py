@@ -240,6 +240,11 @@ class TaiLLM:
                 function_kwargs={'student_message': chat_session.last_student_message.content},
                 relevant_chunks=relevant_chunks,
             )
+            steering_prompt = TaiProfile.get_results_steering_prompt(chat_session.last_student_message.tai_tutor_name)
+            chat_session.append_chat_messages([TaiTutorMessage(
+                content=steering_prompt,
+                render_chat=False,
+            )])
         if relevant_chunks is not None and len(relevant_chunks) == 0:
             format_str = ValidatedFormatString(
                 format_string=STEERING_PROMPT,
