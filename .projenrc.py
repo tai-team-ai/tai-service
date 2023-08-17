@@ -1,3 +1,4 @@
+import copy
 from projen.awscdk import AwsCdkPythonApp
 from projen.python import VenvOptions
 from projen.vscode import (
@@ -55,6 +56,7 @@ project:Project = AwsCdkPythonApp(
         "PyPDF2",
         "unstructured",
         "selenium",
+        "pynamodb",
     ],
 )
 SEARCH_SERVICE_API_URL = "http://tai-s-taise-125N3549KKY44-808887776.us-east-1.elb.amazonaws.com"
@@ -84,7 +86,7 @@ docker_ignore_file: TextFile = TextFile(
         "**/venv",
         "**/tests",
         "**/test-reports",
-        "**/.build*/"
+        "**/.build*/",
     ],
 )
 make_file: Makefile = Makefile(
@@ -188,6 +190,11 @@ make_file.add_rule(
 )
 vscode = VsCode(project)
 vscode_launch_config: VsCodeLaunchConfig = VsCodeLaunchConfig(vscode)
+LAUNCH_API_RUNTIME_ENV_VARS = copy.deepcopy(API_RUNTIME_ENV_VARS)
+LAUNCH_API_RUNTIME_ENV_VARS.update({
+    "DYNAMO_DB_HOST": "http://localhost:8888",
+    "SEARCH_SERVICE_API_URL": "http://localhost:8080",
+})
 vscode_launch_config.add_configuration(
     name="TAI API",
     type="python",
@@ -198,7 +205,7 @@ vscode_launch_config.add_configuration(
         "--reload",
         "--factory",
     ],
-    env=API_RUNTIME_ENV_VARS,
+    env=LAUNCH_API_RUNTIME_ENV_VARS,
 )
 vscode_launch_config.add_configuration(
     name="TAI Search Service",
@@ -222,5 +229,6 @@ vscode_settings.add_setting("python.testing.pytestArgs", ["tests"])
 vscode_settings.add_setting("editor.formatOnSave", True)
 
 project.add_git_ignore(".build*")
+project.add_git_ignore("docker**")
 
 project.synth()

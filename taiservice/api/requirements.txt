@@ -5,3 +5,4 @@ boto3
 openai
 langchain==0.0.229
 requests
+pynamodb

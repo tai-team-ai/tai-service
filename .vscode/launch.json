@@ -8,14 +8,12 @@
       "args": [
         "taiservice.api.main:create_app",
         "--reload",
-        "--factory",
-        "--port",
-        "8081"
+        "--factory"
       ],
       "env": {
         "MESSAGE_ARCHIVE_BUCKET_NAME": "llm-message-archive-dev",
         "OPENAI_API_KEY_SECRET_NAME": "dev/tai_service/openai/api_key",
-        "SEARCH_SERVICE_API_URL": "http://127.0.0.1:8080",
+        "SEARCH_SERVICE_API_URL": "http://tai-s-taise-125N3549KKY44-808887776.us-east-1.elb.amazonaws.com",
         "AWS_DEFAULT_REGION": "us-east-1"
       },
       "program": "${workspaceFolder}/.venv/bin/uvicorn"

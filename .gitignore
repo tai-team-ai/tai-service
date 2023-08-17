@@ -92,3 +92,4 @@ cython_debug/
 !/.vscode/launch.json
 !/.vscode/settings.json
 .build*
+docker**
