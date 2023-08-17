@@ -1,9 +1,8 @@
 """Define the llms interface used for the TAI chat backend."""
 import json
+from datetime import timedelta
 from typing import Any, Dict, Optional
 from uuid import UUID
-from uuid import uuid4
-from enum import Enum
 import tiktoken
 from pydantic import BaseModel, Field
 from langchain.chat_models import ChatOpenAI
@@ -11,9 +10,9 @@ from langchain import PromptTemplate
 from langchain.chat_models.base import BaseChatModel
 from langchain.chains.openai_functions.base import create_openai_fn_chain
 from loguru import logger
-import traceback
 # first imports are for local development, second imports are for deployment
 try:
+    from .errors import UserTokenLimitError
     from .llm_functions import (
         get_relevant_class_resource_chunks,
         save_student_conversation_topics,
@@ -42,6 +41,7 @@ try:
     from ..databases.user_data import UserDB, DynamoDB
 except (KeyError, ImportError):
     from routers.tai_schemas import ClassResourceSnippet
+    from taibackend.taitutors.errors import UserTokenLimitError
     from taibackend.taitutors.llm_functions import (
         get_relevant_class_resource_chunks,
         save_student_conversation_topics,
@@ -98,6 +98,14 @@ class ChatOpenAIConfig(BaseModel):
         ...,
         description="The archive to use for archiving messages.",
     )
+    token_reset_interval: timedelta = Field(
+        default=timedelta(days=1),
+        description="The interval after which the token count of a user is reset.",
+    )
+    token_limit_per_interval: int = Field(
+        default=10,
+        description="The maximum number of tokens per interval.",
+    )
 
     class Config:
         """Define the pydantic config."""
@@ -114,7 +122,10 @@ class TaiLLM:
             "openai_api_key": config.api_key,
             "streaming": config.stream_response,
         }
-        self._user_data: UserDB = DynamoDB()
+        self._user_data: UserDB = DynamoDB(
+            reset_interval=config.token_reset_interval,
+            max_tokens_per_interval=config.token_limit_per_interval,
+        )
         self.basic_chat_model: BaseChatModel = ChatOpenAI(
             model=config.basic_model_name,
             request_timeout=config.request_timeout,
@@ -187,7 +198,7 @@ class TaiLLM:
 
     def summarize_student_messages(self, messages: list[str], as_questions: bool = False) -> list[str]:
         """Summarize the student messages."""
-        def get_summaries(messages: list[str], system_prompt: str, function: callable, ModelToUse: BaseChatModel = None) -> list[str]:
+        def get_summaries(messages: list[str], system_prompt: str, function: callable, model_name: ModelName = None) -> list[str]:
             session: BaseLLMChatSession = BaseLLMChatSession.from_message(
                 SearchQuery(content="\n".join(messages)),
             )
@@ -196,7 +207,7 @@ class TaiLLM:
                 session,
                 function_to_call=function,
                 functions=[function],
-                ModelToUse=ModelToUse,
+                model_name=model_name,
             )
             last_chat: TaiTutorMessage = session.last_chat_message
             args = last_chat.function_call.arguments
@@ -212,14 +223,14 @@ class TaiLLM:
             messages,
             system_prompt,
             function,
-            ModelToUse=self.large_context_chat_model
+            model_name=ModelName.GPT_TURBO_LARGE_CONTEXT,
         )
         if not as_questions:
             summaries = get_summaries(
                 "\n".join(summaries),
                 FINAL_STAGE_STUDENT_TOPIC_SUMMARY_SYSTEM_PROMPT,
                 function,
-                ModelToUse=self.advanced_chat_model
+                model_name=ModelName.GPT_4,
             )
         return summaries
 
@@ -265,7 +276,7 @@ class TaiLLM:
         # function_to_call = {'name': function_to_call.__name__} if function_to_call else "none"
         # llm_kwargs['function_call'] = function_to_call
         # IMPORTANT: langchain does the above line for us, but it's left here for reference
-        self._append_model_response(chat_session, chunks=relevant_chunks, ModelToUse=ModelToUse, **llm_kwargs)
+        self._append_model_response(chat_session, chunks=relevant_chunks, model_name=model_name, **llm_kwargs)
 
     def _append_model_response(
         self,
@@ -285,6 +296,8 @@ class TaiLLM:
         ModelToUse = self._name_to_model_mapping.get(model_name)
         if not ModelToUse:
             raise ValueError(f"Invalid model name: {model_name}")
+        if self._user_data.is_user_over_token_limit(chat_session.user_id):
+            raise UserTokenLimitError(chat_session.user_id)
         chat_message = ModelToUse(messages=chat_session.messages, **kwargs)
         if chat_session.user_id:
             self._user_data.update_token_count(

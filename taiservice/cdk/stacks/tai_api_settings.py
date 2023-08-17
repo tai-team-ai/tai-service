@@ -13,7 +13,7 @@ DYNAMODB_DEPLOYMENT_SETTINGS = DynamoDBSettings(
     table_name="tai-service-users",
     billing_mode=dynamodb.BillingMode.PAY_PER_REQUEST,
     partition_key=dynamodb.Attribute(
-        name="user_id",
+        name="id",
         type=dynamodb.AttributeType.STRING,
     ),
 )
