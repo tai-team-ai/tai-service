@@ -1,4 +1,5 @@
 """Define the runtime settings for the TAI API."""
+from typing import Optional
 from pydantic import Field, BaseSettings
 # first imports are for local development, second imports are for deployment
 try:
@@ -39,4 +40,16 @@ class TaiApiSettings(BaseSettings):
     search_service_api_url: str = Field(
         ...,
         description="The URL of the search service API.",
+    )
+    user_table_name: str = Field(
+        ...,
+        description="The name of the user table.",
+    )
+    user_table_partition_key: str = Field(
+        ...,
+        description="The name of the user table partition key.",
+    )
+    user_table_sort_key: Optional[str] = Field(
+        default=None,
+        description="The name of the user table sort key.",
     )
