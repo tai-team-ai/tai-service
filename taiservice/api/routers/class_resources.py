@@ -26,9 +26,11 @@ def get_class_resources(ids: ClassResourceIds, request: Request, from_class_ids:
 def create_class_resource(class_resources: ClassResources, request: Request, response: Response):
     """Create a class resource."""
     backend: Backend = getattr(request.app.state, BACKEND_ATTRIBUTE_NAME)
-    try:
+    failed_resources = backend.create_class_resources(class_resources)
+    if len(failed_resources.failed_resources) < len(class_resources.class_resources) and len(failed_resources.failed_resources) > 0:
+        response.status_code = status.HTTP_207_MULTI_STATUS
+    elif len(failed_resources.failed_resources) == len(class_resources.class_resources):
+        response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
+    else:
         response.status_code = status.HTTP_202_ACCEPTED
-        return backend.create_class_resources(class_resources)
-    except DuplicateResourceError as error:
-        response.status_code = status.HTTP_409_CONFLICT
-        return {"message": error.message}
+    return failed_resources

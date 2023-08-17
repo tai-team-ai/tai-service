@@ -15,7 +15,7 @@
       "env": {
         "MESSAGE_ARCHIVE_BUCKET_NAME": "llm-message-archive-dev",
         "DYNAMODB_HOST": "http://localhost:8888",
-        "SEARCH_SERVICE_API_URL": "http://tai-s-taise-125N3549KKY44-808887776.us-east-1.elb.amazonaws.com",
+        "SEARCH_SERVICE_API_URL": "http://localhost:8080",
         "OPENAI_API_KEY_SECRET_NAME": "dev/tai_service/openai/api_key",
         "AWS_DEFAULT_REGION": "us-east-1"
       },
