@@ -53,11 +53,11 @@ EXAMPLE_MOST_FREQUENTLY_ACCESSED_RESOURCE.update({
 class DateRange(BasePydanticModel):
     """Define a schema for a date range."""
     start_date: datetime = Field(
-        ...,
+        default=datetime.utcnow() - timedelta(days=30),
         description="The start date of the date range.",
     )
     end_date: datetime = Field(
-        ...,
+        default=datetime.utcnow(),
         description="The end date of the date range.",
     )
 
@@ -69,7 +69,7 @@ class BaseFrequentlyAccessedObjects(BasePydanticModel):
         description="The ID that the common resource belongs to.",
     )
     date_range: DateRange = Field(
-        ...,
+        default_factory=DateRange,
         description="The date range over which the appearances of the common resource are counted.",
     )
 
