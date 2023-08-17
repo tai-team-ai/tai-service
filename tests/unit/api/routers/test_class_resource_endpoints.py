@@ -1,7 +1,16 @@
 """Define tests for the TAI endpoints."""
+import os
 from unittest.mock import MagicMock
 import pytest
 from pydantic import ValidationError
+# These must be set before importing the endpoints as the imports rely on 
+# environment variables being set. I don't like this pattern, but unfortunately.
+# the way pynamoDB works, rn, the config is a global model. I think we may 
+# want to make it a subclass to avoid this.
+os.environ["MESSAGE_ARCHIVE_BUCKET_NAME"] = "tai-service-message-archive"
+os.environ["OPENAI_API_KEY_SECRET_NAME"] = "tai-service-openai-api-key"
+os.environ["SEARCH_SERVICE_API_URL"] = "https://search-service-api-url"
+os.environ["AWS_DEFAULT_REGION"] = "us-east-1"
 from taiservice.searchservice.backend import shared_schemas as backend_shared_schemas
 from taiservice.searchservice.backend.databases import document_db_schemas as backend_db_schemas
 from taiservice.api.routers.class_resources import (
