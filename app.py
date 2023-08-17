@@ -14,11 +14,13 @@ from taiservice.cdk.stacks.search_service_settings import (
     PINECONE_DB_SETTINGS,
     SEARCH_SERVICE_SETTINGS,
 )
-from taiservice.cdk.stacks.tai_api_settings import TAI_API_SETTINGS
+from taiservice.cdk.stacks.tai_api_settings import TAI_API_SETTINGS, DYNAMODB_DEPLOYMENT_SETTINGS
 from taiservice.cdk.stacks.frontend_stack import TaiFrontendServerStack
+
 
 app: App = App()
 load_dotenv()
+
 
 vpc_id = os.environ.get("VPC_ID")
 AWS_DEPLOYMENT_SETTINGS = AWSDeploymentSettings()
@@ -63,6 +65,7 @@ tai_api: TaiApiStack = TaiApiStack(
     scope=app,
     config=tai_api_config,
     api_settings=TAI_API_SETTINGS,
+    dynamodb_settings=DYNAMODB_DEPLOYMENT_SETTINGS,
 )
 
 
