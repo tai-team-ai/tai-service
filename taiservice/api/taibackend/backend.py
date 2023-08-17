@@ -10,7 +10,6 @@ from loguru import logger
 import boto3
 from botocore.exceptions import ClientError
 try:
-    from .errors import DuplicateResourceError
     from .databases.archiver import Archive
     from .metrics import (
         Metrics,
@@ -51,7 +50,6 @@ try:
         SearchResults,
     )
 except (KeyError, ImportError):
-    from taibackend.errors import DuplicateResourceError
     from taibackend.databases.archiver import Archive
     from taibackend.metrics import (
         Metrics,
@@ -238,7 +236,7 @@ class Backend:
         )
         search_results = self._get_search_results(search_query, "tutor-search")
         tai_llm = TaiLLM(self._get_tai_llm_config(stream))
-        tai_llm.add_tai_tutor_chat_response(chat_session, search_results.suggested_resources, ModelToUse=tai_llm.large_context_chat_model)
+        tai_llm.add_tai_tutor_chat_response(chat_session, search_results.suggested_resources)
         return self.to_api_chat_session(chat_session)
 
     # TODO: Add a test to verify the archive method is called
@@ -256,7 +254,7 @@ class Backend:
         if search_results and result_type == 'summary':
             tai_llm = TaiLLM(self._get_tai_llm_config())
             snippet = tai_llm.create_search_result_summary_snippet(
-                class_id=search_query.class_id,
+                user_id=search_query.user_id,
                 search_query=search_query.query,
                 chunks=search_results.suggested_resources
             )

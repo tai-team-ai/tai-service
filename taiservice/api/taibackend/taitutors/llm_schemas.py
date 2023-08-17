@@ -50,9 +50,11 @@ class ResponseTechnicalLevel(str, Enum):
     EXPLAIN_LIKE_IM_AN_EXPERT_IN_THE_FIELD = "likeExpertInTheField"
 
 
-BASE_SYSTEM_MESSAGE = dedent("""\
-
-""")
+class ModelName(str, Enum):
+    """Define the supported LLMs."""
+    GPT_TURBO = "gpt-3.5-turbo"
+    GPT_TURBO_LARGE_CONTEXT = "gpt-3.5-turbo-16k"
+    GPT_4 = "gpt-4"
 
 
 class BaseMessage(langchainBaseMessage):
@@ -83,7 +85,6 @@ class SearchQuery(BaseMessage, HumanMessage):
         const=True,
         description="The role of the creator of the chat message.",
     )
-
 
 
 class TutorAndStudentBaseMessage(BaseMessage):
@@ -176,13 +177,13 @@ class FunctionMessage(langchainFunctionMessage, BaseMessage):
 
 class BaseLLMChatSession(BasePydanticModel):
     """Define the base model for the LLM chat session."""
-    id: UUID = Field(
-        ...,
+    id: Optional[UUID] = Field(
+        default_factory=uuid4,
         description="The ID of the chat session.",
     )
-    class_id: UUID = Field(
-        ...,
-        description="The class ID to which this chat session belongs.",
+    user_id: Optional[UUID] = Field(
+        default_factory=uuid4, # this can stay optional
+        description="The ID of the user that created the chat session.",
     )
     messages: list[BaseMessage] = Field(
         default_factory=list,
@@ -224,6 +225,19 @@ class BaseLLMChatSession(BasePydanticModel):
                 return message
         return None
 
+    @staticmethod
+    def from_message(
+        message: BaseMessage,
+        id: Optional[UUID] = None,
+        user_id: Optional[UUID] = None,
+    ) -> "BaseLLMChatSession":
+        """Create a new chat session from a message."""
+        return BaseLLMChatSession(
+            id=id or uuid4(),
+            user_id=user_id,
+            messages=[message]
+        )
+
     def append_chat_messages(self, new_messages: Union[list[BaseMessage], BaseMessage]) -> None:
         """Append a chat message to the chat session."""
         if isinstance(new_messages, BaseMessage):
@@ -244,19 +258,28 @@ class BaseLLMChatSession(BasePydanticModel):
         if self.messages and isinstance(self.messages[0], SystemMessage):
             self.messages.pop(0)
 
-    @staticmethod
-    def from_message(message: BaseMessage, class_id: UUID) -> "BaseLLMChatSession":
-        """Create a new chat session from a message."""
-        return BaseLLMChatSession(
-            id=uuid4(),
-            class_id=class_id,
-            messages=[message],
-        )
+    def get_token_count(self, token_function: callable) -> int:
+        """Return the tokens used since the last student message."""
+        count = 0
+        for message in self:
+            count += token_function(message.content)
+        return count
 
+    def __iter__(self):
+        """Iterate over the messages in the chat session."""
+        return iter(self.messages)
 
 class TaiChatSession(BaseLLMChatSession):
     """Define the model for the TAI chat session. Compatible with LangChain."""
-
+    # TODO: need to make this required once BE supports
+    user_id: Optional[UUID] = Field(
+        default_factory=uuid4,
+        description="The ID of the user that created the chat session.",
+    )
+    class_id: Optional[UUID] = Field(
+        default=None,
+        description="The class ID to which this chat session belongs.",
+    )
     class_name: str = Field(
         ...,
         max_length=100,

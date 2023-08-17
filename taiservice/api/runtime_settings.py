@@ -4,9 +4,9 @@ from enum import Enum
 from pydantic import Field, BaseSettings
 # first imports are for local development, second imports are for deployment
 try:
-    from .taibackend.taitutors.llm import ModelName
+    from .taibackend.taitutors.llm_schemas import ModelName
 except ImportError:
-    from taibackend.taitutors.llm import ModelName
+    from taibackend.taitutors.llm_schemas import ModelName
 
 BACKEND_ATTRIBUTE_NAME = "tai_backend"
 

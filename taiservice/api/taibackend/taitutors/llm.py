@@ -4,6 +4,7 @@ from typing import Any, Dict, Optional
 from uuid import UUID
 from uuid import uuid4
 from enum import Enum
+import tiktoken
 from pydantic import BaseModel, Field
 from langchain.chat_models import ChatOpenAI
 from langchain import PromptTemplate
@@ -22,6 +23,7 @@ try:
     from ...routers.tai_schemas import ClassResourceSnippet
     from ..databases.archiver import Archive
     from .llm_schemas import (
+        ModelName,
         BaseLLMChatSession,
         TaiChatSession,
         TaiTutorMessage,
@@ -37,8 +39,8 @@ try:
         STEERING_PROMPT,
         ValidatedFormatString,
     )
+    from ..databases.user_data import UserDB, DynamoDB
 except (KeyError, ImportError):
-    print(traceback.format_exc())
     from routers.tai_schemas import ClassResourceSnippet
     from taibackend.taitutors.llm_functions import (
         get_relevant_class_resource_chunks,
@@ -47,6 +49,7 @@ except (KeyError, ImportError):
     )
     from taibackend.databases.archiver import Archive
     from taibackend.taitutors.llm_schemas import (
+        ModelName,
         BaseLLMChatSession,
         TaiChatSession,
         TaiTutorMessage,
@@ -62,13 +65,7 @@ except (KeyError, ImportError):
         STEERING_PROMPT,
         ValidatedFormatString,
     )
-
-
-class ModelName(str, Enum):
-    """Define the supported LLMs."""
-    GPT_TURBO = "gpt-3.5-turbo"
-    GPT_TURBO_LARGE_CONTEXT = "gpt-3.5-turbo-16k"
-    GPT_4 = "gpt-4"
+    from taibackend.databases.user_data import UserDB, DynamoDB
 
 
 class ChatOpenAIConfig(BaseModel):
@@ -117,6 +114,7 @@ class TaiLLM:
             "openai_api_key": config.api_key,
             "streaming": config.stream_response,
         }
+        self._user_data: UserDB = DynamoDB()
         self.basic_chat_model: BaseChatModel = ChatOpenAI(
             model=config.basic_model_name,
             request_timeout=config.request_timeout,
@@ -132,14 +130,17 @@ class TaiLLM:
             request_timeout=config.request_timeout + 30,
             **base_config,
         )
+        self._name_to_model_mapping = {
+            ModelName.GPT_TURBO: self.basic_chat_model,
+            ModelName.GPT_TURBO_LARGE_CONTEXT: self.large_context_chat_model,
+            ModelName.GPT_4: self.advanced_chat_model,
+        }
         self._archive = config.message_archive
-
 
     def add_tai_tutor_chat_response(
         self,
         chat_session: BaseLLMChatSession,
         relevant_chunks: Optional[list[ClassResourceSnippet]] = None,
-        ModelToUse: Optional[BaseChatModel] = None,
         return_without_system_prompt: bool = True,
     ) -> None:
         """Get the response from the LLMs."""
@@ -153,14 +154,14 @@ class TaiLLM:
         self._add_tai_tutor_chat_response(
             chat_session,
             relevant_chunks=relevant_chunks,
-            ModelToUse=ModelToUse,
+            model_name=ModelName.GPT_TURBO,
         )
         if return_without_system_prompt:
             chat_session.remove_system_prompt()
 
     def create_search_result_summary_snippet(
         self,
-        class_id: UUID,
+        user_id: UUID,
         search_query: str,
         chunks: list[ClassResourceSnippet]
     ) -> str:
@@ -169,7 +170,7 @@ class TaiLLM:
             return ""
         session: BaseLLMChatSession = BaseLLMChatSession.from_message(
             SearchQuery(content=search_query),
-            class_id=class_id,
+            user_id=user_id,
         )
         documents = "\n".join([chunk.simplified_string for chunk in chunks])
         format_str = ValidatedFormatString(
@@ -189,7 +190,6 @@ class TaiLLM:
         def get_summaries(messages: list[str], system_prompt: str, function: callable, ModelToUse: BaseChatModel = None) -> list[str]:
             session: BaseLLMChatSession = BaseLLMChatSession.from_message(
                 SearchQuery(content="\n".join(messages)),
-                class_id=uuid4(),
             )
             session.insert_system_prompt(system_prompt)
             self._add_tai_tutor_chat_response(
@@ -229,7 +229,7 @@ class TaiLLM:
         relevant_chunks: Optional[list[ClassResourceSnippet]] = None,
         function_to_call: Optional[callable] = None,
         functions: Optional[list[callable]] = None,
-        ModelToUse: Optional[BaseChatModel] = None,
+        model_name: Optional[ModelName] = None,
     ) -> None:
         """Get the response from the LLM."""
         llm_kwargs ={}
@@ -271,13 +271,26 @@ class TaiLLM:
         self,
         chat_session: BaseLLMChatSession,
         chunks: list[ClassResourceSnippet] = None,
-        ModelToUse: Optional[BaseChatModel] = None,
+        model_name: Optional[ModelName] = None,
         **kwargs: Dict[str, Any],
     ) -> None:
         """Get the response from the LLMs."""
+        def count_tokens(text: str) -> int:
+            """Count the number of tokens in the text."""
+            encoding = tiktoken.encoding_for_model(model_name.value)
+            tokens = encoding.encode(text)
+            return len(tokens)
+        if not model_name:
+            model_name = ModelName.GPT_TURBO
+        ModelToUse = self._name_to_model_mapping.get(model_name)
         if not ModelToUse:
-            ModelToUse = self.basic_chat_model
+            raise ValueError(f"Invalid model name: {model_name}")
         chat_message = ModelToUse(messages=chat_session.messages, **kwargs)
+        if chat_session.user_id:
+            self._user_data.update_token_count(
+                user_id=chat_session.user_id,
+                amount=chat_session.get_token_count(count_tokens)
+            )
         function_call: dict = chat_message.additional_kwargs.get("function_call")
         if function_call:
             function_call = AIResponseCallingFunction(

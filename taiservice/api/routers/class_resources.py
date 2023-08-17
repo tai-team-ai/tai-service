@@ -3,11 +3,11 @@ from fastapi import APIRouter, Request, Response, status
 # first imports are for local development, second imports are for deployment
 try:
     from .class_resources_schema import ClassResources, ClassResourceIds, FailedResources
-    from ..taibackend.backend import Backend, DuplicateResourceError
+    from ..taibackend.backend import Backend
     from ..runtime_settings import BACKEND_ATTRIBUTE_NAME
 except ImportError as e:
     from routers.class_resources_schema import ClassResources, ClassResourceIds
-    from taibackend.backend import Backend, DuplicateResourceError
+    from taibackend.backend import Backend
     from runtime_settings import BACKEND_ATTRIBUTE_NAME
 
 
