@@ -51,11 +51,11 @@ class TaiApiSettings(BaseSettings):
         description="The URL of the search service API.",
     )
     user_table_name: str = Field(
-        ...,
+        default="tai-service-users",
         description="The name of the user table.",
     )
     user_table_partition_key: str = Field(
-        ...,
+        default="id",
         description="The name of the user table partition key.",
     )
     user_table_sort_key: Optional[str] = Field(
@@ -63,7 +63,7 @@ class TaiApiSettings(BaseSettings):
         description="The name of the user table sort key.",
     )
     dynamodb_region: AWSRegion = Field(
-        default=AWSRegion.US_EAST_1,
+        env="AWS_DEFAULT_REGION",
         description="The AWS region for the DynamoDB table.",
     )
     dynamodb_host: Optional[str] = Field(

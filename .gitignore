@@ -87,9 +87,9 @@ cython_debug/
 /cdk.out/
 .cdk.staging/
 !/./.env
-!/./.dockerignore
-!/./makefile
-!/.vscode/launch.json
 !/.vscode/settings.json
+!/.vscode/launch.json
+!/./makefile
 .build*
 docker**
+!/./.dockerignore
