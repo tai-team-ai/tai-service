@@ -1,5 +1,6 @@
 """Define base configurations for the constructs."""
 import json
+from pathlib import Path
 from enum import Enum
 from pydantic import BaseSettings
 
@@ -23,6 +24,12 @@ class BaseDeploymentSettings(BaseSettings):
             for key, value in output.items():
                 if hasattr(self.Config, "env_prefix"):
                     key = self.Config.env_prefix + key
+                if isinstance(value, Enum):
+                    value = value.value
+                if isinstance(value, Path):
+                    value = str(value.resolve())
+                if isinstance(value, int) or isinstance(value, float):
+                    value = str(value)
                 if isinstance(value, dict) or isinstance(value, list) or isinstance(value, set) or isinstance(value, tuple):
                     value = json.dumps(value)
                 key = key.upper()

@@ -37,7 +37,7 @@ from aws_cdk.aws_autoscaling import (
 )
 from tai_aws_account_bootstrap.stack_helpers import add_tags
 from tai_aws_account_bootstrap.stack_config_models import StackConfigBaseModel
-from taiservice.searchservice.runtime_settings import SearchServiceSettings
+from .search_service_settings import DeploymentTaiApiSettings
 from ..constructs.construct_config import Permissions
 from ..constructs.document_db_construct import (
     DocumentDatabase,
@@ -70,7 +70,7 @@ class TaiSearchServiceStack(Stack):
         config: StackConfigBaseModel,
         pinecone_db_settings: PineconeDBSettings,
         doc_db_settings: DocumentDBSettings,
-        search_service_settings: SearchServiceSettings,
+        search_service_settings: DeploymentTaiApiSettings,
         vpc: Any,
     ) -> None:
         """Initialize the search database stack."""
