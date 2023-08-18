@@ -1,4 +1,3 @@
-import copy
 from typing import Literal, Union
 from projen.awscdk import AwsCdkPythonApp
 from projen.python import VenvOptions

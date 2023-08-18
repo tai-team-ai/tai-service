@@ -1,5 +1,4 @@
 """Define the runtime settings for the TAI Search Service."""
-from pathlib import Path
 from pydantic import Field, BaseSettings
 from .backend.databases.pinecone_db import Environment as PineconeEnvironment
 
@@ -68,12 +67,12 @@ class SearchServiceSettings(BaseSettings):
         default=50,
         description="The batch size for OpenAI requests.",
     )
-    nltk_data: Path = Field(
-        default=Path("/var/task/nltk_data"),
+    nltk_data: str = Field(
+        default="/var/task/nltk_data",
         description="The path to the nltk data.",
     )
-    transformers_cache: Path = Field(
-        default=Path("/tmp/transformers_cache"),
+    transformers_cache: str = Field(
+        default="/tmp/transformers_cache",
         description="The path to the transformers cache.",
     )
     cold_store_bucket_name: str = Field(
@@ -84,8 +83,8 @@ class SearchServiceSettings(BaseSettings):
         default="tai-service-documents-to-index-queue",
         description="The name of the data to index transfer bucket. Documents should be uploaded to this bucket.",
     )
-    chrome_driver_path: Path = Field(
-        default=Path("/var/task/chromedriver"),
+    chrome_driver_path: str = Field(
+        default="/var/task/chromedriver",
         description="The path to the chrome driver.",
     )
     class_resource_processing_timeout: int = Field(
