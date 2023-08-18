@@ -8,7 +8,6 @@ from pydantic import ValidationError
 # environment variables being set. I don't like this pattern, but unfortunately.
 # the way pynamoDB works, rn, the config is a global model. I think we may 
 # want to make it a subclass to avoid this.
-os.environ["MESSAGE_ARCHIVE_BUCKET_NAME"] = "tai-service-message-archive"
 os.environ["OPENAI_API_KEY_SECRET_NAME"] = "tai-service-openai-api-key"
 os.environ["SEARCH_SERVICE_API_URL"] = "https://search-service-api-url"
 os.environ["AWS_DEFAULT_REGION"] = "us-east-1"

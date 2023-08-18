@@ -23,7 +23,7 @@ class TaiApiSettings(BaseSettings):
     """Define the configuration model for the TAI API service."""
 
     message_archive_bucket_name: str = Field(
-        ...,
+        default="llm-message-archive",
         description="The name of the student message archive bucket to store all student messages.",
     )
     openAI_api_key_secret_name: str = Field(
