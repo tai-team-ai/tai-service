@@ -16,6 +16,6 @@ class BasePydanticModel(BaseModel):
         alias_generator = to_camel_case
         allow_population_by_field_name = True
         validate_assignment = True
-        extra = Extra.forbid
+        extra = Extra.ignore
 
 EXAMPLE_UUID = uuid4()

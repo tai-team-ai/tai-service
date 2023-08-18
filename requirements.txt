@@ -21,6 +21,7 @@ pydantic<=1.10.11
 pygit2
 pymongo
 pymupdf
+pynamodb
 PyPDF2
 pytest
 pytest-cov

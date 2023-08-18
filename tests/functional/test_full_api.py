@@ -8,6 +8,7 @@ import tempfile
 import pytest
 from taiservice.cdk.stacks.tai_api_stack import MODULES_TO_COPY_INTO_API_DIR
 
+
 def test_imports_for_lambda_api():
     """
     Test that the imports work.
@@ -35,6 +36,9 @@ def test_imports_for_lambda_api():
         except subprocess.CalledProcessError:
             pytest.fail("Failed to install requirements in temporary venv.")
         try:
+            os.environ["OPENAI_API_KEY_SECRET_NAME"] = "tai-service-openai-api-key"
+            os.environ["SEARCH_SERVICE_API_URL"] = "https://search-service-api-url"
+            os.environ["AWS_DEFAULT_REGION"] = "us-east-1"
             # Use subprocess to run each file in the api directory
             # run the index.py file (which will subsequently import all the other files)
             entry_point = str(temp_api_dir / 'main.py')

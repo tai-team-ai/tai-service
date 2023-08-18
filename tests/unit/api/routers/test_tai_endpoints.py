@@ -1,7 +1,16 @@
 """Define tests for the TAI endpoints."""
+import os
 from unittest.mock import MagicMock
 import pytest
 from pydantic import ValidationError
+# These must be set before importing the endpoints as the imports rely on 
+# environment variables being set. I don't like this pattern, but unfortunately.
+# the way pynamoDB works, rn, the config is a global model. I think we may 
+# want to make it a subclass to avoid this.
+os.environ["OPENAI_API_KEY_SECRET_NAME"] = "tai-service-openai-api-key"
+os.environ["SEARCH_SERVICE_API_URL"] = "https://search-service-api-url"
+os.environ["AWS_DEFAULT_REGION"] = "us-east-1"
+
 from taiservice.api.routers.tai import (
     chat,
     search,
@@ -20,6 +29,7 @@ from taiservice.api.taibackend.taitutors.llm_schemas import (
     TaiTutorName as BETaiTutorName,
     ResponseTechnicalLevel as BETechnicalLevel,
 )
+
 
 def test_chat_session_request_example_schemas():
     """Test that the example schemas for the ChatSession model are valid."""
@@ -78,7 +88,7 @@ def test_chat_endpoint():
     mock_response = ChatSessionResponse.parse_obj(mock_chat_session)
     mock_request.app.state.tai_backend.get_tai_response = MagicMock(return_value=mock_response)
     try:
-        chat(ChatSessionRequest.parse_obj(example_schema), mock_request)
+        chat(ChatSessionRequest.parse_obj(example_schema), mock_request, MagicMock())
     except ValidationError as e:
         pytest.fail(f"Endpoint {chat} failed with example schema: {example_schema}. Error: {str(e)}")
 
@@ -93,7 +103,7 @@ def test_search_endpoint():
     )
     mock_request.app.state.tai_backend.search = MagicMock(return_value=mock_response)
     try:
-        search(ResourceSearchQuery.parse_obj(example_schema), mock_request)
+        search(ResourceSearchQuery.parse_obj(example_schema), mock_request, MagicMock())
     except ValidationError as e:
         pytest.fail(f"Endpoint {search} failed with example schema: {example_schema}. Error: {str(e)}")
 
@@ -104,7 +114,7 @@ def test_search_summary_endpoint():
     mock_response = "Summary of results"
     mock_request.app.state.tai_backend.search = MagicMock(return_value=mock_response)
     try:
-        search(SearchQuery.parse_obj(example_schema), mock_request)
+        search(SearchQuery.parse_obj(example_schema), mock_request, MagicMock())
     except ValidationError as e:
         pytest.fail(f"Endpoint {search} failed with example schema: {example_schema}. Error: {str(e)}")
 

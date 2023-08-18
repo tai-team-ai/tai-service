@@ -179,6 +179,11 @@ class BaseChatSession(BasePydanticModel):
         ...,
         description="The ID of the chat session.",
     )
+    # TODO: need ot make this required once BE is updated
+    user_id: Optional[UUID] = Field(
+        default_factory=uuid4,
+        description="The ID of the user that the chat session is for.",
+    )
     class_id: UUID = Field(
         ...,
         description="The ID of the class that the chat session is for.",
@@ -202,6 +207,7 @@ class BaseChatSession(BasePydanticModel):
 
 EXAMPLE_CHAT_SESSION_REQUEST = {
     "id": EXAMPLE_UUID,
+    "userId": EXAMPLE_UUID,
     "classId": EXAMPLE_UUID,
     "className": "Intro to Python",
     "classDescription": "Learn the basics of Python in a fun class.",
@@ -293,6 +299,7 @@ class ChatSessionResponse(BaseChatSession):
 EXAMPLE_SEARCH_QUERY = {
     "classId": EXAMPLE_UUID,
     "query": "dummy pdf",
+    "userId": EXAMPLE_UUID,
 }
 EXAMPLE_RESOURCE_SEARCH_QUERY = copy.deepcopy(EXAMPLE_SEARCH_QUERY)
 EXAMPLE_RESOURCE_SEARCH_QUERY.update(
@@ -336,6 +343,11 @@ class SearchQuery(BasePydanticModel):
     id: UUID = Field(
         default_factory=uuid4,
         description="The ID of the search.",
+    )
+    # TODO: need ot make this required once BE is updated
+    user_id: Optional[UUID] = Field(
+        default_factory=uuid4,
+        description="The ID of the user that the search is for.",
     )
     class_id: UUID = Field(
         ...,

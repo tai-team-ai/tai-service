@@ -1,9 +1,6 @@
 """Define settings for instantiating search databases."""
 import os
 from dotenv import load_dotenv
-from aws_cdk import (
-    RemovalPolicy,
-)
 from taiservice.cdk.constructs.customresources.document_db.settings import (
     DocumentDBSettings,
     CollectionConfig,
@@ -18,6 +15,11 @@ from taiservice.cdk.constructs.customresources.pinecone_db.pinecone_db_custom_re
     PineconeDBSettings,
 )
 from taiservice.searchservice.runtime_settings import SearchServiceSettings
+from ..constructs.construct_config import BaseDeploymentSettings
+
+
+class DeploymentTaiApiSettings(BaseDeploymentSettings, SearchServiceSettings):
+    """Define the settings for instantiating the TAI API."""
 
 INDEXES = [
     PineconeIndexConfig(
@@ -61,7 +63,7 @@ DOCUMENT_DB_SETTINGS = DocumentDBSettings(
     user_config=USER_CONFIG,
 )
 
-SEARCH_SERVICE_SETTINGS = SearchServiceSettings(
+SEARCH_SERVICE_SETTINGS = DeploymentTaiApiSettings(
     pinecone_db_api_key_secret_name=PINECONE_DB_SETTINGS.api_key_secret_name,
     pinecone_db_environment=PINECONE_DB_SETTINGS.environment,
     pinecone_db_index_name=PINECONE_DB_SETTINGS.indexes[0].name,
