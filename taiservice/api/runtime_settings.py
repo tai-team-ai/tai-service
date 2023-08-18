@@ -62,8 +62,8 @@ class TaiApiSettings(BaseSettings):
         default=None,
         description="The name of the user table sort key.",
     )
-    dynamodb_region: AWSRegion = Field(
-        env="AWS_DEFAULT_REGION",
+    aws_default_region: AWSRegion = Field(
+        default=AWSRegion.US_EAST_1,
         description="The AWS region for the DynamoDB table.",
     )
     dynamodb_host: Optional[str] = Field(

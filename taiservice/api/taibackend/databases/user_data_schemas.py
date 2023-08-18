@@ -23,7 +23,7 @@ class UserModel(Model):
         """Define the configuration for the user model."""
 
         table_name = SETTINGS.user_table_name
-        region = SETTINGS.dynamodb_region.value
+        region = SETTINGS.aws_default_region.value
         host = SETTINGS.dynamodb_host
 
     id = UnicodeAttribute(hash_key=True, default_for_new=lambda: str(uuid4()), attr_name=SETTINGS.user_table_partition_key)

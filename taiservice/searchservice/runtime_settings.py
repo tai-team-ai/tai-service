@@ -1,4 +1,5 @@
 """Define the runtime settings for the TAI Search Service."""
+from enum import Enum
 from pathlib import Path
 from pydantic import Field, BaseSettings
 from .backend.databases.pinecone_db import Environment as PineconeEnvironment
@@ -7,9 +8,21 @@ from .backend.databases.pinecone_db import Environment as PineconeEnvironment
 BACKEND_ATTRIBUTE_NAME = "tai_backend"
 
 
+class AWSRegion(str, Enum):
+    """Define valid AWS regions."""
+    US_EAST_1 = "us-east-1"
+    US_EAST_2 = "us-east-2"
+    US_WEST_1 = "us-west-1"
+    US_WEST_2 = "us-west-2"
+
+
 class SearchServiceSettings(BaseSettings):
     """Define the configuration model for the TAI API service."""
 
+    aws_default_region: AWSRegion = Field(
+        default=AWSRegion.US_EAST_1,
+        description="The default AWS region to use with the service.",
+    )
     pinecone_db_api_key_secret_name: str = Field(
         ...,
         description="The name of the secret containing the Pinecone API key.",
