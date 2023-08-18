@@ -346,7 +346,7 @@ class TaiSearchServiceStack(Stack):
         container: ContainerDefinition = task_definition.add_container(
             self._namer("container"),
             image=ContainerImage.from_asset(directory=CWD, file=DOCKER_FILE_NAME),
-            environment=self._search_service_settings.dict(),
+            environment=self._search_service_settings.dict(for_environment=True),
             logging=LogDriver.aws_logs(stream_prefix=self._namer("log")),
             gpu_count=0,
             memory_limit_mib=32000, # instance memory is only 16GB, this will force containers to fight for memory

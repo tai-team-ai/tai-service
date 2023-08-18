@@ -28,8 +28,6 @@ class BaseDeploymentSettings(BaseSettings):
                     value = value.value
                 if isinstance(value, Path):
                     value = str(value.resolve())
-                if isinstance(value, int) or isinstance(value, float):
-                    value = str(value)
                 if isinstance(value, dict) or isinstance(value, list) or isinstance(value, set) or isinstance(value, tuple):
                     value = json.dumps(value)
                 key = key.upper()
