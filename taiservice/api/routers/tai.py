@@ -33,7 +33,7 @@ def handle_error(exc: Exception) -> dict:
 
 
 @ROUTER.post("/chat", response_model=ChatSessionResponse)
-def chat(chat_session: ChatSessionRequest, request: Request, response: Response):
+def chat(chat_session: ChatSessionRequest, request: Request):
     """Define the chat endpoint."""
     backend: Backend = getattr(request.app.state, BACKEND_ATTRIBUTE_NAME)
     try:
@@ -44,7 +44,7 @@ def chat(chat_session: ChatSessionRequest, request: Request, response: Response)
 
 
 @ROUTER.post("/search", response_model=SearchResults)
-def search(search_query: ResourceSearchQuery, request: Request, response: Response):
+def search(search_query: ResourceSearchQuery, request: Request):
     """Define the search endpoint."""
     try:
         backend: Backend = getattr(request.app.state, BACKEND_ATTRIBUTE_NAME)
@@ -54,7 +54,7 @@ def search(search_query: ResourceSearchQuery, request: Request, response: Respon
 
 
 @ROUTER.post("/search-summary")
-def search_summary(search_query: ResourceSearchQuery, request: Request, response: Response):
+def search_summary(search_query: ResourceSearchQuery, request: Request):
     """Define the search endpoint."""
     try:
         backend: Backend = getattr(request.app.state, BACKEND_ATTRIBUTE_NAME)
