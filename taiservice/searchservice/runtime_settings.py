@@ -103,7 +103,7 @@ class SearchServiceSettings(BaseSettings):
         docker_file = [
             # "FROM python:3.10 as dependencies",
             "FROM 763104351884.dkr.ecr.us-east-1.amazonaws.com/pytorch-inference:2.0.1-gpu-py310-cu118-ubuntu20.04-ec2 AS build",
-            "RUN apt-get update && apt-get install -y curl",
+            "RUN rm /etc/apt/sources.list.d/cuda.list && apt-get update && apt-get install -y curl",
             "RUN curl -sL https://deb.nodesource.com/setup_18.x | bash",
             # poppler-utils is used for the python pdf to image package
             "RUN apt-get update && \\\
