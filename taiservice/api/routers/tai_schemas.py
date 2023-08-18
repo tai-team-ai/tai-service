@@ -299,6 +299,7 @@ class ChatSessionResponse(BaseChatSession):
 EXAMPLE_SEARCH_QUERY = {
     "classId": EXAMPLE_UUID,
     "query": "dummy pdf",
+    "userId": EXAMPLE_UUID,
 }
 EXAMPLE_RESOURCE_SEARCH_QUERY = copy.deepcopy(EXAMPLE_SEARCH_QUERY)
 EXAMPLE_RESOURCE_SEARCH_QUERY.update(
