@@ -43,7 +43,7 @@ jobs:
       run: |
         npm install -g aws-cdk && \
         python -m pip install --upgrade pip && \
-        pip install projen && \
+        pip install projen<=0.72.14 && \
         projen && \
         source .venv/bin/activate && \
         pip list
