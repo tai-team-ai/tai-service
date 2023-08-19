@@ -202,8 +202,8 @@ class TaiSearchServiceStack(Stack):
             service_name=self._namer("service"),
             cluster=cluster,
             desired_count=1,
-            min_healthy_percent=100,
-            max_healthy_percent=200,
+            min_healthy_percent=0,
+            max_healthy_percent=100,
             task_definition=task_definition,
             security_groups=[security_group, sg_for_connecting_to_db],
         )
@@ -349,8 +349,7 @@ class TaiSearchServiceStack(Stack):
             environment=self._search_service_settings.dict(for_environment=True, export_aws_vars=True),
             logging=LogDriver.aws_logs(stream_prefix=self._namer("log")),
             gpu_count=0,
-            memory_limit_mib=32000, # instance memory is only 16GB, this will force containers to fight for memory
-            memory_reservation_mib=4000,
+            memory_limit_mib=15000, # instance memory is only 16GB, this will force containers to fight for memory
         )
         container.add_port_mappings(
             PortMapping(container_port=container_port),
