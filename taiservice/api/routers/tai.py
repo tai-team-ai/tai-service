@@ -48,7 +48,7 @@ def search(search_query: ResourceSearchQuery, request: Request):
     """Define the search endpoint."""
     try:
         backend: Backend = getattr(request.app.state, BACKEND_ATTRIBUTE_NAME)
-        return backend.search(search_query)
+        return backend.search(search_query, result_type="results")
     except Exception as e: # pylint: disable=broad-except
         return handle_error(e)
 

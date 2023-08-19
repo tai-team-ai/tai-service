@@ -16,7 +16,7 @@ class Permissions(str, Enum):
 class BaseDeploymentSettings(BaseSettings):
     """Define the base settings for the package."""
 
-    def dict(self, *args, for_environment: bool=False, **kwargs):
+    def dict(self, *args, for_environment: bool=False, export_aws_vars: bool=True, **kwargs):
         """Override the dict method to convert nested, dicts, sets and sequences to JSON."""
         output = super().dict(*args, **kwargs)
         if for_environment:
@@ -32,7 +32,9 @@ class BaseDeploymentSettings(BaseSettings):
                     value = json.dumps(value)
                 key = key.upper()
                 new_output[key] = str(value)
-            return new_output
+            output = new_output
+        if not export_aws_vars:
+            output = {key: value for key, value in output.items() if not key.startswith(("AWS_", "aws_"))}
         return output
 
     class Config:

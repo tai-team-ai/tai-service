@@ -204,8 +204,9 @@ class BaseLambda(Construct):
         self._function_props_dict = {
             "function_name": config.function_name,
             "description": config.description,
-            "environment": self._config.runtime_environment.dict(by_alias=True, exclude_none=True, for_environment=True),
+            "environment": self._config.runtime_environment.dict(by_alias=True, exclude_none=True, for_environment=True, export_aws_vars=False),
         }
+        print( self._config.runtime_environment.dict(by_alias=True, exclude_none=True, for_environment=True, export_aws_vars=False))
         self._build_context_folder = Path(f".build-{self._config.code_path.name}-{self._config.function_name}")
         self._initialize_build_folder()
         self._initialize_function_props()
