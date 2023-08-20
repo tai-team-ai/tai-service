@@ -338,7 +338,7 @@ class Backend:
 
     def _get_search_results(self, query: SearchQuery, endpoint_name: str) -> SearchResults:
         url = f"{self._runtime_settings.search_service_api_url}/{endpoint_name}"
-        response = requests.post(url, data=query.json(), timeout=10)
+        response = requests.post(url, data=query.json(), timeout=15)
         logger.info(f"Search response status code: {response.status_code}")
         if response.status_code == 200:
             try:

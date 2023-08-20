@@ -1,5 +1,6 @@
 """Define the API endpoints for the AI responses."""
-from fastapi import APIRouter, Request, Response, status, HTTPException
+from fastapi import APIRouter, Request, status, HTTPException
+from loguru import logger
 try:
     from ..taibackend.taitutors.errors import UserTokenLimitError
     from ..taibackend.backend import Backend
@@ -29,6 +30,7 @@ def handle_error(exc: Exception) -> dict:
     """Handle exceptions."""
     if isinstance(exc, UserTokenLimitError):
         raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail=exc.message)
+    logger.error(exc)
     raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal Server Error")
 
 

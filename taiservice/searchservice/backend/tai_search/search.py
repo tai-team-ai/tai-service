@@ -4,7 +4,7 @@ import re
 from multiprocessing import current_process, cpu_count, Pool
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-from typing import Optional, Union
+from typing import Optional, Union, Literal
 from uuid import UUID, uuid4
 import traceback
 from time import sleep
@@ -187,7 +187,7 @@ class TAISearch:
         is_search = True if len(query.split()) < 15 else False # assume search if the query is less than 15 words
         alpha = 0.4 if is_search else 0.7 # this is gut feel, we can tune this later, search is likely to use more precise terms
         docs_to_return = 5 if is_search else 3
-        pinecone_docs = self.embed_documents(documents=[chunk_doc])
+        pinecone_docs = self.embed_documents(documents=[chunk_doc], embedding_type='inference')
         similar_docs = self._pinecone_db.get_similar_documents(document=pinecone_docs.documents[0], alpha=alpha, doc_to_return=docs_to_return)
         uuids = [doc.metadata.chunk_id for doc in similar_docs.documents]
         chunk_docs = self._document_db.get_class_resources(uuids, ClassResourceChunkDocument, count_towards_metrics=True)
@@ -274,7 +274,11 @@ class TAISearch:
         if ingested_document.input_format == InputFormat.PDF:
             return get_page_number(documents)
 
-    def embed_documents(self, documents: Union[list[ClassResourceChunkDocument], ClassResourceChunkDocument]) -> PineconeDocuments:
+    def embed_documents(
+        self,
+        documents: Union[list[ClassResourceChunkDocument], ClassResourceChunkDocument],
+        embedding_type: Literal['inference', 'index'] = 'index',
+    ) -> PineconeDocuments:
         """Embed documents."""
         device = 'cuda' if torch.cuda.is_available() else 'cpu'
         logger.info(f"Using device '{device}' for vector encoding.")
@@ -291,7 +295,7 @@ class TAISearch:
         with ThreadPoolExecutor(max_workers=len(batches)) as executor:
             results = executor.map(_embed_batch, batches)
             vector_docs = [vector_doc for result in results for vector_doc in result]
-        sparse_vectors = self.get_sparse_vectors([doc.chunk for doc in documents])
+        sparse_vectors = self.get_sparse_vectors([doc.chunk for doc in documents], embedding_type=embedding_type)
         for vector_doc, sparse_vector in zip(vector_docs, sparse_vectors):
             vector_doc.sparse_values = sparse_vector
         class_ids = {doc.metadata.class_id for doc in vector_docs}
@@ -300,15 +304,18 @@ class TAISearch:
         return PineconeDocuments(class_id=class_id, documents=vector_docs)
 
     @staticmethod
-    def get_sparse_vectors(texts: list[str]) -> list[SparseVector]:
+    def get_sparse_vectors(texts: list[str], embedding_type: Literal['inference', 'index'] = 'index') -> list[SparseVector]:
         """Add sparse vectors to pinecone."""
-        batch_size = 50
-        batches = [texts[i:i + batch_size] for i in range(0, len(texts), batch_size)]
-        logger.info(f"Splitting {len(texts)} documents into {len(batches)} batches.")
-        with Pool(processes = cpu_count()) as pool:
-            result_batches = pool.map(get_sparse_vectors, batches)
-        sparse_vectors = [vector for batch in result_batches for vector in batch]
-        return sparse_vectors
+        if embedding_type == 'inference':
+            return get_sparse_vectors(texts)
+        else:
+            batch_size = 50
+            batches = [texts[i:i + batch_size] for i in range(0, len(texts), batch_size)]
+            logger.info(f"Splitting {len(texts)} documents into {len(batches)} batches.")
+            with Pool(processes = cpu_count()) as pool:
+                result_batches = pool.map(get_sparse_vectors, batches)
+            sparse_vectors = [vector for batch in result_batches for vector in batch]
+            return sparse_vectors
 
     @staticmethod
     def vector_document_from_dense_vectors(
