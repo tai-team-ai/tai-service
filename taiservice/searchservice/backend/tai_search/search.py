@@ -184,7 +184,7 @@ class TAISearch:
                 resource_type=ClassResourceType.TEXTBOOK,
             )
         )
-        is_search = True if len(query.split()) < 15 else False # assume search if the query is less than 15 words
+        is_search = True if len(query.split()) < 10 else False # assume search if the query is less than 15 words
         alpha = 0.4 if is_search else 0.7 # this is gut feel, we can tune this later, search is likely to use more precise terms
         docs_to_return = 5 if is_search else 3
         pinecone_docs = self.embed_documents(documents=[chunk_doc], embedding_type='inference')
