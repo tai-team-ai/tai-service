@@ -304,32 +304,32 @@ class Backend:
             ClassResourceDocument,
             count_towards_metrics=False
         )
-        doc = class_resource_docs[0] if class_resource_docs else None
-        if not doc:
+        existing_doc = class_resource_docs[0] if class_resource_docs else None
+        if not existing_doc:
             return False
-        stable = doc.status == ClassResourceProcessingStatus.COMPLETED \
-            or doc.status == ClassResourceProcessingStatus.FAILED
+        stable = existing_doc.status == ClassResourceProcessingStatus.COMPLETED \
+            or existing_doc.status == ClassResourceProcessingStatus.FAILED
         if not stable:
-            elapsed_time = (datetime.utcnow() - doc.modified_timestamp).total_seconds()
+            elapsed_time = (datetime.utcnow() - existing_doc.modified_timestamp).total_seconds()
             if elapsed_time > self._runtime_settings.class_resource_processing_timeout:
                 return True
         return False
 
-    def _is_duplicate_class_resource(self, doc: tai_search.IngestedDocument) -> bool:
+    def _is_duplicate_class_resource(self, new_doc: tai_search.IngestedDocument) -> bool:
         """Check if the document can be created."""
         class_resource_docs = self._doc_db.get_class_resources(
-            doc.class_id,
+            new_doc.class_id,
             ClassResourceDocument,
-            from_class_ids=True, 
+            from_class_ids=True,
             count_towards_metrics=False
         )
         docs = {doc.id: doc for doc in class_resource_docs}
         doc_hashes = set([class_resource_doc.hashed_document_contents for class_resource_doc in class_resource_docs])
         # find the doc and check the status, if failed, then we can overwrite
-        doc = docs.get(doc.id, None)
-        if not doc or (doc and doc.status == ClassResourceProcessingStatus.FAILED):
+        existing_doc = docs.get(new_doc.id, None)
+        if existing_doc and existing_doc.status == ClassResourceProcessingStatus.FAILED:
             return False
-        return doc.hashed_document_contents in doc_hashes
+        return new_doc.hashed_document_contents in doc_hashes
 
     def _coerce_and_update_status(
         self,

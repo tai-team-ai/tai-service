@@ -1,11 +1,15 @@
 """Define the tai_search module."""
 import os
 import re
+from multiprocessing import current_process, cpu_count, Pool
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Optional, Union
 from uuid import UUID, uuid4
 import traceback
+from time import sleep
+import torch
+import psutil
 from loguru import logger
 from pydantic import BaseModel, Field
 from langchain.embeddings import OpenAIEmbeddings
@@ -74,6 +78,30 @@ class IndexerConfig(BaseModel):
         ...,
         description="The path to the chrome driver.",
     )
+
+
+def get_sparse_vectors(batch: list[str]) -> list[SparseVector]:
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    splade = SpladeEncoder(device=device)
+    logger.info(f"Processing batch with {len(batch)} documents in pid {current_process().pid}")
+    if device == 'cuda':
+        vectors = splade.encode_documents(batch)
+    else:
+        memory_usage = psutil.virtual_memory().percent
+        available_memory = psutil.virtual_memory().available / 1024 / 1024 / 1024 # convert to GB
+        memory_percent_threshold = 90
+        gb_for_batch = len(batch) / 50 # this is a rough estimate of the memory needed for the batch based on experience
+        memory_available_threshold = gb_for_batch + 2 # safety buffer of 2 GB
+        time_to_sleep = 5
+        while memory_usage > memory_percent_threshold or available_memory < memory_available_threshold:
+            logger.warning(f"System resources constrained: memory usage: {memory_usage}%, available memory: {available_memory}GB, Retrying batch in pid {current_process().pid} in {time_to_sleep} seconds..")
+            sleep(time_to_sleep)
+            memory_usage = psutil.virtual_memory().percent
+            available_memory = psutil.virtual_memory().available
+        vectors = splade.encode_documents(batch)
+
+    sparse_vectors = [SparseVector.parse_obj(vec) for vec in vectors]
+    return sparse_vectors
 
 
 class TAISearch:
@@ -248,14 +276,13 @@ class TAISearch:
 
     def embed_documents(self, documents: Union[list[ClassResourceChunkDocument], ClassResourceChunkDocument]) -> PineconeDocuments:
         """Embed documents."""
+        device = 'cuda' if torch.cuda.is_available() else 'cpu'
+        logger.info(f"Using device '{device}' for vector encoding.")
         def _embed_batch(batch: list[ClassResourceChunkDocument]) -> list[PineconeDocument]:
             """Embed a batch of documents."""
             texts = [document.chunk for document in batch]
             dense_vectors = self._embedding_strategy.embed_documents(texts)
             vector_docs =  self.vector_document_from_dense_vectors(dense_vectors, batch)
-            sparse_vectors = self.get_sparse_vectors(texts)
-            for vector_doc, sparse_vector in zip(vector_docs, sparse_vectors):
-                vector_doc.sparse_values = sparse_vector
             return vector_docs
         if isinstance(documents, ClassResourceChunkDocument):
             documents = [documents]
@@ -264,6 +291,9 @@ class TAISearch:
         with ThreadPoolExecutor(max_workers=len(batches)) as executor:
             results = executor.map(_embed_batch, batches)
             vector_docs = [vector_doc for result in results for vector_doc in result]
+        sparse_vectors = self.get_sparse_vectors([doc.chunk for doc in documents])
+        for vector_doc, sparse_vector in zip(vector_docs, sparse_vectors):
+            vector_doc.sparse_values = sparse_vector
         class_ids = {doc.metadata.class_id for doc in vector_docs}
         if len(class_ids) != 1: raise RuntimeError(f"All documents must have the same class id. You provided: {class_ids}")
         class_id = class_ids.pop()
@@ -272,12 +302,12 @@ class TAISearch:
     @staticmethod
     def get_sparse_vectors(texts: list[str]) -> list[SparseVector]:
         """Add sparse vectors to pinecone."""
-        splade = SpladeEncoder()
-        vectors = splade.encode_documents(texts)
-        sparse_vectors = []
-        for vec in vectors:
-            sparse_vector = SparseVector.parse_obj(vec)
-            sparse_vectors.append(sparse_vector)
+        batch_size = 50
+        batches = [texts[i:i + batch_size] for i in range(0, len(texts), batch_size)]
+        logger.info(f"Splitting {len(texts)} documents into {len(batches)} batches.")
+        with Pool(processes = cpu_count()) as pool:
+            result_batches = pool.map(get_sparse_vectors, batches)
+        sparse_vectors = [vector for batch in result_batches for vector in batch]
         return sparse_vectors
 
     @staticmethod
@@ -285,6 +315,7 @@ class TAISearch:
         dense_vectors: list[list[float]],
         documents: list[ClassResourceChunkDocument],
     ) -> list[PineconeDocument]:
+        """Create a vector document from dense vectors."""
         vector_docs = []
         for dense_vector, document in zip(dense_vectors, documents):
             doc = PineconeDocument(

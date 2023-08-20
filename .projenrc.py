@@ -67,6 +67,7 @@ project:Project = AwsCdkPythonApp(
         "selenium",
         "pynamodb",
         "tiktoken",
+        "psutil",
     ],
 )
 

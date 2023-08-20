@@ -1,5 +1,6 @@
 """Define CRUD endpoints for class resources."""
 from fastapi import APIRouter, Request, Response, status, BackgroundTasks
+from loguru import logger
 from ...api.routers.class_resources_schema import ClassResource, ClassResources, ClassResourceIds
 from ..backend.backend import Backend, ServerOverloadedError
 from ...searchservice.backend.databases.errors import DuplicateClassResourceError
@@ -38,4 +39,5 @@ def create_class_resource(
             response.status_code = status.HTTP_429_TOO_MANY_REQUESTS
         else:
             response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
+        logger.error(error)
         return {"message": error.message}

@@ -1,6 +1,7 @@
 """Define the module with code to screenshot class resources."""
 from time import sleep
 import os
+import shutil
 from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Optional, Union
@@ -54,6 +55,10 @@ class ResourceUtility(ABC):
     ) -> Optional[list[Path]]:
         """Get the screenshot from a PDF."""
         output_folder = Path("/tmp") / f"{path.stem}_images"
+        try:
+            shutil.rmtree(output_folder)
+        except FileNotFoundError:
+            pass
         os.makedirs(output_folder, exist_ok=True)
         convert_from_path(
             path,

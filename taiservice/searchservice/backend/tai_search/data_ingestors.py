@@ -174,23 +174,18 @@ class Ingestor(ABC):
         object_prefix = cls._get_object_prefix(ingested_doc)
         screenshot_urls, split_resource_urls = [], []
         def screenshot_upload_resource() -> Union[list[HttpUrl], HttpUrl]:
-            logger.info(f"Screenshotting {len(chunks)} chunks")
             screenshot_paths = cls._screenshot_resource(ingested_doc.data_pointer, ingested_doc.input_format, first_page_only=False)
             screenshot_object_keys = [f"{object_prefix}{i + 1}/{path.name}" for i, path in enumerate(screenshot_paths)]
-            logger.info(f"Uploading {len(chunks)} screenshots")
             return cls._upload_to_cold_store(screenshot_paths, screenshot_object_keys, bucket_name)
         def split_and_upload_pdf() -> Union[list[HttpUrl], HttpUrl]:
-            logger.info(f"Splitting {len(chunks)} chunks")
             split_resource_paths = PDF.split_resource(input_path=ingested_doc.data_pointer)
             split_objects_keys = [f"{object_prefix}{i +  1}/{path.name}" for i, path in enumerate(split_resource_paths)]
-            logger.info(f"Uploading {len(chunks)} chunks")
             return cls._upload_to_cold_store(split_resource_paths, split_objects_keys, bucket_name)
         screenshot_urls = cls.run_screenshot_op(screenshot_upload_resource)
         if isinstance(screenshot_urls, str) and ingested_doc.input_format != InputFormat.HTML:
             screenshot_urls = [screenshot_urls]
         if ingested_doc.input_format == InputFormat.PDF:
             split_resource_urls = cls.run_split_resource_op(split_and_upload_pdf)
-            logger.info(f"Split {len(chunks)} chunks")
             if isinstance(split_resource_urls, str):
                 split_resource_urls = [split_resource_urls]
             for chunk in chunks:
