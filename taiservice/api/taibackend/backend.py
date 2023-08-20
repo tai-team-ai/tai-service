@@ -268,7 +268,7 @@ class Backend:
         resource_queue = deque(class_resources.class_resources)
         while resource_queue:
             resource = resource_queue.popleft()
-            response = requests.post(url, data=resource.json(), timeout=10)
+            response = requests.post(url, data=resource.json(), timeout=15)
             if response.status_code not in {200, 201, 202}:
                 error_message = f"Failed to create class resources. Status code: {response.status_code}"
                 logger.error(error_message)

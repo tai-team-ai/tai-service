@@ -193,7 +193,7 @@ class Backend:
             raise ServerOverloadedError("Server is overloaded, please try again later.")
         input_doc = self.to_backend_input_docs(class_resource)[0]
         ingested_doc = self._tai_search.ingest_document(input_doc)
-        if self._is_stuck_processing(ingested_doc): # if it's stuck, we should continue as the operations are idempotent
+        if self._is_stuck_processing(ingested_doc.id): # if it's stuck, we should continue as the operations are idempotent
             pass
         elif self._is_duplicate_class_resource(ingested_doc):
             raise DuplicateClassResourceError(f"Duplicate class resource: {ingested_doc.id} in class {ingested_doc.class_id}")
@@ -326,9 +326,10 @@ class Backend:
         docs = {doc.id: doc for doc in class_resource_docs}
         doc_hashes = set([class_resource_doc.hashed_document_contents for class_resource_doc in class_resource_docs])
         # find the doc and check the status, if failed, then we can overwrite
-        if doc.id in docs and docs[doc.id].status == ClassResourceProcessingStatus.FAILED:
+        doc = docs.get(doc.id, None)
+        if not doc or (doc and doc.status == ClassResourceProcessingStatus.FAILED):
             return False
-        return doc.id in docs or doc.hashed_document_contents in doc_hashes
+        return doc.hashed_document_contents in doc_hashes
 
     def _coerce_and_update_status(
         self,

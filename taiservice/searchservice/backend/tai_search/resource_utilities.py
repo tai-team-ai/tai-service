@@ -1,5 +1,6 @@
 """Define the module with code to screenshot class resources."""
 from time import sleep
+import os
 from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Optional, Union
@@ -52,12 +53,20 @@ class ResourceUtility(ABC):
         last_page_to_include: Optional[int] = None
     ) -> Optional[list[Path]]:
         """Get the screenshot from a PDF."""
-        images = convert_from_path(path, first_page=start_page, last_page=last_page_to_include)
+        output_folder = Path("/tmp") / f"{path.stem}_images"
+        os.makedirs(output_folder, exist_ok=True)
+        convert_from_path(
+            path,
+            fmt="png",
+            output_folder=output_folder,
+            first_page=start_page,
+            last_page=last_page_to_include
+        )
         paths = []
-        for i, image in enumerate(images):
-            save_path = path.parent / f"{path.stem}_{i}.png"
-            paths.append(save_path)
-            image.save(save_path, format='png')
+        for i, file in enumerate(output_folder.iterdir()):
+            new_path = output_folder / f"{path.stem}_{i + 1}.png"
+            os.rename(file, new_path)
+            paths.append(new_path)
         if len(paths) > 0:
             return paths
         logger.warning(f"Could not get screenshot from PDF {path}")

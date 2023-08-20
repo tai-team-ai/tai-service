@@ -83,6 +83,10 @@ class PineconeDocuments(BasePydanticModel):
         validate_assignment = True
         extra = Extra.ignore
 
+    def __len__(self) -> int:
+        """Return the number of documents."""
+        return len(self.documents)
+
     @root_validator(pre=True)
     def ensure_all_have_same_class_id_and_set_namespace(cls, values: Dict) -> Dict:
         """Ensure that all documents have the same class id."""
