@@ -27,6 +27,7 @@ class ClassResourceProcessingStatus(str, Enum):
 class ResourceUploadFailureReason(str, Enum):
     """Define the possible failures when uploading a resource."""
     DUPLICATE_RESOURCE = "duplicateResource"
+    TO_MANY_REQUESTS = "toManyRequests"
     UNSUPPORTED_RESOURCE_TYPE = "unsupportedResourceType"
     UNPROCESSABLE_RESOURCE = "unprocessableResource"
 

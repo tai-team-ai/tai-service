@@ -15,10 +15,10 @@ ROUTER = APIRouter()
 
 
 @ROUTER.get("/class-resources", response_model=ClassResources)
-def get_class_resources(ids: ClassResourceIds, request: Request, from_class_ids: bool = True):
+def get_class_resources(id: ClassResourceIds, request: Request, from_class_ids: bool = True):
     """Get all class resources."""
     backend: Backend = getattr(request.app.state, BACKEND_ATTRIBUTE_NAME)
-    class_resource_docs = backend.get_class_resources(ids, from_class_ids=from_class_ids)
+    class_resource_docs = backend.get_class_resources(id, from_class_ids=from_class_ids)
     return ClassResources(class_resources=class_resource_docs)
 
 

@@ -270,14 +270,14 @@ class Backend:
             resource = resource_queue.popleft()
             response = requests.post(url, data=resource.json(), timeout=15)
             if response.status_code not in {200, 201, 202}:
-                error_message = f"Failed to create class resources. Status code: {response.status_code}"
-                logger.error(error_message)
                 if response.status_code == 409:
                     reason = ResourceUploadFailureReason.DUPLICATE_RESOURCE
                 elif response.status_code == 429:
-                    reason = ResourceUploadFailureReason.UNPROCESSABLE_RESOURCE
+                    reason = ResourceUploadFailureReason.TO_MANY_REQUESTS
                 else:
                     reason = ResourceUploadFailureReason.UNPROCESSABLE_RESOURCE
+                error_message = response.json().get('message', "Failed to create class resource.")
+                logger.error(error_message)
                 failed_resources.failed_resources.append(
                     FailedResource(
                         failure_reason=reason,
