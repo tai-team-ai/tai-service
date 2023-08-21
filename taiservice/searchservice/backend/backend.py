@@ -92,6 +92,17 @@ class Backend:
         )
 
     @staticmethod
+    def log_system_health() -> None:
+        """Log the system health."""
+        cpu_load = psutil.cpu_percent(interval=1)
+        svmem = psutil.virtual_memory()
+        mem_available_GB = svmem.available / 1024 ** 3
+        mem_percent = svmem.percent
+        logger.info(f"CPU Load: {cpu_load}%")
+        logger.info(f"Memory Available: {round(mem_available_GB, 2)}GB")
+        logger.info(f"Memory Percent: {mem_percent}%")
+
+    @staticmethod
     def to_backend_input_docs(resources: Union[ClassResources, ClassResource]) -> list[tai_search.InputDocument]:
         """Convert the API documents to database documents."""
         input_documents = []

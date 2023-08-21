@@ -48,7 +48,7 @@ def create_app() -> FastAPI:
     @app.middleware("http")
     async def middleware(request: Request, call_next):
         response = await call_next(request)
-
+        Backend.log_system_health()
         # Check and remove 'access-control-allow-origin' if exists to avoid conflict with AWS adding it's own
         if "access-control-allow-origin" in response.headers:
             del response.headers["access-control-allow-origin"]
