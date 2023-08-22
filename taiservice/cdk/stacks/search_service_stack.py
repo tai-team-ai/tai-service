@@ -331,7 +331,7 @@ class TaiSearchServiceStack(Stack):
             # create a schedule that schedules the service to run between 6am and midnight
             asg.scale_on_schedule(
                 self._namer("scale-up"),
-                schedule=Schedule.cron(hour="8", minute="0", week_day="*"),
+                schedule=Schedule.cron(hour="6", minute="0", week_day="*"),
                 min_capacity=1,
                 max_capacity=1,
                 time_zone=TIME_ZONE,
@@ -344,9 +344,11 @@ class TaiSearchServiceStack(Stack):
                 time_zone=TIME_ZONE,
             )
         asg.scale_on_cpu_utilization(
-            id=self._namer("cpu-scaling"),
+            id=self._namer("asg-cpu-scaling"),
             target_utilization_percent=50,
-            cooldown=Duration.seconds(300),
+            # this needs to be pretty long as it takes a bit for the container to place
+            # due to the large container image size
+            cooldown=Duration.seconds(600),
             disable_scale_in=False,
         )
         return asg
@@ -381,17 +383,16 @@ class TaiSearchServiceStack(Stack):
 
     def _get_scalable_task(self, service: Ec2Service, target_group: ApplicationTargetGroup) -> ScalableTaskCount:
         scaling_task = service.auto_scale_task_count(
-            max_capacity=1,
+            max_capacity=4,
             min_capacity=1,
         )
         scaling_task.scale_on_cpu_utilization(
-            self._namer("cpu-scaling"),
-            target_utilization_percent=80,
-        )
-        scaling_task.scale_on_request_count(
-            self._namer("request-scaling"),
-            target_group=target_group,
-            requests_per_target=100,
+            id=self._namer("task-cpu-scaling"),
+            target_utilization_percent=50,
+            # this needs to be pretty long as it takes a bit for the container to place
+            # due to the large container image size
+            scale_out_cooldown=Duration.seconds(600),
+            disable_scale_in=False,
         )
         return scaling_task
 
