@@ -50,8 +50,9 @@ def create_app() -> FastAPI:
     # add a logger to the middleware to log all requests
     @app.middleware("http")
     async def middleware(request: Request, call_next):
-        response = await call_next(request)
+        logger.info(f"Request path: {request.url.path}")
         Backend.log_system_health()
+        response = await call_next(request)
         # Check and remove 'access-control-allow-origin' if exists to avoid conflict with AWS adding it's own
         if "access-control-allow-origin" in response.headers:
             del response.headers["access-control-allow-origin"]

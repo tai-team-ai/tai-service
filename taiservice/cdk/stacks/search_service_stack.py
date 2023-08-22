@@ -22,6 +22,7 @@ from aws_cdk.aws_ecs import (
     AmiHardwareType,
     LogDriver,
     AsgCapacityProvider,
+    DeploymentCircuitBreaker,
 )
 from aws_cdk.aws_elasticloadbalancingv2 import (
     ApplicationLoadBalancer,
@@ -35,6 +36,7 @@ from aws_cdk.aws_autoscaling import (
     AutoScalingGroup,
     Schedule,
     Signals,
+    WarmPool,
 )
 from tai_aws_account_bootstrap.stack_helpers import add_tags
 from tai_aws_account_bootstrap.stack_config_models import StackConfigBaseModel
@@ -167,9 +169,9 @@ class TaiSearchServiceStack(Stack):
         self._create_docker_file(container_port)
         service: Ec2Service = self._create_ecs_service(container_port, target_port, sg_for_connecting_to_db)
         services = [service]
-        target_group: ApplicationTargetGroup = self._get_target_group(services, target_port, target_protocol=ApplicationProtocol.HTTP)
+        self._get_target_group(services, target_port, target_protocol=ApplicationProtocol.HTTP)
         for service in services:
-            self._get_scalable_task(service, target_group)
+            self._get_scalable_task(service)
         return services
 
     def _create_ecs_service(
@@ -207,6 +209,7 @@ class TaiSearchServiceStack(Stack):
             max_healthy_percent=100,
             task_definition=task_definition,
             security_groups=[security_group, sg_for_connecting_to_db],
+            circuit_breaker=DeploymentCircuitBreaker(rollback=True)
         )
         return service
 
@@ -266,6 +269,7 @@ class TaiSearchServiceStack(Stack):
         GPU_END_HOUR = 8
         BUFFER_FOR_SERVICE_SWITCH_MINUTES = 20
         max_num_instances = 2
+        max_instance_lifetime = Duration.days(10)
         if service_type == ECSServiceType.GPU:
             instance_type = ec2.InstanceType.of(
                 instance_class=ec2.InstanceClass.G4DN,
@@ -281,6 +285,7 @@ class TaiSearchServiceStack(Stack):
                 min_capacity=1,
                 # spot_price="0.35",
                 block_devices=block_devices,
+                max_instance_lifetime=max_instance_lifetime,
             )
             asg.scale_on_schedule(
                 self._namer("gpu-scale-up"),
@@ -311,7 +316,7 @@ class TaiSearchServiceStack(Stack):
                 min_capacity=1,
                 # spot_price="0.35",
                 block_devices=block_devices,
-                
+                max_instance_lifetime=max_instance_lifetime,
             )
             # TODO: once we support gpu, we'll add a schedule to switch between the two during busy times
             # asg.scale_on_schedule(
@@ -333,7 +338,7 @@ class TaiSearchServiceStack(Stack):
                 self._namer("scale-up"),
                 schedule=Schedule.cron(hour="6", minute="0", week_day="*"),
                 min_capacity=1,
-                max_capacity=1,
+                max_capacity=max_num_instances,
                 time_zone=TIME_ZONE,
             )
             asg.scale_on_schedule(
@@ -343,13 +348,10 @@ class TaiSearchServiceStack(Stack):
                 max_capacity=0,
                 time_zone=TIME_ZONE,
             )
-        asg.scale_on_cpu_utilization(
-            id=self._namer("asg-cpu-scaling"),
-            target_utilization_percent=50,
-            # this needs to be pretty long as it takes a bit for the container to place
-            # due to the large container image size
-            cooldown=Duration.seconds(600),
-            disable_scale_in=False,
+        WarmPool(
+            self,
+            id=self._namer("asg-warm-pool"),
+            auto_scaling_group=asg,
         )
         return asg
 
@@ -378,17 +380,24 @@ class TaiSearchServiceStack(Stack):
             peer=ec2.Peer.any_ipv4(),
             connection=ec2.Port.tcp(target_port),
         )
-
         return target_sg
 
-    def _get_scalable_task(self, service: Ec2Service, target_group: ApplicationTargetGroup) -> ScalableTaskCount:
+    def _get_scalable_task(self, service: Ec2Service) -> ScalableTaskCount:
         scaling_task = service.auto_scale_task_count(
-            max_capacity=4,
+            max_capacity=2,
             min_capacity=1,
         )
         scaling_task.scale_on_cpu_utilization(
             id=self._namer("task-cpu-scaling"),
             target_utilization_percent=50,
+            # this needs to be pretty long as it takes a bit for the container to place
+        # due to the large container image size
+            scale_out_cooldown=Duration.seconds(600),
+            disable_scale_in=False,
+        )
+        scaling_task.scale_on_memory_utilization(
+            id=self._namer("task-memory-scaling"),
+            target_utilization_percent=75,
             # this needs to be pretty long as it takes a bit for the container to place
             # due to the large container image size
             scale_out_cooldown=Duration.seconds(600),

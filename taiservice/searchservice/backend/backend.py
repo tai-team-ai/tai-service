@@ -290,7 +290,7 @@ class Backend:
         svmem = psutil.virtual_memory()
         mem_available_MB = svmem.available / 1024 ** 2
         mem_percent = svmem.percent
-        if cpu_load > 95 or mem_percent > 95 or mem_available_MB < 1000:
+        if cpu_load > 85 or mem_percent > 85 or mem_available_MB < 3000:
             return False
         return True
 
