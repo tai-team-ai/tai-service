@@ -76,6 +76,10 @@
       "type": "runtime"
     },
     {
+      "name": "psutil",
+      "type": "runtime"
+    },
+    {
       "name": "pydantic[dotenv]<=1.10.11",
       "type": "runtime"
     },

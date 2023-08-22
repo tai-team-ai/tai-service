@@ -34,10 +34,10 @@ from aws_cdk.aws_autoscaling import (
     BlockDeviceVolume,
     EbsDeviceVolumeType,
     AutoScalingGroup,
-    Schedule,
     Signals,
     WarmPool,
 )
+from aws_cdk.aws_applicationautoscaling import Schedule
 from tai_aws_account_bootstrap.stack_helpers import add_tags
 from tai_aws_account_bootstrap.stack_config_models import StackConfigBaseModel
 from .search_service_settings import DeploymentTaiApiSettings
@@ -263,11 +263,6 @@ class TaiSearchServiceStack(Stack):
                 ),
             ),
         ]
-        TIME_ZONE = "US/Mountain"
-        DAY_OF_WEEK = "MON"
-        GPU_START_HOUR = 6
-        GPU_END_HOUR = 8
-        BUFFER_FOR_SERVICE_SWITCH_MINUTES = 20
         max_num_instances = 2
         max_instance_lifetime = Duration.days(10)
         if service_type == ECSServiceType.GPU:
@@ -287,20 +282,6 @@ class TaiSearchServiceStack(Stack):
                 block_devices=block_devices,
                 max_instance_lifetime=max_instance_lifetime,
             )
-            asg.scale_on_schedule(
-                self._namer("gpu-scale-up"),
-                schedule=Schedule.cron(hour=str(GPU_START_HOUR), minute="0", week_day=DAY_OF_WEEK),
-                min_capacity=1,
-                max_capacity=1,
-                time_zone=TIME_ZONE,
-            )
-            asg.scale_on_schedule(
-                self._namer("gpu-scale-down"),
-                schedule=Schedule.cron(hour=str(GPU_END_HOUR), minute="0", week_day=DAY_OF_WEEK),
-                min_capacity=0,
-                max_capacity=0,
-                time_zone=TIME_ZONE,
-            )
         else:
             instance_type = ec2.InstanceType.of(
                 instance_class=ec2.InstanceClass.R6A,
@@ -318,40 +299,11 @@ class TaiSearchServiceStack(Stack):
                 block_devices=block_devices,
                 max_instance_lifetime=max_instance_lifetime,
             )
-            # TODO: once we support gpu, we'll add a schedule to switch between the two during busy times
-            # asg.scale_on_schedule(
-            #     self._namer("scale-up"),
-            #     schedule=Schedule.cron(hour=str(GPU_END_HOUR - 1), minute=str(60 - BUFFER_FOR_SERVICE_SWITCH_MINUTES), week_day=DAY_OF_WEEK),
-            #     min_capacity=1,
-            #     max_capacity=1,
-            #     time_zone=TIME_ZONE,
-            # )
-            # asg.scale_on_schedule(
-            #     self._namer("scale-down"),
-            #     schedule=Schedule.cron(hour=str(GPU_START_HOUR), minute=str(BUFFER_FOR_SERVICE_SWITCH_MINUTES), week_day=DAY_OF_WEEK),
-            #     min_capacity=0,
-            #     max_capacity=0,
-            #     time_zone=TIME_ZONE,
-            # )
-            # create a schedule that schedules the service to run between 6am and midnight
-            asg.scale_on_schedule(
-                self._namer("scale-up"),
-                schedule=Schedule.cron(hour="6", minute="0", week_day="*"),
-                min_capacity=1,
-                max_capacity=max_num_instances,
-                time_zone=TIME_ZONE,
-            )
-            asg.scale_on_schedule(
-                self._namer("scale-down"),
-                schedule=Schedule.cron(hour="23", minute="0", week_day="*"),
-                min_capacity=0,
-                max_capacity=0,
-                time_zone=TIME_ZONE,
-            )
         WarmPool(
             self,
             id=self._namer("asg-warm-pool"),
             auto_scaling_group=asg,
+            reuse_on_scale_in=True,
         )
         return asg
 
@@ -362,7 +314,7 @@ class TaiSearchServiceStack(Stack):
             environment=self._search_service_settings.dict(for_environment=True, export_aws_vars=True),
             logging=LogDriver.aws_logs(stream_prefix=self._namer("log")),
             gpu_count=0,
-            memory_limit_mib=15000,
+            memory_reservation_mib=15000,
         )
         container.add_port_mappings(
             PortMapping(container_port=container_port),
@@ -383,25 +335,35 @@ class TaiSearchServiceStack(Stack):
         return target_sg
 
     def _get_scalable_task(self, service: Ec2Service) -> ScalableTaskCount:
+        min_task_count = 1
+        max_task_count = 2
         scaling_task = service.auto_scale_task_count(
-            max_capacity=2,
-            min_capacity=1,
+            min_capacity=min_task_count,
+            max_capacity=max_task_count,
         )
         scaling_task.scale_on_cpu_utilization(
             id=self._namer("task-cpu-scaling"),
             target_utilization_percent=50,
-            # this needs to be pretty long as it takes a bit for the container to place
-        # due to the large container image size
-            scale_out_cooldown=Duration.seconds(600),
+            scale_out_cooldown=Duration.seconds(120), # we should be fast because of the warm pool
             disable_scale_in=False,
         )
         scaling_task.scale_on_memory_utilization(
             id=self._namer("task-memory-scaling"),
             target_utilization_percent=75,
-            # this needs to be pretty long as it takes a bit for the container to place
-            # due to the large container image size
-            scale_out_cooldown=Duration.seconds(600),
+            scale_out_cooldown=Duration.seconds(120), # we should be fast because of the warm pool
             disable_scale_in=False,
+        )
+        scaling_task.scale_on_schedule(
+            id=self._namer("scale-up"),
+            schedule=Schedule.cron(hour="12", minute="0", week_day="*"),
+            min_capacity=min_task_count,
+            max_capacity=max_task_count,
+        )
+        scaling_task.scale_on_schedule(
+            self._namer("scale-down"),
+            schedule=Schedule.cron(hour="6", minute="0", week_day="*"),
+            min_capacity=0,
+            max_capacity=0,
         )
         return scaling_task
 

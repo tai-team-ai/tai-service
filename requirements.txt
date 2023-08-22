@@ -16,6 +16,7 @@ openai
 pdf2image
 pinecone-client[grpc]
 pinecone-text[splade]
+psutil
 pydantic[dotenv]<=1.10.11
 pydantic<=1.10.11
 pygit2

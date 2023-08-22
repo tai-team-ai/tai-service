@@ -15,10 +15,10 @@
       "env": {
         "MESSAGE_ARCHIVE_BUCKET_NAME": "llm-message-archive-dev",
         "DYNAMODB_HOST": "http://localhost:8888",
-        // "SEARCH_SERVICE_API_URL": "http://tai-s-taise-125N3549KKY44-808887776.us-east-1.elb.amazonaws.com",
-        "SEARCH_SERVICE_API_URL": "http://localhost:8080",
+        "SEARCH_SERVICE_API_URL": "http://tai-s-taise-QKBE7U7I2JJJ-958927155.us-east-1.elb.amazonaws.com",
         "OPENAI_API_KEY_SECRET_NAME": "dev/tai_service/openai/api_key",
-        "AWS_DEFAULT_REGION": "us-east-1"
+        "AWS_DEFAULT_REGION": "us-east-1",
+        "LOG_LEVEL": "DEBUG"
       },
       "program": "${workspaceFolder}/.venv/bin/uvicorn"
     },
@@ -46,7 +46,8 @@
         "PINECONE_DB_API_KEY_SECRET_NAME": "dev/tai_service/pinecone_db/api_key",
         "PINECONE_DB_ENVIRONMENT": "us-east-1-aws",
         "OPENAI_API_KEY_SECRET_NAME": "dev/tai_service/openai/api_key",
-        "AWS_DEFAULT_REGION": "us-east-1"
+        "AWS_DEFAULT_REGION": "us-east-1",
+        "LOG_LEVEL": "DEBUG"
       },
       "program": "${workspaceFolder}/.venv/bin/uvicorn"
     }

@@ -1,10 +1,11 @@
 """Define the tai_search module."""
 import os
 import re
+from functools import partial
 from multiprocessing import current_process, cpu_count, Pool
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-from typing import Optional, Union, Literal
+from typing import Any, Callable, Optional, Union, Literal
 from uuid import UUID, uuid4
 import traceback
 from time import sleep
@@ -80,31 +81,56 @@ class IndexerConfig(BaseModel):
     )
 
 
-def resources_constrained(batch: list[str]) -> bool:
+class ResourceLimits(BaseModel):
+    """Define the custom parameters for resource usage."""
+    memory_percent_threshold: Optional[float] = Field(
+        70.0,
+        le=80.0,
+        description="The threshold for memory usage percentage beyond which system is considered as resource constrained.",
+    )
+    cpu_percent_threshold: Optional[float] = Field(
+        60.0,
+        le=80.0,
+        description="The threshold for CPU usage percentage beyond which system is considered as resource constrained.",
+    )
+    additional_memory_gb: Optional[float] = Field(
+        2.0,
+        description="The safety buffer of memory in GB that needs to be available apart from the estimated memory for batch processing.",
+    )
+
+
+def resources_constrained(resource_limits: ResourceLimits) -> bool:
     """
-    Checks if the system resources (CPU and Memory) are currently constrained.
-
-    This function returns a boolean indicating whether or not the system's CPU usage,
-    memory usage, or available memory has crossed their respective thresholds. 
-    This is primarily to ensure that the 
-    resource-intensive process of indexing doesn't crash the server. 
-
-    Args:
-        batch: The list of strings that would be processed.
-
-    Returns:
-        True if the resources are constrained, False otherwise.
+    Helper function for checking system resources.
     """
     memory_usage = psutil.virtual_memory().percent
     cpu_usage = psutil.cpu_percent()
     available_memory = psutil.virtual_memory().available / 1024 / 1024 / 1024  # convert to GB
-    memory_percent_threshold = 80
-    cpu_percent_threshold = 70
-    gb_for_batch = len(batch) / 50  # this is a rough estimate of the memory needed for the batch based on experience
-    memory_available_threshold = gb_for_batch + 2  # safety buffer of 2 GB
-    if memory_usage > memory_percent_threshold or cpu_usage > cpu_percent_threshold or available_memory < memory_available_threshold:
-        return True
-    return False
+    are_resources_constrained = memory_usage > resource_limits.memory_percent_threshold or \
+        cpu_usage > resource_limits.cpu_percent_threshold or available_memory < resource_limits.additional_memory_gb
+    return are_resources_constrained
+
+
+def execute_with_resource_check(func: Callable[..., Any], resource_limits: ResourceLimits = ResourceLimits()) -> Any:
+    """
+    Executes the given partial function based on system resource availability.
+
+    This function checks whether system resources are constrained or not before starting the
+    resource-intensive process. If resources are constrained, it retries until resources 
+    are sustainably available.
+
+    Args:
+        func: The partial function to be executed.
+        resource_limits: An instance of ResourceLimits to customize CPU and memory usage, as well as available memory.
+
+    Returns:
+        The function's return value.
+    """
+    time_to_sleep = 5
+    while resources_constrained(resource_limits=resource_limits):
+        logger.warning(f"System resources constrained. Retrying operatino {func} after {time_to_sleep} seconds.")
+        sleep(time_to_sleep)
+    return func()
 
 
 def get_sparse_vectors(batch: list[str]) -> list[SparseVector]:
@@ -125,11 +151,9 @@ def get_sparse_vectors(batch: list[str]) -> list[SparseVector]:
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     splade = SpladeEncoder(device=device)
     logger.debug(f"Processing batch with {len(batch)} documents in pid {current_process().pid}")
-    time_to_sleep = 5
-    while resources_constrained(batch):
-        logger.warning(f"System resources constrained. Retrying batch in pid {current_process().pid} in {time_to_sleep} seconds..")
-        sleep(time_to_sleep)
-    vectors = splade.encode_documents(batch)
+    partial_func = partial(splade.encode_documents, batch)
+    gb_for_batch = len(batch) / 50  # this is a rough estimate of the memory needed for the batch based on experience
+    vectors = execute_with_resource_check(partial_func, ResourceLimits(additional_memory_gb=gb_for_batch))
     sparse_vectors = [SparseVector.parse_obj(vec) for vec in vectors]
     return sparse_vectors
 
@@ -165,14 +189,17 @@ class TAISearch:
             logger.info(f"Finished loading and splitting document into {len(chunk_documents)} chunks: {ingested_document.id}")
             class_resource_document.class_resource_chunk_ids = [chunk_doc.id for chunk_doc in chunk_documents]
             logger.info(f"Uploading {len(chunk_documents)} document to cold store: {ingested_document.id}")
-            Ingestor.upload_document_to_cold_store(
+            partial_func = partial(
+                Ingestor.upload_document_to_cold_store,
                 bucket_name=self._cold_store_bucket_name,
                 ingested_doc=ingested_document,
                 chunks=chunk_documents,
             )
+            execute_with_resource_check(partial_func)
             logger.info(f"Finished uploading {len(chunk_documents)}  chunks to cold store: {ingested_document.id}")
             logger.info(f"Embedding {len(chunk_documents)} chunks: {ingested_document.id}")
-            vector_documents = self.embed_documents(chunk_documents)
+            partial_func = partial(self.embed_documents, chunk_documents)
+            vector_documents = execute_with_resource_check(partial_func)
             logger.info(f"Finished embedding {len(chunk_documents)}  chunks: {ingested_document.id}")
             logger.info(f"Loading {len(chunk_documents)}  chunks to db: {ingested_document.id}")
             self._load_class_resources_to_db(class_resource_document, chunk_documents)

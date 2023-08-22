@@ -1,5 +1,6 @@
 """Define CRUD endpoints for class resources."""
 from fastapi import APIRouter, Request, Response, status
+from loguru import logger
 # first imports are for local development, second imports are for deployment
 try:
     from .class_resources_schema import ClassResources, ClassResourceIds, FailedResources
@@ -27,6 +28,9 @@ def create_class_resource(class_resources: ClassResources, request: Request, res
     """Create a class resource."""
     backend: Backend = getattr(request.app.state, BACKEND_ATTRIBUTE_NAME)
     failed_resources = backend.create_class_resources(class_resources)
+    if len(failed_resources.failed_resources) > 0:
+        logger.info(f"Class resources: {class_resources.class_resources}")
+        logger.warning(f"Failed resources: {failed_resources}")
     if len(failed_resources.failed_resources) < len(class_resources.class_resources) and len(failed_resources.failed_resources) > 0:
         response.status_code = status.HTTP_207_MULTI_STATUS
     elif len(failed_resources.failed_resources) == len(class_resources.class_resources):

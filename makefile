@@ -29,10 +29,10 @@ build-and-run-docker-api:
 	cdk synth && \
 	cd $(DIR) && \
 	sudo docker build -t test-container -f $(DOCKER_FILE) . && \
-	sudo docker run --network host MESSAGE_ARCHIVE_BUCKET_NAME="llm-message-archive-dev" DYNAMODB_HOST="http://localhost:8888" SEARCH_SERVICE_API_URL="http://tai-s-taise-125N3549KKY44-808887776.us-east-1.elb.amazonaws.com" OPENAI_API_KEY_SECRET_NAME="dev/tai_service/openai/api_key" AWS_DEFAULT_REGION="us-east-1" test-container
+	sudo docker run --network host MESSAGE_ARCHIVE_BUCKET_NAME="llm-message-archive-dev" DYNAMODB_HOST="http://localhost:8888" SEARCH_SERVICE_API_URL="http://tai-s-taise-QKBE7U7I2JJJ-958927155.us-east-1.elb.amazonaws.com" OPENAI_API_KEY_SECRET_NAME="dev/tai_service/openai/api_key" AWS_DEFAULT_REGION="us-east-1" LOG_LEVEL="DEBUG" test-container
 
 build-and-run-docker-search-service:
 	cdk synth && \
 	cd $(DIR) && \
 	sudo docker build -t test-container -f $(DOCKER_FILE) . && \
-	sudo docker run --network host PINECONE_DB_INDEX_NAME="tai-index" DOC_DB_CREDENTIALS_SECRET_NAME="dev/tai_service/document_DB/read_write_user_password" DOC_DB_FULLY_QUALIFIED_DOMAIN_NAME="tai-service-645860363137.us-east-1.docdb-elastic.amazonaws.com" DOC_DB_DATABASE_NAME="class_resources" DOC_DB_CLASS_RESOURCE_COLLECTION_NAME="class_resource" DOC_DB_CLASS_RESOURCE_CHUNK_COLLECTION_NAME="class_resource_chunk" COLD_STORE_BUCKET_NAME="tai-service-class-resource-cold-store-dev" DOCUMENTS_TO_INDEX_QUEUE="tai-service-documents-to-index-queue-dev" NLTK_DATA="/tmp/nltk_data" PINECONE_DB_API_KEY_SECRET_NAME="dev/tai_service/pinecone_db/api_key" PINECONE_DB_ENVIRONMENT="us-east-1-aws" OPENAI_API_KEY_SECRET_NAME="dev/tai_service/openai/api_key" AWS_DEFAULT_REGION="us-east-1" test-container
+	sudo docker run --network host PINECONE_DB_INDEX_NAME="tai-index" DOC_DB_CREDENTIALS_SECRET_NAME="dev/tai_service/document_DB/read_write_user_password" DOC_DB_FULLY_QUALIFIED_DOMAIN_NAME="tai-service-645860363137.us-east-1.docdb-elastic.amazonaws.com" DOC_DB_DATABASE_NAME="class_resources" DOC_DB_CLASS_RESOURCE_COLLECTION_NAME="class_resource" DOC_DB_CLASS_RESOURCE_CHUNK_COLLECTION_NAME="class_resource_chunk" COLD_STORE_BUCKET_NAME="tai-service-class-resource-cold-store-dev" DOCUMENTS_TO_INDEX_QUEUE="tai-service-documents-to-index-queue-dev" NLTK_DATA="/tmp/nltk_data" PINECONE_DB_API_KEY_SECRET_NAME="dev/tai_service/pinecone_db/api_key" PINECONE_DB_ENVIRONMENT="us-east-1-aws" OPENAI_API_KEY_SECRET_NAME="dev/tai_service/openai/api_key" AWS_DEFAULT_REGION="us-east-1" LOG_LEVEL="DEBUG" test-container
