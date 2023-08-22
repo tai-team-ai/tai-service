@@ -88,12 +88,14 @@ def get_sparse_vectors(batch: list[str]) -> list[SparseVector]:
         vectors = splade.encode_documents(batch)
     else:
         memory_usage = psutil.virtual_memory().percent
+        cpu_usage = psutil.cpu_percent()
         available_memory = psutil.virtual_memory().available / 1024 / 1024 / 1024 # convert to GB
         memory_percent_threshold = 90
+        cpu_percent_threshold = 90
         gb_for_batch = len(batch) / 50 # this is a rough estimate of the memory needed for the batch based on experience
         memory_available_threshold = gb_for_batch + 2 # safety buffer of 2 GB
         time_to_sleep = 5
-        while memory_usage > memory_percent_threshold or available_memory < memory_available_threshold:
+        while memory_usage > memory_percent_threshold or cpu_usage > cpu_percent_threshold or available_memory < memory_available_threshold:
             logger.warning(f"System resources constrained: memory usage: {memory_usage}%, available memory: {available_memory}GB, Retrying batch in pid {current_process().pid} in {time_to_sleep} seconds..")
             sleep(time_to_sleep)
             memory_usage = psutil.virtual_memory().percent

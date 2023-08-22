@@ -1,6 +1,7 @@
 """Define settings for instantiating search databases."""
 import os
 from dotenv import load_dotenv
+from tai_aws_account_bootstrap.stack_config_models import DeploymentType
 from taiservice.cdk.constructs.customresources.document_db.settings import (
     DocumentDBSettings,
     CollectionConfig,
@@ -14,12 +15,14 @@ from taiservice.cdk.constructs.customresources.pinecone_db.pinecone_db_custom_re
     PineconeIndexConfig,
     PineconeDBSettings,
 )
-from taiservice.searchservice.runtime_settings import SearchServiceSettings
+from taiservice.searchservice.runtime_settings import SearchServiceSettings, LogLevel
+from .deployment_settings import AWS_DEPLOYMENT_SETTINGS
 from ..constructs.construct_config import BaseDeploymentSettings
 
 
 class DeploymentTaiApiSettings(BaseDeploymentSettings, SearchServiceSettings):
     """Define the settings for instantiating the TAI API."""
+
 
 INDEXES = [
     PineconeIndexConfig(
@@ -78,4 +81,5 @@ SEARCH_SERVICE_SETTINGS = DeploymentTaiApiSettings(
     openAI_api_key_secret_name=os.environ.get("OPENAI_API_KEY_SECRET_NAME"),
     cold_store_bucket_name="tai-service-class-resource-cold-store",
     documents_to_index_queue="tai-service-documents-to-index-queue",
+    log_level=LogLevel.DEBUG if AWS_DEPLOYMENT_SETTINGS.deployment_type == DeploymentType.DEV else LogLevel.INFO,
 )

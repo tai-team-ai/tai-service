@@ -1,14 +1,12 @@
 """Define the search service app."""
-import os
-from aws_cdk import App, RemovalPolicy
-from dotenv import load_dotenv
-from tai_aws_account_bootstrap.stack_config_models import (
-    StackConfigBaseModel,
-    AWSDeploymentSettings,
-    DeploymentType,
-)
+from aws_cdk import App
+from tai_aws_account_bootstrap.stack_config_models import StackConfigBaseModel
 from taiservice.cdk.stacks.search_service_stack import TaiSearchServiceStack
 from taiservice.cdk.stacks.tai_api_stack import TaiApiStack
+from taiservice.cdk.stacks.deployment_settings import (
+    BASE_SETTINGS,
+    VPC_ID,
+)
 from taiservice.cdk.stacks.search_service_settings import (
     DOCUMENT_DB_SETTINGS,
     PINECONE_DB_SETTINGS,
@@ -19,21 +17,8 @@ from taiservice.cdk.stacks.frontend_stack import TaiFrontendServerStack
 
 
 app: App = App()
-load_dotenv()
 
 
-vpc_id = os.environ.get("VPC_ID")
-AWS_DEPLOYMENT_SETTINGS = AWSDeploymentSettings()
-is_prod_deployment = AWS_DEPLOYMENT_SETTINGS.deployment_type == DeploymentType.PROD
-TERMINATION_PROTECTION = True if is_prod_deployment else False
-REMOVAL_POLICY = RemovalPolicy.RETAIN if is_prod_deployment else RemovalPolicy.DESTROY
-TAGS = {'blame': 'jacob'}
-BASE_SETTINGS = {
-    "deployment_settings": AWS_DEPLOYMENT_SETTINGS,
-    "termination_protection": TERMINATION_PROTECTION,
-    "removal_policy": REMOVAL_POLICY,
-    "tags": TAGS,
-}
 search_service_config = StackConfigBaseModel(
 	stack_id="tai-search-service-databases",
 	stack_name="tai-search-service-databases",
@@ -48,7 +33,7 @@ search_service: TaiSearchServiceStack = TaiSearchServiceStack(
     doc_db_settings=DOCUMENT_DB_SETTINGS,
     pinecone_db_settings=PINECONE_DB_SETTINGS,
     search_service_settings=SEARCH_SERVICE_SETTINGS,
-    vpc=vpc_id,
+    vpc=VPC_ID,
 )
 
 

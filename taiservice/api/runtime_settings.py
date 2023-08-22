@@ -20,6 +20,17 @@ class AWSRegion(str, Enum):
     US_WEST_2 = "us-west-2"
 
 
+class LogLevel(str, Enum):
+    """Define valid log levels."""
+    TRACE = "TRACE"
+    DEBUG = "DEBUG"
+    INFO = "INFO"
+    SUCCESS = "SUCCESS"
+    WARNING = "WARNING"
+    ERROR = "ERROR"
+    CRITICAL = "CRITICAL"
+
+
 class TaiApiSettings(BaseSettings):
     """Define the configuration model for the TAI API service."""
 
@@ -70,4 +81,8 @@ class TaiApiSettings(BaseSettings):
     dynamodb_host: Optional[str] = Field(
         default=None,
         description="The host for the DynamoDB table.",
+    )
+    log_level: LogLevel = Field(
+        default=LogLevel.INFO,
+        description="The log level for the service.",
     )
