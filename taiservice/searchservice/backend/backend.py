@@ -99,9 +99,9 @@ class Backend:
         svmem = psutil.virtual_memory()
         mem_available_GB = svmem.available / 1024 ** 3
         mem_percent = svmem.percent
-        logger.info(f"CPU Load: {cpu_load}%")
-        logger.info(f"Memory Available: {round(mem_available_GB, 2)}GB")
-        logger.info(f"Memory Percent: {mem_percent}%")
+        logger.debug(f"CPU Load: {cpu_load}%")
+        logger.debug(f"Memory Available: {round(mem_available_GB, 2)}GB")
+        logger.debug(f"Memory Percent: {mem_percent}%")
 
     @staticmethod
     def to_backend_input_docs(resources: Union[ClassResources, ClassResource]) -> list[tai_search.InputDocument]:

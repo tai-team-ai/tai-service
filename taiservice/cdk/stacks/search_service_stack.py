@@ -7,6 +7,7 @@ from aws_cdk import (
     Stack,
     aws_ec2 as ec2,
     aws_iam as iam,
+    Duration,
 )
 from aws_cdk.aws_ecs import (
     Cluster,
@@ -264,6 +265,7 @@ class TaiSearchServiceStack(Stack):
         GPU_START_HOUR = 6
         GPU_END_HOUR = 8
         BUFFER_FOR_SERVICE_SWITCH_MINUTES = 20
+        max_num_instances = 2
         if service_type == ECSServiceType.GPU:
             instance_type = ec2.InstanceType.of(
                 instance_class=ec2.InstanceClass.G4DN,
@@ -275,7 +277,7 @@ class TaiSearchServiceStack(Stack):
                 vpc=self.vpc,
                 instance_type=instance_type,
                 machine_image=ami,
-                max_capacity=2,
+                max_capacity=max_num_instances,
                 min_capacity=1,
                 # spot_price="0.35",
                 block_devices=block_devices,
@@ -305,10 +307,11 @@ class TaiSearchServiceStack(Stack):
                 vpc=self.vpc,
                 instance_type=instance_type,
                 machine_image=ami,
-                max_capacity=1,
+                max_capacity=max_num_instances,
                 min_capacity=1,
                 # spot_price="0.35",
                 block_devices=block_devices,
+                
             )
             # TODO: once we support gpu, we'll add a schedule to switch between the two during busy times
             # asg.scale_on_schedule(
@@ -340,6 +343,12 @@ class TaiSearchServiceStack(Stack):
                 max_capacity=0,
                 time_zone=TIME_ZONE,
             )
+        asg.scale_on_cpu_utilization(
+            id=self._namer("cpu-scaling"),
+            target_utilization_percent=50,
+            cooldown=Duration.seconds(300),
+            disable_scale_in=False,
+        )
         return asg
 
     def _get_container_definition(self, task_definition: Ec2TaskDefinition, container_port: int) -> ContainerDefinition:
@@ -367,7 +376,7 @@ class TaiSearchServiceStack(Stack):
             peer=ec2.Peer.any_ipv4(),
             connection=ec2.Port.tcp(target_port),
         )
-        
+
         return target_sg
 
     def _get_scalable_task(self, service: Ec2Service, target_group: ApplicationTargetGroup) -> ScalableTaskCount:
