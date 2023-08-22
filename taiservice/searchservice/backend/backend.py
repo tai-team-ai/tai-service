@@ -8,7 +8,7 @@ import boto3
 from botocore.exceptions import ClientError
 from loguru import logger
 
-from .errors import ServerOverloadedError
+
 from taiservice.api.routers.class_resources_schema import (
     ClassResource,
     ClassResources,
@@ -25,6 +25,7 @@ from taiservice.api.routers.tai_schemas import (
     ResourceSearchQuery,
     SearchResults,
 )
+from .errors import ServerOverloadedError
 from ..runtime_settings import SearchServiceSettings
 from .databases.document_db import DocumentDB, DocumentDBConfig
 from .databases.document_db_schemas import (
@@ -98,9 +99,9 @@ class Backend:
         svmem = psutil.virtual_memory()
         mem_available_GB = svmem.available / 1024 ** 3
         mem_percent = svmem.percent
-        logger.info(f"CPU Load: {cpu_load}%")
-        logger.info(f"Memory Available: {round(mem_available_GB, 2)}GB")
-        logger.info(f"Memory Percent: {mem_percent}%")
+        logger.debug(f"CPU Load: {cpu_load}%")
+        logger.debug(f"Memory Available: {round(mem_available_GB, 2)}GB")
+        logger.debug(f"Memory Percent: {mem_percent}%")
 
     @staticmethod
     def to_backend_input_docs(resources: Union[ClassResources, ClassResource]) -> list[tai_search.InputDocument]:
@@ -289,7 +290,7 @@ class Backend:
         svmem = psutil.virtual_memory()
         mem_available_MB = svmem.available / 1024 ** 2
         mem_percent = svmem.percent
-        if cpu_load > 99 or mem_percent > 95 or mem_available_MB < 1000:
+        if cpu_load > 95 or mem_percent > 95 or mem_available_MB < 1000:
             return False
         return True
 

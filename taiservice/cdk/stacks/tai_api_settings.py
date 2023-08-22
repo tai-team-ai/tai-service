@@ -1,9 +1,12 @@
 """Define settings for instantiating the TAI API."""
 import os
 from aws_cdk import aws_dynamodb as dynamodb
-from ...api.runtime_settings import TaiApiSettings
+from tai_aws_account_bootstrap.stack_config_models import DeploymentType
+from .deployment_settings import AWS_DEPLOYMENT_SETTINGS
+from ...api.runtime_settings import TaiApiSettings, LogLevel
 from ..stacks.tai_api_stack import DynamoDBSettings
 from ..constructs.construct_config import BaseDeploymentSettings
+
 
 class DeploymentTaiApiSettings(BaseDeploymentSettings, TaiApiSettings):
     """Define the settings for instantiating the TAI API."""
@@ -26,4 +29,5 @@ TAI_API_SETTINGS = DeploymentTaiApiSettings(
     user_table_name=DYNAMODB_DEPLOYMENT_SETTINGS.table_name,
     user_table_partition_key=DYNAMODB_DEPLOYMENT_SETTINGS.partition_key.name,
     user_table_sort_key=SORT_KEY_NAME,
+    log_level=LogLevel.DEBUG if AWS_DEPLOYMENT_SETTINGS.deployment_type == DeploymentType.DEV else LogLevel.INFO,
 )

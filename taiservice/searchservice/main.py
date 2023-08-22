@@ -1,5 +1,6 @@
 """Define the main entry point for the tai service API."""
 from http.client import HTTPException
+import sys
 import traceback
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -28,6 +29,8 @@ ROUTERS = [
 def create_app() -> FastAPI:
     """Create the FastAPI app."""
     runtime_settings = SearchServiceSettings()
+    logger.remove()
+    logger.add(sys.stdout, level=runtime_settings.log_level.value)
     app = FastAPI(
         title=TITLE,
         description=DESCRIPTION,
