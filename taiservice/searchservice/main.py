@@ -15,7 +15,7 @@ from .routers import (
     health,
 )
 
-TITLE = "T.A.I. Service!!"
+TITLE = "T.A.I. Service!!!"
 DESCRIPTION = "A service for the T.A.I. project."
 
 

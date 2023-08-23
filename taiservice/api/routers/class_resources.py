@@ -1,4 +1,5 @@
 """Define CRUD endpoints for class resources."""
+import traceback
 from fastapi import APIRouter, Request, Response, status
 from loguru import logger
 # first imports are for local development, second imports are for deployment
@@ -16,10 +17,15 @@ ROUTER = APIRouter()
 
 
 @ROUTER.get("/class-resources", response_model=ClassResources)
-def get_class_resources(id: ClassResourceIds, request: Request, from_class_ids: bool = True):
+def get_class_resources(id: ClassResourceIds, request: Request, response: Response, from_class_ids: bool = True):
     """Get all class resources."""
     backend: Backend = getattr(request.app.state, BACKEND_ATTRIBUTE_NAME)
-    class_resource_docs = backend.get_class_resources(id, from_class_ids=from_class_ids)
+    try:
+        class_resource_docs = backend.get_class_resources(id, from_class_ids=from_class_ids)
+    except Exception: # pylint: disable=broad-except
+        logger.error(traceback.format_exc())
+        response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
+        return ClassResources(class_resources=[])
     return ClassResources(class_resources=class_resource_docs)
 
 

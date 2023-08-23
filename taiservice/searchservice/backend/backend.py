@@ -29,12 +29,12 @@ from .errors import ServerOverloadedError
 from ..runtime_settings import SearchServiceSettings
 from .databases.document_db import DocumentDB, DocumentDBConfig
 from .databases.document_db_schemas import (
-    ClassResourceProcessingStatus,
     ClassResourceDocument,
     BaseClassResourceDocument,
     ClassResourceChunkDocument,
     ChunkMetadata as BEChunkMetadata,
 )
+from taiservice.api.taibackend.databases.document_db import ClassResourceProcessingStatus
 from .databases.pinecone_db import PineconeDB, PineconeDBConfig
 from .metrics import (
     MetricsConfig,

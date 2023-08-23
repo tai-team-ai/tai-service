@@ -1,9 +1,8 @@
 """Define the shared schemas used by the backend."""
-from enum import Enum
 from typing import Optional
 from uuid import UUID
-from uuid import uuid4
 from pydantic import Field, HttpUrl, validator
+from taiservice.api.taibackend.databases.document_db import ClassResourceProcessingStatus
 from ..shared_schemas import (
     ChunkMetadata,
     Metadata,
@@ -13,21 +12,8 @@ from ..shared_schemas import (
 from ..tai_search.data_ingestor_schema import IngestedDocument
 
 
-class ClassResourceProcessingStatus(str, Enum):
-    """Define the document status."""
-    PENDING = "pending"
-    PROCESSING = "processing"
-    FAILED = "failed"
-    DELETING = "deleting"
-    COMPLETED = "completed"
-
-
 class ClassResourceDocument(StatefulClassResourceDocument):
     """Define the document model of the class resource."""
-    status: ClassResourceProcessingStatus = Field(
-        ...,
-        description=f"The processing status of the class resource. Valid values are: {', '.join([status.value for status in ClassResourceProcessingStatus])}",
-    )
     child_resource_ids: Optional[list[UUID]] = Field(
         default=None,
         description=("The IDs of the child resource. This is useful when the provided "

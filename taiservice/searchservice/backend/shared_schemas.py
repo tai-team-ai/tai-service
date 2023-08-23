@@ -6,6 +6,7 @@ from enum import Enum
 from typing import Any, Optional
 from pathlib import Path
 from pydantic import BaseModel, Field, Extra, HttpUrl, constr
+from taiservice.api.taibackend.databases.document_db import MinimumClassResourceDocument
 
 
 HASH_FIELD_OBJECT = Field(
@@ -142,17 +143,8 @@ class ChunkMetadata(Metadata):
 
         extra = Extra.allow
 
-class BaseClassResourceDocument(BasePydanticModel):
+class BaseClassResourceDocument(MinimumClassResourceDocument):
     """Define the base model of the class resource."""
-    id: UUID = Field(
-        ...,
-        description="The ID of the class resource.",
-        alias="_id",
-    )
-    class_id: UUID = Field(
-        ...,
-        description="The ID of the class that the resource belongs to.",
-    )
     full_resource_url: HttpUrl = Field(
         ...,
         description="The URL of the class resource.",

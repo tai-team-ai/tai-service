@@ -5,23 +5,14 @@ from typing import Any, Callable, Optional, Union
 from uuid import UUID
 from pydantic import BaseModel, Field, ValidationError
 from pymongo import MongoClient
-from pymongo.collection import Collection
 from loguru import logger
-# first imports are for local development, second imports are for deployment
-try:
-    from .document_db_schemas import (
-        BaseClassResourceDocument,
-        ClassResourceDocument,
-        ClassResourceChunkDocument,
-    )
-    from ..shared_schemas import UsageMetric
-except ImportError:
-    from taibackend.databases.document_db_schemas import (
-        BaseClassResourceDocument,
-        ClassResourceDocument,
-        ClassResourceChunkDocument,
-    )
-    from taibackend.shared_schemas import UsageMetric
+from .document_db_schemas import (
+    BaseClassResourceDocument,
+    ClassResourceDocument,
+    ClassResourceChunkDocument,
+)
+from ..shared_schemas import UsageMetric
+
 
 class DocumentDBConfig(BaseModel):
     """Define the document database config."""

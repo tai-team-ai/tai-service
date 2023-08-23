@@ -268,7 +268,19 @@ class Backend:
         resource_queue = deque(class_resources.class_resources)
         while resource_queue:
             resource = resource_queue.popleft()
-            response = requests.post(url, data=resource.json(), timeout=15)
+            try:
+                response = requests.post(url, data=resource.json(), timeout=15)
+            except Exception as e: # pylint: disable=broad-except
+                logger.error(f"Failed to create class resource. Exception: {e}")
+                failed_resources = FailedResources()
+                for resource in resource_queue:
+                    failed_resources.failed_resources.append(
+                        FailedResource(
+                            failure_reason=ResourceUploadFailureReason.UNPROCESSABLE_RESOURCE,
+                            message="Failed to create class resource.",
+                            **resource.dict(),
+                        )
+                    )
             if response.status_code not in {200, 201, 202}:
                 if response.status_code == 409:
                     reason = ResourceUploadFailureReason.DUPLICATE_RESOURCE
@@ -307,7 +319,6 @@ class Backend:
                 error_message = f"Failed to parse class resources. Exception: {e}"
         else:
             error_message = f"Failed to retrieve class resources. Status code: {response.status_code}"
-        logger.critical(error_message)
         raise RuntimeError(error_message)
 
     def get_frequently_accessed_class_resources(

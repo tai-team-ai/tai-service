@@ -9,6 +9,7 @@ from aws_cdk import (
     aws_iam as iam,
     Duration,
 )
+from aws_cdk.aws_ecs_patterns import ApplicationLoadBalancedServiceBase
 from aws_cdk.aws_ecs import (
     Cluster,
     Ec2TaskDefinition,
@@ -23,6 +24,7 @@ from aws_cdk.aws_ecs import (
     LogDriver,
     AsgCapacityProvider,
     DeploymentCircuitBreaker,
+    PlacementStrategy,
 )
 from aws_cdk.aws_elasticloadbalancingv2 import (
     ApplicationLoadBalancer,
@@ -34,10 +36,9 @@ from aws_cdk.aws_autoscaling import (
     BlockDeviceVolume,
     EbsDeviceVolumeType,
     AutoScalingGroup,
-    Signals,
     WarmPool,
+    Schedule,
 )
-from aws_cdk.aws_applicationautoscaling import Schedule
 from tai_aws_account_bootstrap.stack_helpers import add_tags
 from tai_aws_account_bootstrap.stack_config_models import StackConfigBaseModel
 from .search_service_settings import DeploymentTaiApiSettings
@@ -56,7 +57,10 @@ from ..constructs.customresources.pinecone_db.pinecone_db_custom_resource import
 DOCKER_FILE_NAME = "Dockerfile.searchservice"
 FULLY_QUALIFIED_HANDLER_NAME = "taiservice.searchservice.main:create_app"
 CWD = os.getcwd()
-
+PROTOCOL_TO_LISTENER_PORT = {
+    ApplicationProtocol.HTTP: 80,
+    ApplicationProtocol.HTTPS: 443,
+}
 
 class ECSServiceType(str, Enum):
     """Define the ECS service type."""
@@ -204,12 +208,12 @@ class TaiSearchServiceStack(Stack):
             self._namer("service"),
             service_name=self._namer("service"),
             cluster=cluster,
-            desired_count=1,
-            min_healthy_percent=0,
-            max_healthy_percent=100,
+            min_healthy_percent=50,
+            max_healthy_percent=200,
             task_definition=task_definition,
             security_groups=[security_group, sg_for_connecting_to_db],
-            circuit_breaker=DeploymentCircuitBreaker(rollback=True)
+            circuit_breaker=DeploymentCircuitBreaker(rollback=True),
+            placement_strategies=[PlacementStrategy.spread_across_instances()],
         )
         return service
 
@@ -224,24 +228,13 @@ class TaiSearchServiceStack(Stack):
             self._namer("cluster"),
             vpc=self.vpc,
         )
-        # gpu_asg = self._get_auto_scaling_group(ECSServiceType.GPU)
         no_gpu_asg = self._get_auto_scaling_group(ECSServiceType.NO_GPU)
-        # cluster.add_asg_capacity_provider(
-        #     provider=AsgCapacityProvider(
-        #         self,
-        #         self._namer("asg-provider-gpu"),
-        #         auto_scaling_group=gpu_asg,
-        #         capacity_provider_name=self._namer("capacity-provider-gpu"),
-        #         enable_managed_termination_protection=False,
-        #     ),
-        # )
         cluster.add_asg_capacity_provider(
             provider=AsgCapacityProvider(
                 self,
                 self._namer("asg-provider-no-gpu"),
                 auto_scaling_group=no_gpu_asg,
                 capacity_provider_name=self._namer("capacity-provider-no-gpu"),
-                enable_managed_termination_protection=False,
             ),
         )
         return cluster
@@ -263,7 +256,7 @@ class TaiSearchServiceStack(Stack):
                 ),
             ),
         ]
-        max_num_instances = 2
+        max_num_instances = 3
         max_instance_lifetime = Duration.days(10)
         if service_type == ECSServiceType.GPU:
             instance_type = ec2.InstanceType.of(
@@ -299,6 +292,20 @@ class TaiSearchServiceStack(Stack):
                 block_devices=block_devices,
                 max_instance_lifetime=max_instance_lifetime,
             )
+        asg.scale_on_schedule(
+            id=self._namer("scale-up"),
+            schedule=Schedule.cron(hour="7", minute="0", week_day="*"),
+            min_capacity=1,
+            max_capacity=2,
+            time_zone="MST",
+        )
+        asg.scale_on_schedule(
+            self._namer("scale-down"),
+            schedule=Schedule.cron(hour="1", minute="0", week_day="*"),
+            min_capacity=0,
+            max_capacity=0,
+            time_zone="MST",
+        )
         WarmPool(
             self,
             id=self._namer("asg-warm-pool"),
@@ -335,7 +342,7 @@ class TaiSearchServiceStack(Stack):
         return target_sg
 
     def _get_scalable_task(self, service: Ec2Service) -> ScalableTaskCount:
-        min_task_count = 1
+        min_task_count = 2
         max_task_count = 2
         scaling_task = service.auto_scale_task_count(
             min_capacity=min_task_count,
@@ -352,18 +359,6 @@ class TaiSearchServiceStack(Stack):
             target_utilization_percent=75,
             scale_out_cooldown=Duration.seconds(120), # we should be fast because of the warm pool
             disable_scale_in=False,
-        )
-        scaling_task.scale_on_schedule(
-            id=self._namer("scale-up"),
-            schedule=Schedule.cron(hour="12", minute="0", week_day="*"),
-            min_capacity=min_task_count,
-            max_capacity=max_task_count,
-        )
-        scaling_task.scale_on_schedule(
-            self._namer("scale-down"),
-            schedule=Schedule.cron(hour="6", minute="0", week_day="*"),
-            min_capacity=0,
-            max_capacity=0,
         )
         return scaling_task
 
@@ -386,3 +381,25 @@ class TaiSearchServiceStack(Stack):
             targets=services,
         )
         return target_group
+
+
+    def get_search_service_NEW_WIP(
+        self,
+        sg_for_connecting_to_db: ec2.SecurityGroup
+    ) -> ApplicationLoadBalancedServiceBase:
+        alb: ApplicationLoadBalancer = ApplicationLoadBalancer(
+            id=self,
+            load_balancer_name=self._namer("alb"),
+            vpc=self.vpc,
+            internet_facing=True
+        )
+        self._service_url = alb.load_balancer_dns_name
+        protocol = ApplicationProtocol.HTTPS
+        service = ApplicationLoadBalancedServiceBase(
+            scope=self,
+            id=self._namer("service"),
+            circuit_breaker=DeploymentCircuitBreaker(rollback=True),
+            cluster=self._get_cluster(),
+            listener_port=PROTOCOL_TO_LISTENER_PORT[protocol],
+        )
+        return service
