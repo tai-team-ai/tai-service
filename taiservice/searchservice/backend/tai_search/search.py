@@ -106,6 +106,7 @@ def resources_constrained(resource_limits: ResourceLimits) -> bool:
     memory_usage = psutil.virtual_memory().percent
     cpu_usage = psutil.cpu_percent()
     available_memory = psutil.virtual_memory().available / 1024 / 1024 / 1024  # convert to GB
+    logger.debug(f"Memory usage: {memory_usage}%, CPU usage: {cpu_usage}%, Available memory: {available_memory}GB")
     are_resources_constrained = memory_usage > resource_limits.memory_percent_threshold or \
         cpu_usage > resource_limits.cpu_percent_threshold or available_memory < resource_limits.additional_memory_gb
     return are_resources_constrained
@@ -128,7 +129,7 @@ def execute_with_resource_check(func: Callable[..., Any], resource_limits: Resou
     """
     time_to_sleep = 5
     while resources_constrained(resource_limits=resource_limits):
-        logger.warning(f"System resources constrained. Retrying operatino {func} after {time_to_sleep} seconds.")
+        logger.warning(f"System resources constrained. Retrying operation {func.__name__} after {time_to_sleep} seconds.")
         sleep(time_to_sleep)
     return func()
 

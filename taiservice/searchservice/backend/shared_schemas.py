@@ -6,7 +6,6 @@ from enum import Enum
 from typing import Any, Optional
 from pathlib import Path
 from pydantic import BaseModel, Field, Extra, HttpUrl, constr
-from taiservice.api.taibackend.databases.document_db import MinimumClassResourceDocument
 
 
 HASH_FIELD_OBJECT = Field(
@@ -27,6 +26,15 @@ class ClassResourceType(str, Enum):
     STUDY_GUIDE = "study guide"
     LECTURE = "lecture"
     ARTICLE = "article"
+
+
+class ClassResourceProcessingStatus(str, Enum):
+    """Define the document status."""
+    PENDING = "pending"
+    PROCESSING = "processing"
+    FAILED = "failed"
+    DELETING = "deleting"
+    COMPLETED = "completed"
 
 
 class BasePydanticModel(BaseModel):
@@ -143,8 +151,17 @@ class ChunkMetadata(Metadata):
 
         extra = Extra.allow
 
-class BaseClassResourceDocument(MinimumClassResourceDocument):
+class BaseClassResourceDocument(BasePydanticModel):
     """Define the base model of the class resource."""
+    id: UUID = Field(
+        ...,
+        description="The id of the class resource.",
+        alias="_id",
+    )
+    class_id: UUID = Field(
+        ...,
+        description="The id of the class.",
+    )
     full_resource_url: HttpUrl = Field(
         ...,
         description="The URL of the class resource.",
@@ -190,6 +207,10 @@ class StatefulClassResourceDocument(BaseClassResourceDocument):
             "it was processed. The value of this field is the SHA1 hash of the document "
             "contents."
         )
+    )
+    status: ClassResourceProcessingStatus = Field(
+        default=ClassResourceProcessingStatus.PENDING,
+        description="The status of the class resource.",
     )
 
 

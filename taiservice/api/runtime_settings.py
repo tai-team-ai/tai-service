@@ -74,6 +74,36 @@ class TaiApiSettings(BaseSettings):
         default=None,
         description="The name of the user table sort key.",
     )
+    doc_db_credentials_secret_name: str = Field(
+        ...,
+        description="The name of the secret containing the document database credentials.",
+    )
+    doc_db_username_secret_key: str = Field(
+        default="username",
+        const=True,
+        description="The name of the secret key containing the document database username.",
+    )
+    doc_db_password_secret_key: str = Field(
+        default="password",
+        const=True,
+        description="The name of the secret key containing the document database password.",
+    )
+    doc_db_fully_qualified_domain_name: str = Field(
+        ...,
+        description="The fully qualified domain name of the TAI API service.",
+    )
+    doc_db_port: int = Field(
+        default=27017,
+        description="The port of the TAI API service.",
+    )
+    doc_db_database_name: str = Field(
+        ...,
+        description="The name of the document db.",
+    )
+    doc_db_class_resource_collection_name: str = Field(
+        ...,
+        description="The name of the collection in the document db for class resources.",
+    )
     aws_default_region: AWSRegion = Field(
         default=AWSRegion.US_EAST_1,
         description="The AWS region for the DynamoDB table.",

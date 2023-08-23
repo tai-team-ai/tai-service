@@ -37,8 +37,8 @@ from aws_cdk.aws_autoscaling import (
     EbsDeviceVolumeType,
     AutoScalingGroup,
     WarmPool,
-    Schedule,
 )
+from aws_cdk.aws_applicationautoscaling import Schedule
 from tai_aws_account_bootstrap.stack_helpers import add_tags
 from tai_aws_account_bootstrap.stack_config_models import StackConfigBaseModel
 from .search_service_settings import DeploymentTaiApiSettings
@@ -256,7 +256,7 @@ class TaiSearchServiceStack(Stack):
                 ),
             ),
         ]
-        max_num_instances = 3
+        max_num_instances = 2
         max_instance_lifetime = Duration.days(10)
         if service_type == ECSServiceType.GPU:
             instance_type = ec2.InstanceType.of(
@@ -270,7 +270,7 @@ class TaiSearchServiceStack(Stack):
                 instance_type=instance_type,
                 machine_image=ami,
                 max_capacity=max_num_instances,
-                min_capacity=1,
+                min_capacity=0,
                 # spot_price="0.35",
                 block_devices=block_devices,
                 max_instance_lifetime=max_instance_lifetime,
@@ -287,25 +287,11 @@ class TaiSearchServiceStack(Stack):
                 instance_type=instance_type,
                 machine_image=ami,
                 max_capacity=max_num_instances,
-                min_capacity=1,
+                min_capacity=0,
                 # spot_price="0.35",
                 block_devices=block_devices,
                 max_instance_lifetime=max_instance_lifetime,
             )
-        asg.scale_on_schedule(
-            id=self._namer("scale-up"),
-            schedule=Schedule.cron(hour="7", minute="0", week_day="*"),
-            min_capacity=1,
-            max_capacity=2,
-            time_zone="MST",
-        )
-        asg.scale_on_schedule(
-            self._namer("scale-down"),
-            schedule=Schedule.cron(hour="1", minute="0", week_day="*"),
-            min_capacity=0,
-            max_capacity=0,
-            time_zone="MST",
-        )
         WarmPool(
             self,
             id=self._namer("asg-warm-pool"),
@@ -342,7 +328,7 @@ class TaiSearchServiceStack(Stack):
         return target_sg
 
     def _get_scalable_task(self, service: Ec2Service) -> ScalableTaskCount:
-        min_task_count = 2
+        min_task_count = 1
         max_task_count = 2
         scaling_task = service.auto_scale_task_count(
             min_capacity=min_task_count,
@@ -359,6 +345,18 @@ class TaiSearchServiceStack(Stack):
             target_utilization_percent=75,
             scale_out_cooldown=Duration.seconds(120), # we should be fast because of the warm pool
             disable_scale_in=False,
+        )
+        scaling_task.scale_on_schedule(
+            id=self._namer("scale-up"),
+            schedule=Schedule.cron(hour="12", minute="0", week_day="*"), # 6am MST
+            min_capacity=min_task_count,
+            max_capacity=max_task_count,
+        )
+        scaling_task.scale_on_schedule(
+            self._namer("scale-down"),
+            schedule=Schedule.cron(hour="6", minute="0", week_day="*"), # 12am MST
+            min_capacity=0,
+            max_capacity=0,
         )
         return scaling_task
 
@@ -383,12 +381,12 @@ class TaiSearchServiceStack(Stack):
         return target_group
 
 
-    def get_search_service_NEW_WIP(
+    def get_search_service_NEW(
         self,
         sg_for_connecting_to_db: ec2.SecurityGroup
     ) -> ApplicationLoadBalancedServiceBase:
         alb: ApplicationLoadBalancer = ApplicationLoadBalancer(
-            id=self,
+            self,
             load_balancer_name=self._namer("alb"),
             vpc=self.vpc,
             internet_facing=True
@@ -402,4 +400,3 @@ class TaiSearchServiceStack(Stack):
             cluster=self._get_cluster(),
             listener_port=PROTOCOL_TO_LISTENER_PORT[protocol],
         )
-        return service

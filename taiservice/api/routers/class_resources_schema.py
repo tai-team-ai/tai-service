@@ -24,6 +24,7 @@ class ClassResourceProcessingStatus(str, Enum):
     FAILED = "failed"
     COMPLETED = "completed"
 
+
 class ResourceUploadFailureReason(str, Enum):
     """Define the possible failures when uploading a resource."""
     DUPLICATE_RESOURCE = "duplicateResource"

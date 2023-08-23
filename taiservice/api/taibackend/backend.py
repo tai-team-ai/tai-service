@@ -49,6 +49,11 @@ try:
         SearchQuery,
         SearchResults,
     )
+    from .databases.document_db import (
+        MinimumClassResourceDocument,
+        DocumentDBConfig,
+        DocumentDB,
+    )
 except (KeyError, ImportError):
     from taibackend.databases.archiver import Archive
     from taibackend.metrics import (
@@ -89,6 +94,11 @@ except (KeyError, ImportError):
         SearchQuery,
         SearchResults,
     )
+    from taibackend.databases.document_db import (
+        MinimumClassResourceDocument,
+        DocumentDBConfig,
+        DocumentDB,
+    )
 
 
 class Backend:
@@ -104,6 +114,16 @@ class Backend:
                 openai_config=self._get_tai_llm_config(),
             )
         )
+        db_credentials = self._get_secret_value(runtime_settings.doc_db_credentials_secret_name)
+        self._doc_db_config = DocumentDBConfig(
+            username=db_credentials[runtime_settings.doc_db_username_secret_key],
+            password=db_credentials[runtime_settings.doc_db_password_secret_key],
+            fully_qualified_domain_name=runtime_settings.doc_db_fully_qualified_domain_name,
+            port=runtime_settings.doc_db_port,
+            database_name=runtime_settings.doc_db_database_name,
+            class_resource_collection_name=runtime_settings.doc_db_class_resource_collection_name,
+        )
+        self._doc_db = DocumentDB(self._doc_db_config)
 
     @classmethod
     def to_backend_chat_session(cls, chat_session: APIChatSession) -> BEChatSession:
@@ -265,60 +285,30 @@ class Backend:
         """Create a list of class resources."""
         url = f"{self._runtime_settings.search_service_api_url}/class-resources"
         failed_resources = FailedResources()
+
         resource_queue = deque(class_resources.class_resources)
         while resource_queue:
             resource = resource_queue.popleft()
             try:
                 response = requests.post(url, data=resource.json(), timeout=15)
-            except Exception as e: # pylint: disable=broad-except
-                logger.error(f"Failed to create class resource. Exception: {e}")
-                failed_resources = FailedResources()
-                for resource in resource_queue:
-                    failed_resources.failed_resources.append(
-                        FailedResource(
-                            failure_reason=ResourceUploadFailureReason.UNPROCESSABLE_RESOURCE,
-                            message="Failed to create class resource.",
-                            **resource.dict(),
-                        )
-                    )
-            if response.status_code not in {200, 201, 202}:
-                if response.status_code == 409:
-                    reason = ResourceUploadFailureReason.DUPLICATE_RESOURCE
-                elif response.status_code == 429:
-                    reason = ResourceUploadFailureReason.TO_MANY_REQUESTS
-                else:
-                    reason = ResourceUploadFailureReason.UNPROCESSABLE_RESOURCE
-                error_message = response.json().get('message', "Failed to create class resource.")
-                logger.error(error_message)
-                failed_resources.failed_resources.append(
-                    FailedResource(
-                        failure_reason=reason,
-                        message=error_message,
-                        **resource.dict(),
-                    )
-                )
+                self._check_create_resources_response(response, resource, failed_resources)
+            except Exception as e:
+                self._handle_create_req_error(e, resource, failed_resources)
         return failed_resources
-
 
     def get_class_resources(self, ids: list[UUID], from_class_ids: bool = False) -> list[ClassResource]:
         """Get the class resources."""
-        url = f"{self._runtime_settings.search_service_api_url}/class-resources"
-        logger.info(f"Getting class resources from {url}")
-        params = {
-            'ids': ids,
-            'from_class_ids': from_class_ids
-        }
-        response = requests.get(url, params=params, timeout=4)
-        class_resources = []
-        if response.status_code == 200:
-            try:
-                data = response.json()
-                class_resources = [ClassResource(**item) for item in data['classResources']]
-                return class_resources
-            except Exception as e: # pylint: disable=broad-except
-                error_message = f"Failed to parse class resources. Exception: {e}"
-        else:
-            error_message = f"Failed to retrieve class resources. Status code: {response.status_code}"
+        resources = self._doc_db.get_class_resources(ids=ids, from_class_ids=from_class_ids)
+        api_resources = []
+        for resource in resources:
+            api_res = ClassResource(
+                id=resource.id,
+                class_id=resource.class_id,
+                full_resource_url=resource.full_resource_url,
+                preview_image_url=resource.preview_image_url,
+                status=resource.status,
+                metadata=resource.metadata,
+            )
         raise RuntimeError(error_message)
 
     def get_frequently_accessed_class_resources(
@@ -346,6 +336,52 @@ class Backend:
     def delete_class_resources(self, ids: list[UUID]) -> None:
         """Delete a list of class resources."""
         pass #TODO call new tai search service
+
+    def _check_create_resources_response(
+        self,
+        response: requests.Response,
+        resource: ClassResource,
+        failed_resources: FailedResources
+    ) -> None:
+        if response.status_code not in {200, 201, 202}:
+            if response.status_code == 409:
+                reason = ResourceUploadFailureReason.DUPLICATE_RESOURCE
+            elif response.status_code == 429:
+                reason = ResourceUploadFailureReason.TO_MANY_REQUESTS
+            else:
+                reason = ResourceUploadFailureReason.UNPROCESSABLE_RESOURCE
+            error_message = response.json().get('message', "Failed to create class resource.")
+            logger.error(error_message)
+            self._add_failed_resource(
+                failed_resources=failed_resources,
+                reason=reason,
+                message=error_message,
+                resource=resource,
+            )
+
+    def _handle_create_req_error(self, e: Exception, resource: ClassResource, failed_resources: FailedResources) -> None:
+        logger.error(f"Failed to create class resource with request. Exception: {e}")
+        self._add_failed_resource(
+            failed_resources=failed_resources,
+            reason=ResourceUploadFailureReason.TO_MANY_REQUESTS,
+            message="Failed to create class resource with request.",
+            resource=resource,
+        )
+
+    def _add_failed_resource(
+        self,
+        failed_resources: FailedResources,
+        reason: ResourceUploadFailureReason,
+        message: str,
+        resource: ClassResource,
+    ) -> None:
+        failed_resources.failed_resources.append(
+            FailedResource(
+                failure_reason=reason,
+                message=message,
+                **resource.dict(),
+            )
+        )
 
     def _get_search_results(self, query: SearchQuery, endpoint_name: str) -> SearchResults:
         url = f"{self._runtime_settings.search_service_api_url}/{endpoint_name}"

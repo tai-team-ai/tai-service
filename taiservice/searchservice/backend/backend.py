@@ -34,7 +34,6 @@ from .databases.document_db_schemas import (
     ClassResourceChunkDocument,
     ChunkMetadata as BEChunkMetadata,
 )
-from taiservice.api.taibackend.databases.document_db import ClassResourceProcessingStatus
 from .databases.pinecone_db import PineconeDB, PineconeDBConfig
 from .metrics import (
     MetricsConfig,
@@ -44,6 +43,7 @@ from .metrics import (
 from .databases.errors import DuplicateClassResourceError
 from .shared_schemas import (
     Metadata as DBResourceMetadata,
+    ClassResourceProcessingStatus,
 ) 
 from .tai_search import search as tai_search
 
@@ -209,9 +209,9 @@ class Backend:
             pass
         elif self._is_duplicate_class_resource(ingested_doc):
             raise DuplicateClassResourceError(f"Duplicate class resource: {ingested_doc.id} in class {ingested_doc.class_id}")
-        class_resource = ClassResourceDocument.from_ingested_doc(ingested_doc)
-        self._coerce_and_update_status(class_resource, ClassResourceProcessingStatus.PENDING)
         def index_resource() -> None:
+            class_resource = ClassResourceDocument.from_ingested_doc(ingested_doc)
+            self._coerce_and_update_status(class_resource, ClassResourceProcessingStatus.PENDING)
             try:
                 self._coerce_and_update_status(class_resource, ClassResourceProcessingStatus.PROCESSING)
                 self._tai_search.index_resource(ingested_doc, class_resource)
