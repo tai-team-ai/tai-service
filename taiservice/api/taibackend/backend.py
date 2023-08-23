@@ -50,7 +50,6 @@ try:
         SearchResults,
     )
     from .databases.document_db import (
-        MinimumClassResourceDocument,
         DocumentDBConfig,
         DocumentDB,
     )
@@ -95,7 +94,6 @@ except (KeyError, ImportError):
         SearchResults,
     )
     from taibackend.databases.document_db import (
-        MinimumClassResourceDocument,
         DocumentDBConfig,
         DocumentDB,
     )
@@ -309,7 +307,8 @@ class Backend:
                 status=resource.status,
                 metadata=resource.metadata,
             )
-        raise RuntimeError(error_message)
+            api_resources.append(api_res)
+        return api_resources
 
     def get_frequently_accessed_class_resources(
         self,

@@ -81,7 +81,7 @@ class Metadata(BasePydanticModel):
         extra = Extra.allow
 
 
-class BaseClassResourceDocument(BasePydanticModel):
+class ClassResourceDocument(BasePydanticModel):
     """Define the base model of the class resource."""
     id: UUID = Field(
         ...,
@@ -108,25 +108,17 @@ class BaseClassResourceDocument(BasePydanticModel):
         ...,
         description="The metadata of the class resource.",
     )
-    create_timestamp: datetime = Field(
-        default_factory=datetime.utcnow,
-        description="The timestamp when the class resource was created.",
-    )
-    modified_timestamp: datetime = Field(
-        default_factory=datetime.utcnow,
-        description="The timestamp when the class resource was last modified.",
-    )
-    usage_log: list[UsageMetric] = Field(
-        default_factory=list,
-        description="The usage log of the class resource. This allows us to track the usage of the resource.",
-    )
+
+    class Config:
+        """Define the configuration for the model."""
+        extra = Extra.allow
 
     @property
     def id_as_str(self) -> str:
         """Return the string representation of the id."""
         return str(self.id)
 
-    def dict(self, **kwargs) -> dict:
+    def dict(self, *args, **kwargs) -> dict:
         """Convert all objects to strs."""
         self.modified_timestamp = datetime.utcnow()
         return super().dict(**kwargs)
@@ -181,11 +173,11 @@ class DocumentDB:
     def get_class_resources(self,
         ids: Union[list[UUID], UUID],
         from_class_ids: bool=False,
-    ) -> list[BaseClassResourceDocument]:
+    ) -> list[ClassResourceDocument]:
         """Return the full class resources."""
         ids = [ids] if isinstance(ids, UUID) else ids
         ids = [str(id) for id in ids]
         field_name = "class_id" if from_class_ids else "_id"
         documents = list(self._class_resource_collection.find({field_name: {"$in": ids}}))
-        documents = [BaseClassResourceDocument.parse_obj(document) for document in documents]
+        documents = [ClassResourceDocument.parse_obj(document) for document in documents]
         return documents

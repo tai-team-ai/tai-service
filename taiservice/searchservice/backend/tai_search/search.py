@@ -46,6 +46,10 @@ from ..databases.document_db_schemas import (
     ClassResourceDocument,
 )
 
+# the minus 2 provides some overhead so we aren't using all the resources
+# and helps minimize the likelihood of crashing the instance
+MAX_NUM_PROCESS = max(cpu_count() - 2, 1)
+
 
 class OpenAIConfig(BaseOpenAIConfig):
     """Define the OpenAI config."""
@@ -89,8 +93,8 @@ class ResourceLimits(BaseModel):
         description="The threshold for memory usage percentage beyond which system is considered as resource constrained.",
     )
     cpu_percent_threshold: Optional[float] = Field(
-        60.0,
-        le=80.0,
+        50.0,
+        le=70.0,
         description="The threshold for CPU usage percentage beyond which system is considered as resource constrained.",
     )
     additional_memory_gb: Optional[float] = Field(
@@ -128,8 +132,10 @@ def execute_with_resource_check(func: Callable[..., Any], resource_limits: Resou
         The function's return value.
     """
     time_to_sleep = 5
+    if isinstance(func, partial):
+        func_name = func.func.__name__ if func.func.__name__ else ""
     while resources_constrained(resource_limits=resource_limits):
-        logger.warning(f"System resources constrained. Retrying operation {func.__name__} after {time_to_sleep} seconds.")
+        logger.warning(f"System resources constrained. Retrying operation {func_name} after {time_to_sleep} seconds.")
         sleep(time_to_sleep)
     return func()
 
@@ -370,7 +376,7 @@ class TAISearch:
             batch_size = 50
             batches = [texts[i:i + batch_size] for i in range(0, len(texts), batch_size)]
             logger.info(f"Splitting {len(texts)} documents into {len(batches)} batches.")
-            with Pool(processes = cpu_count()) as pool:
+            with Pool(processes = cpu_count() - 2) as pool:
                 result_batches = pool.map(get_sparse_vectors, batches)
             sparse_vectors = [vector for batch in result_batches for vector in batch]
             return sparse_vectors
