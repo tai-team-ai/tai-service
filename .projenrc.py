@@ -13,12 +13,14 @@ from projen import (
 )
 
 
-def convert_dict_env_vars_to_env_vars(env_vars: dict, output: Literal["string", "list"] = "string") -> Union[str, list]:
+def convert_dict_env_vars_to_env_vars(env_vars: dict, output: Literal["docker", "list"] = "docker") -> Union[str, list]:
     """Convert a dictionary of environment variables to a string or list of strings."""
-    if output == "string":
-        return " ".join([f"{key}=\"{value}\"" for key, value in env_vars.items()])
+    if output == "docker":
+        return " ".join([f"-e {key}=\"{value}\"" for key, value in env_vars.items()])
     elif output == "list":
         return [f"{key}=\"{value}\"" for key, value in env_vars.items()]
+    else:
+        raise ValueError(f"Invalid output type: {output}")
 
 
 VENV_DIR = ".venv"
@@ -96,7 +98,7 @@ ENV_FILE_VARS = {
 API_RUNTIME_ENV_VARS = {
     "MESSAGE_ARCHIVE_BUCKET_NAME": "llm-message-archive-dev",
     "DYNAMODB_HOST": "http://localhost:8888",
-    "DOC_DB_CREDENTIALS_SECRET_NAME": DOC_DB_READ_WRITE_USER_PASSWORD_SECRET_NAME,
+    "DOC_DB_CREDENTIALS_SECRET_NAME": DOC_DB_READ_ONLY_USER_PASSWORD_SECRET_NAME,
 } | SEARCH_SERVICE_API_URL | OPENAI_API_KEY_SECRET_NAME | AWS_DEFAULT_REGION | LOG_LEVEL | \
     DOC_DB_FULLY_QUALIFIED_DOMAIN_NAME | DOC_DB_DATABASE_NAME | DOC_DB_CLASS_RESOURCE_COLLECTION_NAME
 

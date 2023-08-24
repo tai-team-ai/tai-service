@@ -33,8 +33,9 @@ def test_get_common_resources_endpoint():
     """Test that the get common resources endpoint works."""
     example_schema = FrequentlyAccessedResources.Config.schema_extra["example"]
     request_mock = MagicMock()
+    response_mock = MagicMock()
     try:
-        get_frequently_accessed_resources(request_mock, uuid4())
+        get_frequently_accessed_resources(request_mock, response_mock, uuid4())
     except ValidationError as e:
         pytest.fail(f"Endpoint {get_frequently_accessed_resources} failed with example schema: {example_schema}. Error: {str(e)}")
 
@@ -50,7 +51,8 @@ def test_get_common_questions_endpoint():
     """Test that the get common questions endpoint works."""
     example_schema = CommonQuestions.Config.schema_extra["example"]
     request_mock = MagicMock()
+    response_mock = MagicMock()
     try:
-        get_common_questions(request_mock, uuid4())
+        get_common_questions(request_mock, response_mock, uuid4())
     except ValidationError as e:
         pytest.fail(f"Endpoint {get_common_questions} failed with example schema: {example_schema}. Error: {str(e)}")

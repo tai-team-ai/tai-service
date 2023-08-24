@@ -15,7 +15,7 @@
       "env": {
         "MESSAGE_ARCHIVE_BUCKET_NAME": "llm-message-archive-dev",
         "DYNAMODB_HOST": "http://localhost:8888",
-        "DOC_DB_CREDENTIALS_SECRET_NAME": "dev/tai_service/document_DB/read_write_user_password",
+        "DOC_DB_CREDENTIALS_SECRET_NAME": "dev/tai_service/document_DB/read_ONLY_user_password",
         "SEARCH_SERVICE_API_URL": "http://localhost:8080",
         "OPENAI_API_KEY_SECRET_NAME": "dev/tai_service/openai/api_key",
         "AWS_DEFAULT_REGION": "us-east-1",

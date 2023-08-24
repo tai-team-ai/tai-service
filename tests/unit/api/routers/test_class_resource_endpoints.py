@@ -5,11 +5,16 @@ import pytest
 from pydantic import ValidationError
 # These must be set before importing the endpoints as the imports rely on 
 # environment variables being set. I don't like this pattern, but unfortunately.
-# the way pynamoDB works, rn, the config is a global model. I think we may 
-# want to make it a subclass to avoid this.
+# the way pynamoDB works, rn, the config is a global model which means we 
+# globally instantiate the settings model, thus we need to set the env vars this way.
+# I think we may want to make it a subclass to avoid this.
 os.environ["OPENAI_API_KEY_SECRET_NAME"] = "tai-service-openai-api-key"
 os.environ["SEARCH_SERVICE_API_URL"] = "https://search-service-api-url"
 os.environ["AWS_DEFAULT_REGION"] = "us-east-1"
+os.environ["DOC_DB_CREDENTIALS_SECRET_NAME"] = "tai-service-doc-db-credentials"
+os.environ["DOC_DB_FULLY_QUALIFIED_DOMAIN_NAME"] = "https://doc-db-fully-qualified-domain-name"
+os.environ["DOC_DB_DATABASE_NAME"] = "tai-service-doc-db-database-name"
+os.environ["DOC_DB_CLASS_RESOURCE_COLLECTION_NAME"] = "tai-service-doc-db-class-resource-collection-name"
 from taiservice.searchservice.backend import shared_schemas as backend_shared_schemas
 from taiservice.searchservice.backend.databases import document_db_schemas as backend_db_schemas
 from taiservice.api.routers.class_resources import (

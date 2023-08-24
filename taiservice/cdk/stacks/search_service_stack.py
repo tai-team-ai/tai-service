@@ -8,6 +8,8 @@ from aws_cdk import (
     aws_ec2 as ec2,
     aws_iam as iam,
     Duration,
+    aws_ecs as ecs,
+    aws_autoscaling as autoscaling,
 )
 from aws_cdk.aws_ecs_patterns import ApplicationLoadBalancedServiceBase
 from aws_cdk.aws_ecs import (
@@ -25,6 +27,7 @@ from aws_cdk.aws_ecs import (
     AsgCapacityProvider,
     DeploymentCircuitBreaker,
     PlacementStrategy,
+    CapacityProviderStrategy,
 )
 from aws_cdk.aws_elasticloadbalancingv2 import (
     ApplicationLoadBalancer,
@@ -105,14 +108,14 @@ class TaiSearchServiceStack(Stack):
         name_with_suffix = (search_service_settings.cold_store_bucket_name + config.stack_suffix)[:63]
         search_service_settings.doc_db_fully_qualified_domain_name = self.document_db.fully_qualified_domain_name
         search_service_settings.cold_store_bucket_name = name_with_suffix
-        # self.search_services: list[Ec2Service] = self._get_search_services(self._security_group_for_connecting_to_doc_db)
+        self.search_services: list[Ec2Service] = self._get_search_services(self._security_group_for_connecting_to_doc_db)
         self._cold_store_bucket: VersionedBucket = VersionedBucket.create_bucket(
             scope=self,
             bucket_name=search_service_settings.cold_store_bucket_name,
             public_read_access=True,
             permissions=Permissions.READ_WRITE,
             removal_policy=config.removal_policy,
-            # role=[service.task_definition.task_role for service in self.search_services],
+            role=[service.task_definition.task_role for service in self.search_services],
         )
         name_with_suffix = (search_service_settings.documents_to_index_queue + config.stack_suffix)[:63]
         search_service_settings.documents_to_index_queue = name_with_suffix
@@ -214,6 +217,11 @@ class TaiSearchServiceStack(Stack):
             security_groups=[security_group, sg_for_connecting_to_db],
             circuit_breaker=DeploymentCircuitBreaker(rollback=True),
             placement_strategies=[PlacementStrategy.spread_across_instances()],
+            capacity_provider_strategies=[CapacityProviderStrategy(
+                capacity_provider=self._namer("capacity-provider-no-gpu"),
+                base=0,
+                weight=1,
+            )],
         )
         return service
 
@@ -228,7 +236,7 @@ class TaiSearchServiceStack(Stack):
             self._namer("cluster"),
             vpc=self.vpc,
         )
-        no_gpu_asg = self._get_auto_scaling_group(ECSServiceType.NO_GPU)
+        no_gpu_asg = self._get_auto_scaling_group(ECSServiceType.NO_GPU, cluster)
         cluster.add_asg_capacity_provider(
             provider=AsgCapacityProvider(
                 self,
@@ -239,7 +247,7 @@ class TaiSearchServiceStack(Stack):
         )
         return cluster
 
-    def _get_auto_scaling_group(self, service_type: ECSServiceType) -> AutoScalingGroup:
+    def _get_auto_scaling_group(self, service_type: ECSServiceType, cluster: Cluster) -> AutoScalingGroup:
         ami = EcsOptimizedImage.amazon_linux2(
             hardware_type=AmiHardwareType.GPU,
         ) if service_type == ECSServiceType.GPU else EcsOptimizedImage.amazon_linux2(
@@ -256,7 +264,10 @@ class TaiSearchServiceStack(Stack):
                 ),
             ),
         ]
-        max_num_instances = 2
+        user_data = ec2.UserData.for_linux()
+        # this is necessary for the warm pool to work with ECS
+        user_data.add_commands(f"echo -e 'ECS_CLUSTER={cluster.cluster_name}\nECS_WARM_POOLS_CHECK=true' >> /etc/ecs/ecs.config")
+        max_num_instances = 3
         max_instance_lifetime = Duration.days(10)
         if service_type == ECSServiceType.GPU:
             instance_type = ec2.InstanceType.of(
@@ -274,11 +285,12 @@ class TaiSearchServiceStack(Stack):
                 # spot_price="0.35",
                 block_devices=block_devices,
                 max_instance_lifetime=max_instance_lifetime,
+                user_data=user_data,
             )
         else:
             instance_type = ec2.InstanceType.of(
-                instance_class=ec2.InstanceClass.R6A,
-                instance_size=ec2.InstanceSize.LARGE,
+                instance_class=ec2.InstanceClass.M6A,
+                instance_size=ec2.InstanceSize.XLARGE,
             )
             asg = AutoScalingGroup(
                 self,
@@ -291,12 +303,13 @@ class TaiSearchServiceStack(Stack):
                 # spot_price="0.35",
                 block_devices=block_devices,
                 max_instance_lifetime=max_instance_lifetime,
+                user_data=user_data,
             )
         WarmPool(
             self,
             id=self._namer("asg-warm-pool"),
             auto_scaling_group=asg,
-            reuse_on_scale_in=True,
+            reuse_on_scale_in=False,
         )
         return asg
 
@@ -308,6 +321,7 @@ class TaiSearchServiceStack(Stack):
             logging=LogDriver.aws_logs(stream_prefix=self._namer("log")),
             gpu_count=0,
             memory_reservation_mib=15000,
+            stop_timeout=Duration.seconds(240),
         )
         container.add_port_mappings(
             PortMapping(container_port=container_port),
