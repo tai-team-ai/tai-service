@@ -1,4 +1,4 @@
-"""Define tests for the full API."""""
+"""Define tests for the full API.""" ""
 import os
 from pathlib import Path
 import sys
@@ -27,21 +27,51 @@ def test_imports_for_lambda_api():
         for module in MODULES_TO_COPY_INTO_API_DIR:
             shutil.copy(module, temp_api_dir / module.name)
         # Create a venv in the temp directory
-        subprocess.run([sys.executable, '-m', 'venv', str(temp_dir)], check=True)
+        subprocess.run([sys.executable, "-m", "venv", str(temp_dir)], check=True)
         try:
             # Install the requirements
-            subprocess.run([str(temp_dir / 'bin' / 'python'), '-m', 'pip', 'install', '-r', str(temp_api_dir / 'requirements.txt')], check=True)
+            subprocess.run(
+                [
+                    str(temp_dir / "bin" / "python"),
+                    "-m",
+                    "pip",
+                    "install",
+                    "-r",
+                    str(temp_api_dir / "requirements.txt"),
+                ],
+                check=True,
+            )
             # need to install boto3 separately because it is not in the requirements.txt as it's included in the base image
-            subprocess.run([str(temp_dir / 'bin' / 'python'), '-m', 'pip', 'install', 'boto3'], check=True)
+            subprocess.run(
+                [str(temp_dir / "bin" / "python"), "-m", "pip", "install", "boto3"],
+                check=True,
+            )
         except subprocess.CalledProcessError:
             pytest.fail("Failed to install requirements in temporary venv.")
+
+        entry_point = str(temp_api_dir / "main.py")
         try:
             os.environ["OPENAI_API_KEY_SECRET_NAME"] = "tai-service-openai-api-key"
             os.environ["SEARCH_SERVICE_API_URL"] = "https://search-service-api-url"
             os.environ["AWS_DEFAULT_REGION"] = "us-east-1"
+            os.environ[
+                "DOC_DB_CREDENTIALS_SECRET_NAME"
+            ] = "tai-service-doc-db-credentials"
+            os.environ[
+                "DOC_DB_FULLY_QUALIFIED_DOMAIN_NAME"
+            ] = "https://doc-db-fully-qualified-domain-name"
+            os.environ["DOC_DB_DATABASE_NAME"] = "tai-service-doc-db-database-name"
+            os.environ[
+                "DOC_DB_CLASS_RESOURCE_COLLECTION_NAME"
+            ] = "tai-service-doc-db-class-resource-collection-name"
             # Use subprocess to run each file in the api directory
             # run the index.py file (which will subsequently import all the other files)
-            entry_point = str(temp_api_dir / 'main.py')
-            subprocess.run([str(temp_dir / 'bin' / 'python'), entry_point], check=True)
+            subprocess.run(
+                [str(temp_dir / "bin" / "python"), entry_point],
+                check=True,
+                env=os.environ,
+            )
         except subprocess.CalledProcessError:
-            pytest.fail(f"Failed to execute {entry_point} in temporary venv. Rerun test in debug mode ot pinpoint the issue.")
+            pytest.fail(
+                f"Failed to execute {entry_point} in temporary venv. Rerun test in debug mode ot pinpoint the issue."
+            )

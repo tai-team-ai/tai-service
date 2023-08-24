@@ -5,6 +5,7 @@ from fastapi import APIRouter, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from loguru import logger
+
 # first imports are for local development, second imports are for deployment
 try:
     from .routers import (
@@ -35,6 +36,7 @@ ROUTERS = [
     ROUTER,
 ]
 
+
 def create_app() -> FastAPI:
     """Create the FastAPI app."""
     runtime_settings = TaiApiSettings()
@@ -54,6 +56,7 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
     # add a logger to the middleware to log all requests
     @app.middleware("http")
     async def middleware(request: Request, call_next):
@@ -69,7 +72,9 @@ def create_app() -> FastAPI:
     async def error_handler(_, exc):
         logger.error(f"Error occurred: {exc}")
         logger.critical(traceback.format_exc())
-        return JSONResponse(status_code=500, content={"message": "Internal Server Error"})
+        return JSONResponse(
+            status_code=500, content={"message": "Internal Server Error"}
+        )
 
     app.exception_handler(HTTPException)(error_handler)
 
