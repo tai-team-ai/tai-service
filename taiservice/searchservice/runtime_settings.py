@@ -10,6 +10,7 @@ BACKEND_ATTRIBUTE_NAME = "tai_backend"
 
 class AWSRegion(str, Enum):
     """Define valid AWS regions."""
+
     US_EAST_1 = "us-east-1"
     US_EAST_2 = "us-east-2"
     US_WEST_1 = "us-west-1"
@@ -18,6 +19,7 @@ class AWSRegion(str, Enum):
 
 class LogLevel(str, Enum):
     """Define valid log levels."""
+
     TRACE = "TRACE"
     DEBUG = "DEBUG"
     INFO = "INFO"
@@ -125,10 +127,13 @@ class SearchServiceSettings(BaseSettings):
 
     class Config:
         """Define the Pydantic config."""
+
         env_file = ".env"
         env_file_encoding = "utf-8"
 
-    def get_docker_file_contents(self, port: int, fully_qualified_handler_path: str) -> str:
+    def get_docker_file_contents(
+        self, port: int, fully_qualified_handler_path: str
+    ) -> str:
         """Create and return the path to the Dockerfile."""
         docker_file = [
             # "FROM python:3.10 as dependencies",
@@ -137,14 +142,14 @@ class SearchServiceSettings(BaseSettings):
             "RUN curl -sL https://deb.nodesource.com/setup_18.x | bash",
             # poppler-utils is used for the python pdf to image package
             "RUN apt-get update && \\\
-                \n\tapt-get install -y nodejs poppler-utils wget unzip",
+                \n\tapt-get install -y nodejs poppler-utils wget unzip\\\
+                \n\tlibglib2.0-0 libnss3 libgconf-2-4 libfontconfig1 chromium-browser",  # chrome deps
             # install chrome driver for selenium use
             # install extra dependencies for chrome driver
             f"RUN mkdir -p {self.chrome_driver_path}",
             f"RUN wget -O {self.chrome_driver_path}.zip https://chromedriver.storage.googleapis.com/90.0.4430.24/chromedriver_linux64.zip",
             # unzip to the self._settings.chrome_driver_path directory
             f"RUN unzip {self.chrome_driver_path}.zip -d {self.chrome_driver_path}",
-            "RUN apt-get install -y libglib2.0-0 libnss3 libgconf-2-4 libfontconfig1 chromium-browser",
             "\nFROM build AS dependencies",
             "WORKDIR /app",
             "RUN pip install --upgrade pip && pip install nltk projen uvicorn",
@@ -159,10 +164,6 @@ class SearchServiceSettings(BaseSettings):
             "\nFROM dependencies AS runtime",
             "WORKDIR /app",
             "COPY . .",
-            "RUN .venv/bin/pip list",
-            "RUN which .venv/bin/python",
-            "RUN which .venv/bin/pip",
-            "RUN .venv/bin/pip install pymupdf",
             f"EXPOSE {port}",
             f'CMD [".venv/bin/python", "-m", "uvicorn", "{fully_qualified_handler_path}", "--host", "0.0.0.0", "--port", "{port}", "--factory"]',
         ]

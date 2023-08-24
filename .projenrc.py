@@ -64,7 +64,7 @@ project: Project = AwsCdkPythonApp(
         "pinecone-text[splade]",
         # "torch -f https://download.pytorch.org/whl/cpu",
         # "transformers",
-        "pymupdf",
+        "pymupdf==1.22.5",
         "pdf2image",
         "PyPDF2",
         "unstructured",
