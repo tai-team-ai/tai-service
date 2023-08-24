@@ -1,8 +1,16 @@
 {
   "dependencies": [
     {
+      "name": "black",
+      "type": "devenv"
+    },
+    {
       "name": "projen",
       "version": "0.72.12",
+      "type": "devenv"
+    },
+    {
+      "name": "pyright",
       "type": "devenv"
     },
     {

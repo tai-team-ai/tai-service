@@ -13,18 +13,20 @@ from projen import (
 )
 
 
-def convert_dict_env_vars_to_env_vars(env_vars: dict, output: Literal["docker", "list"] = "docker") -> Union[str, list]:
+def convert_dict_env_vars_to_env_vars(
+    env_vars: dict, output: Literal["docker", "list"] = "docker"
+) -> Union[str, list]:
     """Convert a dictionary of environment variables to a string or list of strings."""
     if output == "docker":
-        return " ".join([f"-e {key}=\"{value}\"" for key, value in env_vars.items()])
+        return " ".join([f'-e {key}="{value}"' for key, value in env_vars.items()])
     elif output == "list":
-        return [f"{key}=\"{value}\"" for key, value in env_vars.items()]
+        return [f'{key}="{value}"' for key, value in env_vars.items()]
     else:
         raise ValueError(f"Invalid output type: {output}")
 
 
 VENV_DIR = ".venv"
-project:Project = AwsCdkPythonApp(
+project: Project = AwsCdkPythonApp(
     author_email="jacobpetterle+aiforu@gmail.com",
     author_name="Jacob Petterle",
     cdk_version="2.85.0",
@@ -71,47 +73,87 @@ project:Project = AwsCdkPythonApp(
         "tiktoken",
         "psutil",
     ],
+    dev_deps=[
+        "black",
+        "pyright",
+    ],
 )
 
 
-SEARCH_SERVICE_API_URL = {"SEARCH_SERVICE_API_URL": "http://localhost:8080"} # this gets set during deployment so this is for local dev
+SEARCH_SERVICE_API_URL = {
+    "SEARCH_SERVICE_API_URL": "http://localhost:8080"
+}  # this gets set during deployment so this is for local dev
 PINECONE_DB_ENVIRONMENT = {"PINECONE_DB_ENVIRONMENT": "us-east-1-aws"}
-PINECONE_DB_API_KEY_SECRET_NAME = {"PINECONE_DB_API_KEY_SECRET_NAME": "dev/tai_service/pinecone_db/api_key"}
-OPENAI_API_KEY_SECRET_NAME = {"OPENAI_API_KEY_SECRET_NAME": "dev/tai_service/openai/api_key"}
-DOC_DB_READ_ONLY_USER_PASSWORD_SECRET_NAME = "dev/tai_service/document_DB/read_ONLY_user_password"
-DOC_DB_READ_WRITE_USER_PASSWORD_SECRET_NAME = "dev/tai_service/document_DB/read_write_user_password"
-DOC_DB_FULLY_QUALIFIED_DOMAIN_NAME = {"DOC_DB_FULLY_QUALIFIED_DOMAIN_NAME": "tai-service-645860363137.us-east-1.docdb-elastic.amazonaws.com"}
+PINECONE_DB_API_KEY_SECRET_NAME = {
+    "PINECONE_DB_API_KEY_SECRET_NAME": "dev/tai_service/pinecone_db/api_key"
+}
+OPENAI_API_KEY_SECRET_NAME = {
+    "OPENAI_API_KEY_SECRET_NAME": "dev/tai_service/openai/api_key"
+}
+DOC_DB_READ_ONLY_USER_PASSWORD_SECRET_NAME = (
+    "dev/tai_service/document_DB/read_ONLY_user_password"
+)
+DOC_DB_READ_WRITE_USER_PASSWORD_SECRET_NAME = (
+    "dev/tai_service/document_DB/read_write_user_password"
+)
+DOC_DB_FULLY_QUALIFIED_DOMAIN_NAME = {
+    "DOC_DB_FULLY_QUALIFIED_DOMAIN_NAME": "tai-service-645860363137.us-east-1.docdb-elastic.amazonaws.com"
+}
 DOC_DB_DATABASE_NAME = {"DOC_DB_DATABASE_NAME": "class_resources"}
-DOC_DB_CLASS_RESOURCE_COLLECTION_NAME = {"DOC_DB_CLASS_RESOURCE_COLLECTION_NAME": "class_resource"}
+DOC_DB_CLASS_RESOURCE_COLLECTION_NAME = {
+    "DOC_DB_CLASS_RESOURCE_COLLECTION_NAME": "class_resource"
+}
 AWS_DEFAULT_REGION = {"AWS_DEFAULT_REGION": "us-east-1"}
 LOG_LEVEL = {"LOG_LEVEL": "DEBUG"}
 
-ENV_FILE_VARS = {
-    "DOC_DB_READ_ONLY_USER_PASSWORD_SECRET_NAME": DOC_DB_READ_ONLY_USER_PASSWORD_SECRET_NAME,
-    "DOC_DB_READ_WRITE_USER_PASSWORD_SECRET_NAME": DOC_DB_READ_WRITE_USER_PASSWORD_SECRET_NAME,
-    "DOC_DB_ADMIN_USER_PASSWORD_SECRET_NAME": "dev/tai_service/document_DB/admin_password",
-    "AWS_DEPLOYMENT_ACCOUNT_ID": "645860363137",
-    "DEPLOYMENT_TYPE": "dev",
-    "VPC_ID": "vpc-0fdc1f2e77f6dba96",
-} | SEARCH_SERVICE_API_URL | PINECONE_DB_ENVIRONMENT | PINECONE_DB_API_KEY_SECRET_NAME | OPENAI_API_KEY_SECRET_NAME
+ENV_FILE_VARS = (
+    {
+        "DOC_DB_READ_ONLY_USER_PASSWORD_SECRET_NAME": DOC_DB_READ_ONLY_USER_PASSWORD_SECRET_NAME,
+        "DOC_DB_READ_WRITE_USER_PASSWORD_SECRET_NAME": DOC_DB_READ_WRITE_USER_PASSWORD_SECRET_NAME,
+        "DOC_DB_ADMIN_USER_PASSWORD_SECRET_NAME": "dev/tai_service/document_DB/admin_password",
+        "AWS_DEPLOYMENT_ACCOUNT_ID": "645860363137",
+        "DEPLOYMENT_TYPE": "dev",
+        "VPC_ID": "vpc-0fdc1f2e77f6dba96",
+    }
+    | SEARCH_SERVICE_API_URL
+    | PINECONE_DB_ENVIRONMENT
+    | PINECONE_DB_API_KEY_SECRET_NAME
+    | OPENAI_API_KEY_SECRET_NAME
+)
 
-API_RUNTIME_ENV_VARS = {
-    "MESSAGE_ARCHIVE_BUCKET_NAME": "llm-message-archive-dev",
-    "DYNAMODB_HOST": "http://localhost:8888",
-    "DOC_DB_CREDENTIALS_SECRET_NAME": DOC_DB_READ_ONLY_USER_PASSWORD_SECRET_NAME,
-} | SEARCH_SERVICE_API_URL | OPENAI_API_KEY_SECRET_NAME | AWS_DEFAULT_REGION | LOG_LEVEL | \
-    DOC_DB_FULLY_QUALIFIED_DOMAIN_NAME | DOC_DB_DATABASE_NAME | DOC_DB_CLASS_RESOURCE_COLLECTION_NAME
+API_RUNTIME_ENV_VARS = (
+    {
+        "MESSAGE_ARCHIVE_BUCKET_NAME": "llm-message-archive-dev",
+        "DYNAMODB_HOST": "http://localhost:8888",
+        "DOC_DB_CREDENTIALS_SECRET_NAME": DOC_DB_READ_ONLY_USER_PASSWORD_SECRET_NAME,
+    }
+    | SEARCH_SERVICE_API_URL
+    | OPENAI_API_KEY_SECRET_NAME
+    | AWS_DEFAULT_REGION
+    | LOG_LEVEL
+    | DOC_DB_FULLY_QUALIFIED_DOMAIN_NAME
+    | DOC_DB_DATABASE_NAME
+    | DOC_DB_CLASS_RESOURCE_COLLECTION_NAME
+)
 
-SEARCH_SERVICE_RUNTIME_ENV_VARS = {
-    "PINECONE_DB_INDEX_NAME": "tai-index",
-    "DOC_DB_CREDENTIALS_SECRET_NAME": DOC_DB_READ_WRITE_USER_PASSWORD_SECRET_NAME,
-    "DOC_DB_CLASS_RESOURCE_CHUNK_COLLECTION_NAME": "class_resource_chunk",
-    "COLD_STORE_BUCKET_NAME": "tai-service-class-resource-cold-store-dev",
-    "DOCUMENTS_TO_INDEX_QUEUE": "tai-service-documents-to-index-queue-dev",
-    "NLTK_DATA": "/tmp/nltk_data",
-} | PINECONE_DB_API_KEY_SECRET_NAME | PINECONE_DB_ENVIRONMENT | OPENAI_API_KEY_SECRET_NAME | \
-    AWS_DEFAULT_REGION | LOG_LEVEL | DOC_DB_FULLY_QUALIFIED_DOMAIN_NAME | DOC_DB_DATABASE_NAME | \
-    DOC_DB_CLASS_RESOURCE_COLLECTION_NAME
+SEARCH_SERVICE_RUNTIME_ENV_VARS = (
+    {
+        "PINECONE_DB_INDEX_NAME": "tai-index",
+        "DOC_DB_CREDENTIALS_SECRET_NAME": DOC_DB_READ_WRITE_USER_PASSWORD_SECRET_NAME,
+        "DOC_DB_CLASS_RESOURCE_CHUNK_COLLECTION_NAME": "class_resource_chunk",
+        "COLD_STORE_BUCKET_NAME": "tai-service-class-resource-cold-store-dev",
+        "DOCUMENTS_TO_INDEX_QUEUE": "tai-service-documents-to-index-queue-dev",
+        "NLTK_DATA": "/tmp/nltk_data",
+    }
+    | PINECONE_DB_API_KEY_SECRET_NAME
+    | PINECONE_DB_ENVIRONMENT
+    | OPENAI_API_KEY_SECRET_NAME
+    | AWS_DEFAULT_REGION
+    | LOG_LEVEL
+    | DOC_DB_FULLY_QUALIFIED_DOMAIN_NAME
+    | DOC_DB_DATABASE_NAME
+    | DOC_DB_CLASS_RESOURCE_COLLECTION_NAME
+)
 
 env_file: TextFile = TextFile(
     project,
@@ -126,6 +168,13 @@ vscode_settings.add_setting("python.formatting.provider", "none")
 vscode_settings.add_setting("python.testing.pytestEnabled", True)
 vscode_settings.add_setting("python.testing.pytestArgs", ["tests"])
 vscode_settings.add_setting("editor.formatOnSave", True)
+vscode_settings.add_settings(
+    settings={
+        "editor.defaultFormatter": "ms-python.black-formatter",
+        "editor.formatOnSave": True,
+    },
+    languages=["python"],
+)
 vscode_launch_config: VsCodeLaunchConfig = VsCodeLaunchConfig(vscode)
 
 vscode_launch_config.add_configuration(
@@ -181,13 +230,13 @@ make_file.add_rule(
     targets=[UNITTEST_TARGET_NAME],
     recipe=[
         "python3 -m pytest -vv tests/unit --cov=taiservice --cov-report=term-missing --cov-report=xml:test-reports/coverage.xml --cov-report=html:test-reports/coverage",
-    ]
+    ],
 )
 make_file.add_rule(
     targets=[FUNCTIONAL_TEST_TARGET_NAME],
     recipe=[
         "python3 -m pytest -vv tests/functional --cov=taiservice --cov-report=term-missing --cov-report=xml:test-reports/coverage.xml --cov-report=html:test-reports/coverage",
-    ]
+    ],
 )
 make_file.add_rule(
     targets=[FULL_TEST_TARGET_NAME],

@@ -159,6 +159,10 @@ class SearchServiceSettings(BaseSettings):
             "\nFROM dependencies AS runtime",
             "WORKDIR /app",
             "COPY . .",
+            "RUN .venv/bin/pip list",
+            "RUN which .venv/bin/python",
+            "RUN which .venv/bin/pip",
+            "RUN .venv/bin/pip install pymupdf",
             f"EXPOSE {port}",
             f'CMD [".venv/bin/python", "-m", "uvicorn", "{fully_qualified_handler_path}", "--host", "0.0.0.0", "--port", "{port}", "--factory"]',
         ]

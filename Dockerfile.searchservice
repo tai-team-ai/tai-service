@@ -20,5 +20,9 @@ RUN projen
 FROM dependencies AS runtime
 WORKDIR /app
 COPY . .
+RUN .venv/bin/pip list
+RUN which .venv/bin/python
+RUN which .venv/bin/pip
+RUN .venv/bin/pip install pymupdf
 EXPOSE 8080
 CMD [".venv/bin/python", "-m", "uvicorn", "taiservice.searchservice.main:create_app", "--host", "0.0.0.0", "--port", "8080", "--factory"]

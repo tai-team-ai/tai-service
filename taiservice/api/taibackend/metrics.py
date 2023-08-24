@@ -45,12 +45,14 @@ class BaseFrequentlyAccessedObjects(BasePydanticModel):
 
 class BaseFrequentlyAccessedObject(BasePydanticModel):
     """Define a base schema for ranked common resources."""
-    rank: conint(ge=1) = Field(
+    rank: int = Field(
         ...,
+        ge=1,
         description="The rank of the object when ranked by appearances during the date range.",
     )
-    appearances_during_period: conint(ge=1) = Field(
+    appearances_during_period: int = Field(
         ...,
+        ge=1,
         description="The number of times the object appeared during the date range.",
     )
 
@@ -87,10 +89,9 @@ class Metrics:
             date_range=date_range,
             RecordClass=HumanMessageRecord,
         )
-        assert all(isinstance(rec, HumanMessageRecord) for rec in records)
-        rec: HumanMessageRecord
         messages = []
         for rec in records:
+            assert isinstance(rec, HumanMessageRecord)
             messages.append(rec.message)
         return messages
 
