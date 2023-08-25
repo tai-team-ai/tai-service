@@ -193,12 +193,14 @@ class TaiSearchServiceStack(Stack):
             self._namer("task"),
             network_mode=NetworkMode.AWS_VPC,
         )
+        secret_names = self._search_service_settings.secret_names
+        secret_arns = [f"arn:aws:secretsmanager:{self.region}:{self.account}:{secret_name}" for secret_name in secret_names]
         task_definition.add_to_task_role_policy(
             statement=iam.PolicyStatement(
                 actions=[
                     "secretsmanager:GetSecretValue",
                 ],
-                resources=self._search_service_settings.secret_names,
+                resources=secret_arns,
             ),
         )
         cluster: Cluster = self._get_cluster()
