@@ -1,7 +1,7 @@
 """Define the backend for handling requests to the TAI Search Service."""
 from datetime import date, datetime, timedelta
 import json
-from typing import Any, Optional, Union
+from typing import Any, Callable, Optional, Union
 from uuid import UUID
 import psutil
 import boto3
@@ -197,7 +197,7 @@ class Backend:
             output_documents.append(output_doc)
         return output_documents
 
-    def create_class_resource(self, class_resource: ClassResource) -> callable:
+    def create_class_resource(self, class_resource: ClassResource) -> Callable[[], None]:
         """Create the class resources."""
         if not self._is_server_ready():
             raise ServerOverloadedError("Server is overloaded, please try again later.")

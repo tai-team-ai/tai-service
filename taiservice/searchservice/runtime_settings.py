@@ -131,6 +131,15 @@ class SearchServiceSettings(BaseSettings):
         env_file = ".env"
         env_file_encoding = "utf-8"
 
+    @property
+    def secret_names(self) -> list[str]:
+        """Return the names of the secrets used by the service."""
+        return [
+            self.openAI_api_key_secret_name,
+            self.doc_db_credentials_secret_name,
+            self.pinecone_db_api_key_secret_name,
+        ]
+
     def get_docker_file_contents(
         self, port: int, fully_qualified_handler_path: str
     ) -> str:
