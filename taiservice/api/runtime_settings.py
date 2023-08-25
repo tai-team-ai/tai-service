@@ -116,3 +116,11 @@ class TaiApiSettings(BaseSettings):
         default=LogLevel.INFO,
         description="The log level for the service.",
     )
+
+    @property
+    def secret_names(self) -> list[str]:
+        """Return the names of the secrets used by the service."""
+        return [
+            self.openAI_api_key_secret_name,
+            self.doc_db_credentials_secret_name,
+        ]

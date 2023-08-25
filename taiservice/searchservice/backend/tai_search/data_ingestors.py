@@ -298,7 +298,11 @@ class URLIngestor(Ingestor):
         final_part = path.split("/")[-1]
         tmp_path = Path("/tmp") / str(uuid4()) / final_part
         tmp_path.parent.mkdir(parents=True, exist_ok=True)
-        urllib.request.urlretrieve(remote_file_url, tmp_path)
+        try:
+            urllib.request.urlretrieve(remote_file_url, tmp_path)
+        except Exception as e:
+            logger.error(f"Failed to download from {remote_file_url}: {e}")
+            raise RuntimeError(f"Failed to download from {remote_file_url}: {e}") from e
         file_type = cls._get_file_type(tmp_path)
         document = IngestedDocument(
             data_pointer=tmp_path,

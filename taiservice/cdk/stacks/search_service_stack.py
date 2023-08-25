@@ -198,9 +198,7 @@ class TaiSearchServiceStack(Stack):
                 actions=[
                     "secretsmanager:GetSecretValue",
                 ],
-                resources=[
-                    "*",
-                ],
+                resources=self._search_service_settings.secret_names,
             ),
         )
         cluster: Cluster = self._get_cluster()
