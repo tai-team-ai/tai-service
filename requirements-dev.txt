@@ -2,3 +2,4 @@
 black
 projen==0.72.12
 pyright
+uvicorn

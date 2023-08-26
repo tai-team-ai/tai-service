@@ -50,7 +50,6 @@ project: Project = AwsCdkPythonApp(
         "boto3-stubs[essential]",
         "pytest",
         "pytest-cov",
-        "uvicorn",
         "pinecone-client[grpc]",
         "langchain==0.0.229",
         "ipykernel",
@@ -72,10 +71,12 @@ project: Project = AwsCdkPythonApp(
         "pynamodb",
         "tiktoken",
         "psutil",
+        "gunicorn",
     ],
     dev_deps=[
         "black",
         "pyright",
+        "uvicorn",
     ],
 )
 
@@ -210,7 +211,9 @@ vscode_launch_config.add_configuration(
 UNITTEST_TARGET_NAME = "unit-test"
 FUNCTIONAL_TEST_TARGET_NAME = "functional-test"
 FULL_TEST_TARGET_NAME = "full-test"
+PROJEN_SYNTH_CMD = "projen --post false"
 BASE_DOCKER_RUN_RECIPE = [
+    f"{PROJEN_SYNTH_CMD} && \\",
     "cdk synth && \\",
     "cd $(DIR) && \\",
     "sudo docker build -t test-container -f $(DOCKER_FILE) . && \\",
@@ -221,8 +224,15 @@ make_file: Makefile = Makefile(
     "./makefile",
 )
 make_file.add_rule(
+    targets=["synth"],
+    recipe=[
+        "projen --post false",
+    ],
+)
+make_file.add_rule(
     targets=["deploy-all"],
     recipe=[
+        f"{PROJEN_SYNTH_CMD} && \\",
         "cdk deploy --all --require-approval never",
     ],
 )

@@ -167,13 +167,14 @@ class SearchServiceSettings(BaseSettings):
             # averaged_perceptron_tagger is used for langchain for HTML parsing
             # the path is specified as lambda does NOT have access to the default path
             f"RUN python3 -m nltk.downloader -d {self.nltk_data} punkt stopwords averaged_perceptron_tagger",  # Download the model and save it to the directory
-            "COPY .projenrc.py .projenrc.py",
-            "COPY .projen .projen",
-            "RUN projen",
+            "COPY requirements.txt .",
+            "RUN pip install -r requirements.txt",
             "\nFROM dependencies AS runtime",
             "WORKDIR /app",
             "COPY . .",
             f"EXPOSE {port}",
-            f'CMD [".venv/bin/python", "-m", "uvicorn", "{fully_qualified_handler_path}", "--host", "0.0.0.0", "--port", "{port}", "--factory"]',
+            f'CMD ["gunicorn", "-w", "4", "-k", "uvicorn.workers.UvicornWorker", "{fully_qualified_handler_path}", "--bind", "0.0.0.0:{port}", "--worker-tmp-dir", "/dev/shm"]',
+            
+            # f'CMD [".venv/bin/python", "-m", "uvicorn", "{fully_qualified_handler_path}", "--host", "0.0.0.0", "--port", "{port}", "--factory"]',
         ]
         return "\n".join(docker_file)

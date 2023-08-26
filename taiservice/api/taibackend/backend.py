@@ -288,7 +288,7 @@ class Backend:
         while resource_queue:
             resource = resource_queue.popleft()
             try:
-                response = requests.post(url, data=resource.json(), timeout=120)
+                response = requests.post(url, data=resource.json(), timeout=40)
                 self._check_create_resources_response(response, resource, failed_resources)
             except Exception as e:
                 self._handle_create_req_error(e, resource, failed_resources)

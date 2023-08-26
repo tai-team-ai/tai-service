@@ -9,6 +9,7 @@ boto3-stubs[secretsmanager]
 constructs>=10.0.5, <11.0.0
 fastapi<=0.98.0
 filetype
+gunicorn
 ipykernel
 langchain==0.0.229
 loguru
@@ -21,7 +22,7 @@ pydantic[dotenv]<=1.10.11
 pydantic<=1.10.11
 pygit2
 pymongo
-pymupdf
+pymupdf==1.22.5
 pynamodb
 PyPDF2
 pytest
@@ -31,4 +32,3 @@ selenium
 tai-aws-account-bootstrap
 tiktoken
 unstructured
-uvicorn
