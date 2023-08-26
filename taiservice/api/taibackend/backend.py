@@ -349,7 +349,16 @@ class Backend:
                 reason = ResourceUploadFailureReason.TO_MANY_REQUESTS
             else:
                 reason = ResourceUploadFailureReason.UNPROCESSABLE_RESOURCE
-            error_message = response.json().get('message', "Failed to create class resource.")
+
+            error_message = 'Failed to create class resource.'  # default error message
+            
+            try:
+                response_json = response.json()
+                error_message = response_json.get('message', error_message)
+            except ValueError:  
+                # Catch the ValueError (of which JSONDecodeError is a subclass) and log the response
+                error_message = 'Failed to decode response. Raw response: {}'.format(response.text)
+            
             logger.error(error_message)
             self._add_failed_resource(
                 failed_resources=failed_resources,
