@@ -45,11 +45,14 @@ tai_api_config = StackConfigBaseModel(
     **BASE_SETTINGS,
 )
 TAI_API_SETTINGS.search_service_api_url = f"http://{search_service.service_url}"
+TAI_API_SETTINGS.doc_db_fully_qualified_domain_name = search_service.document_db.fully_qualified_domain_name
 tai_api: TaiApiStack = TaiApiStack(
     scope=app,
     config=tai_api_config,
     api_settings=TAI_API_SETTINGS,
     dynamodb_settings=DYNAMODB_DEPLOYMENT_SETTINGS,
+    security_group_for_connecting_to_doc_db=search_service.document_db.security_group_for_connecting_to_cluster,
+    vpc=VPC_ID,
 )
 
 

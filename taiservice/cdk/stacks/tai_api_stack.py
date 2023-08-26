@@ -1,11 +1,12 @@
 """Define the stack for the TAI API service."""
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Any
 from constructs import Construct
 from aws_cdk import (
     Stack,
     aws_lambda as _lambda,
     aws_dynamodb as dynamodb,
+    aws_ec2 as ec2,
     Duration,
     Size as StorageSize,
     CfnOutput,
@@ -25,6 +26,7 @@ from ..constructs.bucket_construct import VersionedBucket
 from ..constructs.construct_config import Permissions
 from ..constructs.construct_helpers import (
     get_secret_arn_from_name,
+    get_vpc,
 )
 
 
@@ -68,6 +70,8 @@ class TaiApiStack(Stack):
         config: StackConfigBaseModel,
         api_settings: TaiApiSettings,
         dynamodb_settings: DynamoDBSettings,
+        security_group_for_connecting_to_doc_db: ec2.SecurityGroup,
+        vpc: Any,
     ) -> None:
         """Initialize the stack for the TAI API service."""
         super().__init__(
@@ -86,7 +90,8 @@ class TaiApiStack(Stack):
         self._stack_suffix = config.stack_suffix
         name_with_suffix = (api_settings.message_archive_bucket_name + self._stack_suffix)[:63]
         api_settings.message_archive_bucket_name = name_with_suffix
-        self._python_lambda: DockerLambda = self._create_lambda_function()
+        vpc = get_vpc(scope=self, vpc=vpc)
+        self._python_lambda: DockerLambda = self._create_lambda_function(security_group_for_connecting_to_doc_db, vpc)
         self._dynamodb_table = self._create_dynamodb_table()
         self._dynamodb_table.grant_read_write_data(self._python_lambda.role)
         lambda_role = self._python_lambda.role
@@ -123,8 +128,8 @@ class TaiApiStack(Stack):
         )
         return table
 
-    def _create_lambda_function(self) -> DockerLambda:
-        config = self._get_lambda_config()
+    def _create_lambda_function(self, sg_for_connecting_to_doc_db: ec2.SecurityGroup, vpc: ec2.IVpc) -> DockerLambda:
+        config = self._get_lambda_config(sg_for_connecting_to_doc_db, vpc)
         name = config.function_name
         python_lambda: DockerLambda = DockerLambda(
             self,
@@ -135,8 +140,21 @@ class TaiApiStack(Stack):
         python_lambda.allow_public_invoke_of_function()
         return python_lambda
 
-    def _get_lambda_config(self) -> BaseLambdaConfigModel:
+    def _get_lambda_config(self, sg_for_connecting_to_doc_db: ec2.SecurityGroup, vpc: ec2.IVpc) -> DockerLambdaConfigModel:
         function_name = self._namer("handler")
+        security_group: ec2.SecurityGroup = ec2.SecurityGroup(
+            self,
+            id=function_name + "-sg",
+            security_group_name=function_name,
+            description="The security group for the tai api lambda function.",
+            vpc=vpc,
+            allow_all_outbound=True,
+        )
+        security_group.add_ingress_rule(
+            peer=ec2.Peer.any_ipv4(),
+            connection=ec2.Port.tcp(443),
+            description="Allow inbound HTTPS traffic from anywhere",
+        )
         lambda_config = DockerLambdaConfigModel(
             function_name=function_name,
             description="The lambda for the TAI API service.",
@@ -156,5 +174,8 @@ class TaiApiStack(Stack):
                 auth_type=_lambda.FunctionUrlAuthType.NONE,
             ),
             run_as_webserver=True,
+            security_groups=[security_group, sg_for_connecting_to_doc_db],
+            vpc=vpc,
+            subnet_selection=ec2.SubnetSelection(subnet_type=ec2.SubnetType.PRIVATE_WITH_EGRESS),
         )
         return lambda_config

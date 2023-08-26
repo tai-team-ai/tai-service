@@ -10,6 +10,7 @@ from aws_cdk import (
     Duration,
     aws_ecs as ecs,
     aws_autoscaling as autoscaling,
+    aws_elasticloadbalancingv2 as elbv2,
 )
 from aws_cdk.aws_ecs_patterns import ApplicationLoadBalancedServiceBase
 from aws_cdk.aws_ecs import (
@@ -55,6 +56,9 @@ from ..constructs.construct_helpers import get_vpc
 from ..constructs.pinecone_db_construct import PineconeDatabase
 from ..constructs.bucket_construct import VersionedBucket
 from ..constructs.customresources.pinecone_db.pinecone_db_custom_resource import PineconeDBSettings
+from ..constructs.construct_helpers import (
+    get_secret_arn_from_name,
+)
 
 
 DOCKER_FILE_NAME = "Dockerfile.searchservice"
@@ -193,14 +197,12 @@ class TaiSearchServiceStack(Stack):
             self._namer("task"),
             network_mode=NetworkMode.AWS_VPC,
         )
-        secret_names = self._search_service_settings.secret_names
-        secret_arns = [f"arn:aws:secretsmanager:{self.region}:{self.account}:{secret_name}" for secret_name in secret_names]
         task_definition.add_to_task_role_policy(
             statement=iam.PolicyStatement(
                 actions=[
                     "secretsmanager:GetSecretValue",
                 ],
-                resources=secret_arns,
+                resources=[get_secret_arn_from_name(secret) for secret in self._search_service_settings.secret_names]
             ),
         )
         cluster: Cluster = self._get_cluster()
@@ -222,6 +224,7 @@ class TaiSearchServiceStack(Stack):
                 base=0,
                 weight=1,
             )],
+            health_check_grace_period=Duration.seconds(450),
         )
         return service
 
@@ -289,8 +292,8 @@ class TaiSearchServiceStack(Stack):
             )
         else:
             instance_type = ec2.InstanceType.of(
-                instance_class=ec2.InstanceClass.M6A,
-                instance_size=ec2.InstanceSize.XLARGE,
+                instance_class=ec2.InstanceClass.C6A,
+                instance_size=ec2.InstanceSize.XLARGE2,
             )
             asg = AutoScalingGroup(
                 self,
@@ -321,7 +324,7 @@ class TaiSearchServiceStack(Stack):
             logging=LogDriver.aws_logs(stream_prefix=self._namer("log")),
             gpu_count=0,
             memory_reservation_mib=15000,
-            stop_timeout=Duration.seconds(240),
+            stop_timeout=Duration.seconds(600),
         )
         container.add_port_mappings(
             PortMapping(container_port=container_port),
@@ -351,13 +354,13 @@ class TaiSearchServiceStack(Stack):
         scaling_task.scale_on_cpu_utilization(
             id=self._namer("task-cpu-scaling"),
             target_utilization_percent=50,
-            scale_out_cooldown=Duration.seconds(120), # we should be fast because of the warm pool
+            scale_out_cooldown=Duration.seconds(300), # we should be fast because of the warm pool
             disable_scale_in=False,
         )
         scaling_task.scale_on_memory_utilization(
             id=self._namer("task-memory-scaling"),
             target_utilization_percent=75,
-            scale_out_cooldown=Duration.seconds(120), # we should be fast because of the warm pool
+            scale_out_cooldown=Duration.seconds(300), # we should be fast because of the warm pool
             disable_scale_in=False,
         )
         scaling_task.scale_on_schedule(
@@ -391,6 +394,13 @@ class TaiSearchServiceStack(Stack):
             port=target_port,
             protocol=target_protocol,
             targets=services,
+            deregistration_delay=Duration.seconds(600),
+            health_check=elbv2.HealthCheck(
+                healthy_threshold_count=2,
+                interval=Duration.seconds(120),
+                timeout=Duration.seconds(60),
+                unhealthy_threshold_count=5,
+            ),
         )
         return target_group
 

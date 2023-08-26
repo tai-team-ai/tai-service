@@ -288,7 +288,7 @@ class Backend:
         while resource_queue:
             resource = resource_queue.popleft()
             try:
-                response = requests.post(url, data=resource.json(), timeout=15)
+                response = requests.post(url, data=resource.json(), timeout=120)
                 self._check_create_resources_response(response, resource, failed_resources)
             except Exception as e:
                 self._handle_create_req_error(e, resource, failed_resources)
@@ -369,6 +369,7 @@ class Backend:
 
     def _handle_create_req_error(self, e: Exception, resource: ClassResource, failed_resources: FailedResources) -> None:
         logger.error(f"Failed to create class resource with request. Exception: {e}")
+        logger.error(traceback.format_exc())
         self._add_failed_resource(
             failed_resources=failed_resources,
             reason=ResourceUploadFailureReason.TO_MANY_REQUESTS,

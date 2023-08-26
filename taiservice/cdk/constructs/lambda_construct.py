@@ -143,10 +143,12 @@ class BaseLambdaConfigModel(BaseModel):
         use_enum_values = True
 
     @root_validator
-    def validate_vpc_is_provided_if_subnet_selection_is_provided(cls, values) -> dict:
+    def validate_vpc_and_subnet_selection_is_provided(cls, values) -> dict:
         """Validate that a VPC is provided if a subnet selection is provided."""
         if values["subnet_selection"] is not None and values["vpc"] is None:
             raise ValueError("Must provide a VPC if providing a subnet selection")
+        if values["vpc"] is not None and values["subnet_selection"] is None:
+            raise ValueError("Must provide a subnet selection if providing a VPC")
         return values
 
     @validator("function_name")
