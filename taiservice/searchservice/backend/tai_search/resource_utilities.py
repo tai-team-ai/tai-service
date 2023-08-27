@@ -54,7 +54,7 @@ class ResourceUtility(ABC):
         last_page_to_include: Optional[int] = None
     ) -> Optional[list[Path]]:
         """Get the screenshot from a PDF."""
-        output_folder = Path("/tmp") / f"{path.stem}_images"
+        output_folder = path.parent / f"{path.stem}_images"
         try:
             shutil.rmtree(output_folder)
         except FileNotFoundError:

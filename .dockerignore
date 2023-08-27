@@ -5,3 +5,6 @@
 **/tests
 **/test-reports
 **/.build*/
+**/cdk.out
+**/docker
+**/tests

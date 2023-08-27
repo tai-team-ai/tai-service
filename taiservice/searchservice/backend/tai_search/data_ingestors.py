@@ -267,7 +267,8 @@ class S3ObjectIngestor(Ingestor):
     @classmethod
     def _ingest_data(cls, input_data: InputDocument) -> IngestedDocument:
         """Ingest the data from S3."""
-        tmp_path = Path(f"/tmp/{input_data.full_resource_url.split('/')[-1]}")
+        tmp_path: Path = Path("/tmp") / str(uuid4()) / input_data.full_resource_url.split('/')[-1]
+        tmp_path.parent.mkdir(parents=True, exist_ok=True)
         response = requests.get(input_data.full_resource_url, timeout=10)
         response.raise_for_status() # Raise an error if the download fails
         with open(tmp_path, "wb") as f:

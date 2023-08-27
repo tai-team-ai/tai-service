@@ -207,9 +207,9 @@ class Backend:
             pass
         elif self._is_duplicate_class_resource(ingested_doc):
             raise DuplicateClassResourceError(f"Duplicate class resource: {ingested_doc.id} in class {ingested_doc.class_id}")
+        class_resource = ClassResourceDocument.from_ingested_doc(ingested_doc)
+        self._coerce_and_update_status(class_resource, ClassResourceProcessingStatus.PENDING)
         def index_resource() -> None:
-            class_resource = ClassResourceDocument.from_ingested_doc(ingested_doc)
-            self._coerce_and_update_status(class_resource, ClassResourceProcessingStatus.PENDING)
             try:
                 self._coerce_and_update_status(class_resource, ClassResourceProcessingStatus.PROCESSING)
                 self._tai_search.index_resource(ingested_doc, class_resource)
@@ -288,7 +288,7 @@ class Backend:
         svmem = psutil.virtual_memory()
         mem_available_MB = svmem.available / 1024 ** 2
         mem_percent = svmem.percent
-        if cpu_load > 85 or mem_percent > 85 or mem_available_MB < 3000:
+        if cpu_load > 98 or mem_percent > 98 or mem_available_MB < 1000:
             return False
         return True
 

@@ -95,7 +95,7 @@ class SearchServiceSettings(BaseSettings):
         description="The batch size for OpenAI requests.",
     )
     nltk_data: Path = Field(
-        default=Path("/var/task/nltk_data"),
+        default=Path("/tmp/nltk_data"),
         description="The path to the nltk data.",
     )
     transformers_cache: Path = Field(
@@ -173,8 +173,9 @@ class SearchServiceSettings(BaseSettings):
             "WORKDIR /app",
             "COPY . .",
             f"EXPOSE {port}",
-            f'CMD ["gunicorn", "-w", "4", "-k", "uvicorn.workers.UvicornWorker", "{fully_qualified_handler_path}", "--bind", "0.0.0.0:{port}", "--worker-tmp-dir", "/dev/shm"]',
-            
+            f'CMD ["gunicorn", "-w", "2", "-k", "uvicorn.workers.UvicornWorker", '
+            f'"{fully_qualified_handler_path}", "--bind", "0.0.0.0:{port}", "--worker-tmp-dir", "/dev/shm", '
+            '"--graceful-timeout", "240", "--timeout", "240"]',
             # f'CMD [".venv/bin/python", "-m", "uvicorn", "{fully_qualified_handler_path}", "--host", "0.0.0.0", "--port", "{port}", "--factory"]',
         ]
         return "\n".join(docker_file)

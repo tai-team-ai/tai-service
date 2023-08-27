@@ -32,3 +32,4 @@ selenium
 tai-aws-account-bootstrap
 tiktoken
 unstructured
+uvicorn[standard]

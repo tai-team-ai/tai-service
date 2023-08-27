@@ -72,6 +72,7 @@ project: Project = AwsCdkPythonApp(
         "tiktoken",
         "psutil",
         "gunicorn",
+        "uvicorn[standard]", # installs high performance ASGI server
     ],
     dev_deps=[
         "black",
@@ -307,6 +308,9 @@ docker_ignore_file: TextFile = TextFile(
         "**/tests",
         "**/test-reports",
         "**/.build*/",
+        "**/cdk.out",
+        "**/docker",
+        "**/tests",
     ],
 )
 
