@@ -141,7 +141,10 @@ class SearchServiceSettings(BaseSettings):
         ]
 
     def get_docker_file_contents(
-        self, port: int, fully_qualified_handler_path: str
+        self,
+        port: int,
+        fully_qualified_handler_path: str,
+        worker_count: int = 1,
     ) -> str:
         """Create and return the path to the Dockerfile."""
         docker_file = [
@@ -173,9 +176,9 @@ class SearchServiceSettings(BaseSettings):
             "WORKDIR /app",
             "COPY . .",
             f"EXPOSE {port}",
-            f'CMD ["gunicorn", "-w", "2", "-k", "uvicorn.workers.UvicornWorker", '
+            f'CMD ["gunicorn", "-w", "{worker_count}", "-k", "uvicorn.workers.UvicornWorker", '
             f'"{fully_qualified_handler_path}", "--bind", "0.0.0.0:{port}", "--worker-tmp-dir", "/dev/shm", '
-            '"--graceful-timeout", "240", "--timeout", "240"]',
+            '"--graceful-timeout", "450", "--timeout", "450"]',
             # f'CMD [".venv/bin/python", "-m", "uvicorn", "{fully_qualified_handler_path}", "--host", "0.0.0.0", "--port", "{port}", "--factory"]',
         ]
         return "\n".join(docker_file)

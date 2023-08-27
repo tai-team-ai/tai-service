@@ -46,9 +46,9 @@ from ..databases.document_db_schemas import (
     ClassResourceDocument,
 )
 
-# the minus 2 provides some overhead so we aren't using all the resources
+# the minus 10 provides some overhead so we aren't using all the resources
 # and helps minimize the likelihood of crashing the instance
-MAX_NUM_PROCESS = max(cpu_count() - 2, 1)
+MAX_NUM_PROCESS = max(cpu_count() - 5, 1)
 
 
 class OpenAIConfig(BaseOpenAIConfig):
@@ -93,7 +93,7 @@ class ResourceLimits(BaseModel):
         description="The threshold for memory usage percentage beyond which system is considered as resource constrained.",
     )
     cpu_percent_threshold: Optional[float] = Field(
-        default=80.0,
+        default=70.0,
         le=80.0,
         description="The threshold for CPU usage percentage beyond which system is considered as resource constrained.",
     )
@@ -197,24 +197,24 @@ class TAISearch:
             logger.info(f"Finished loading and splitting document into {len(chunk_documents)} chunks: {ingested_document.id}")
             class_resource_document.class_resource_chunk_ids = [chunk_doc.id for chunk_doc in chunk_documents]
             logger.info(f"Uploading {len(chunk_documents)} document to cold store: {ingested_document.id}")
-            # partial_func = partial(
-            #     Ingestor.upload_document_to_cold_store,
-            #     bucket_name=self._cold_store_bucket_name,
-            #     ingested_doc=ingested_document,
-            #     chunks=chunk_documents,
-            # )
-            # execute_with_resource_check(partial_func)
-            # logger.info(f"Finished uploading {len(chunk_documents)}  chunks to cold store: {ingested_document.id}")
-            # logger.info(f"Embedding {len(chunk_documents)} chunks: {ingested_document.id}")
-            # partial_func = partial(self.embed_documents, chunk_documents)
-            # vector_documents = execute_with_resource_check(partial_func)
-            # logger.info(f"Finished embedding {len(chunk_documents)}  chunks: {ingested_document.id}")
-            # logger.info(f"Loading {len(chunk_documents)}  chunks to db: {ingested_document.id}")
-            # self._load_class_resources_to_db(class_resource_document, chunk_documents)
-            # logger.info(f"Finished loading {len(chunk_documents)}  chunks to db: {ingested_document.id}")
-            # logger.info(f"Loading {len(vector_documents)} vectors to vector store: {ingested_document.id}")
-            # self._load_vectors_to_vector_store(vector_documents)
-            # logger.info(f"Finished loading {len(vector_documents)} vectors to vector store: {ingested_document.id}")
+            partial_func = partial(
+                Ingestor.upload_document_to_cold_store,
+                bucket_name=self._cold_store_bucket_name,
+                ingested_doc=ingested_document,
+                chunks=chunk_documents,
+            )
+            execute_with_resource_check(partial_func)
+            logger.info(f"Finished uploading {len(chunk_documents)}  chunks to cold store: {ingested_document.id}")
+            logger.info(f"Embedding {len(chunk_documents)} chunks: {ingested_document.id}")
+            partial_func = partial(self.embed_documents, chunk_documents)
+            vector_documents = execute_with_resource_check(partial_func)
+            logger.info(f"Finished embedding {len(chunk_documents)}  chunks: {ingested_document.id}")
+            logger.info(f"Loading {len(chunk_documents)}  chunks to db: {ingested_document.id}")
+            self._load_class_resources_to_db(class_resource_document, chunk_documents)
+            logger.info(f"Finished loading {len(chunk_documents)}  chunks to db: {ingested_document.id}")
+            logger.info(f"Loading {len(vector_documents)} vectors to vector store: {ingested_document.id}")
+            self._load_vectors_to_vector_store(vector_documents)
+            logger.info(f"Finished loading {len(vector_documents)} vectors to vector store: {ingested_document.id}")
         except Exception as e:
             logger.error(traceback.format_exc())
             raise RuntimeError("Failed to index resource.") from e
@@ -377,12 +377,12 @@ class TAISearch:
             batch_size = 100
             batches = [texts[i:i + batch_size] for i in range(0, len(texts), batch_size)]
             logger.info(f"Splitting {len(texts)} documents into {len(batches)} batches.")
-            # with Pool(processes = cpu_count() - 2) as pool:
-            #     result_batches = pool.map(get_sparse_vectors, batches)
-            # sparse_vectors = [vector for batch in result_batches for vector in batch]
-            sparse_vectors = []
-            for batch in batches:
-                sparse_vectors.extend(get_sparse_vectors(batch))
+            with Pool(processes=MAX_NUM_PROCESS) as pool:
+                result_batches = pool.map(get_sparse_vectors, batches)
+            sparse_vectors = [vector for batch in result_batches for vector in batch]
+            # sparse_vectors = []
+            # for batch in batches:
+            #     sparse_vectors.extend(get_sparse_vectors(batch))
             return sparse_vectors
 
     @staticmethod

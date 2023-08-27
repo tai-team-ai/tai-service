@@ -231,7 +231,11 @@ class TaiSearchServiceStack(Stack):
     def _create_docker_file(self, target_port: int) -> None:
         docker_file_path = os.path.join(CWD, DOCKER_FILE_NAME)
         with open(docker_file_path, "w", encoding="utf-8") as f:
-            f.write(self._search_service_settings.get_docker_file_contents(target_port, FULLY_QUALIFIED_HANDLER_NAME))
+            f.write(self._search_service_settings.get_docker_file_contents(
+                target_port,
+                FULLY_QUALIFIED_HANDLER_NAME,
+                worker_count=10,
+            ))
 
     def _get_cluster(self) -> Cluster:
         cluster = Cluster(

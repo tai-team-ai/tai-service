@@ -316,7 +316,7 @@ class Backend:
     ) -> APIFrequentlyAccessedResources:
         """Get the most frequently accessed class resources from the tai search service."""
         url = f"{self._runtime_settings.search_service_api_url}/frequently-accessed-resources/{class_id}"
-        response = requests.get(url, timeout=4)
+        response = requests.get(url, timeout=10)
         if response.status_code == 200:
             try:
                 data = response.json()
@@ -369,7 +369,6 @@ class Backend:
 
     def _handle_create_req_error(self, e: Exception, resource: ClassResource, failed_resources: FailedResources) -> None:
         logger.error(f"Failed to create class resource with request. Exception: {e}")
-        logger.error(traceback.format_exc())
         self._add_failed_resource(
             failed_resources=failed_resources,
             reason=ResourceUploadFailureReason.TO_MANY_REQUESTS,
