@@ -88,8 +88,8 @@ class IndexerConfig(BaseModel):
 class ResourceLimits(BaseModel):
     """Define the custom parameters for resource usage."""
     memory_percent_threshold: Optional[float] = Field(
-        default=85.0,
-        le=85.0,
+        default=80.0,
+        le=80.0,
         description="The threshold for memory usage percentage beyond which system is considered as resource constrained.",
     )
     cpu_percent_threshold: Optional[float] = Field(
@@ -98,8 +98,8 @@ class ResourceLimits(BaseModel):
         description="The threshold for CPU usage percentage beyond which system is considered as resource constrained.",
     )
     additional_memory_gb: Optional[float] = Field(
-        default=2.0,
-        ge=1.0,
+        default=3.0,
+        ge=3.0,
         description="The safety buffer of memory in GB that needs to be available apart from the estimated memory for batch processing.",
     )
 
@@ -160,7 +160,7 @@ def get_sparse_vectors(batch: list[str]) -> list[SparseVector]:
     splade = SpladeEncoder(device=device)
     logger.debug(f"Processing batch with {len(batch)} documents in pid {current_process().pid}")
     partial_func = partial(splade.encode_documents, batch)
-    gb_for_batch = len(batch) / 50  # this is a rough estimate of the memory needed for the batch based on experience
+    gb_for_batch = max(len(batch) / 50, 3)  # this is a rough estimate of the memory needed for the batch based on experience
     vectors = execute_with_resource_check(partial_func, ResourceLimits(additional_memory_gb=gb_for_batch))
     sparse_vectors = [SparseVector.parse_obj(vec) for vec in vectors]
     return sparse_vectors
@@ -374,15 +374,15 @@ class TAISearch:
         if embedding_type == 'inference':
             return get_sparse_vectors(texts)
         else:
-            batch_size = 100
+            batch_size = 50
             batches = [texts[i:i + batch_size] for i in range(0, len(texts), batch_size)]
             logger.info(f"Splitting {len(texts)} documents into {len(batches)} batches.")
-            with Pool(processes=MAX_NUM_PROCESS) as pool:
-                result_batches = pool.map(get_sparse_vectors, batches)
-            sparse_vectors = [vector for batch in result_batches for vector in batch]
-            # sparse_vectors = []
-            # for batch in batches:
-            #     sparse_vectors.extend(get_sparse_vectors(batch))
+            # with Pool(processes=MAX_NUM_PROCESS) as pool:
+            #     result_batches = pool.map(get_sparse_vectors, batches)
+            # sparse_vectors = [vector for batch in result_batches for vector in batch]
+            sparse_vectors = []
+            for batch in batches:
+                sparse_vectors.extend(get_sparse_vectors(batch))
             return sparse_vectors
 
     @staticmethod

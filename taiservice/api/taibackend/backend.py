@@ -296,6 +296,23 @@ class Backend:
 
     def get_class_resources(self, ids: list[UUID], from_class_ids: bool = False) -> list[ClassResource]:
         """Get the class resources."""
+        url = f"{self._runtime_settings.search_service_api_url}/class-resources"
+        logger.info(f"Getting class resources from {url}")
+        params = {
+            'ids': ids,
+            'from_class_ids': from_class_ids
+        }
+        response = requests.get(url, params=params, timeout=4)
+        if response.status_code != 200:
+            logger.info(f"Failed to retrieve class resources from {url}. Status code: {response.status_code}")
+        else:
+            try:
+                data = response.json()
+                api_resources = [ClassResource(**item) for item in data['classResources']]
+                return api_resources
+            except Exception as e: # pylint: disable=broad-except
+                logger.info(f"Failed to parse class resources from {url}. Exception: {e}")
+        # we fall back to the document db if the search service fails
         resources = self._doc_db.get_class_resources(ids=ids, from_class_ids=from_class_ids)
         api_resources = []
         for resource in resources:
