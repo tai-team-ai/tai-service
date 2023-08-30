@@ -274,44 +274,27 @@ class TaiSearchServiceStack(Stack):
         user_data = ec2.UserData.for_linux()
         # this is necessary for the warm pool to work with ECS
         user_data.add_commands(f"echo -e 'ECS_CLUSTER={cluster.cluster_name}\nECS_WARM_POOLS_CHECK=true' >> /etc/ecs/ecs.config")
-        max_num_instances = 3
-        max_instance_lifetime = Duration.days(10)
-        if service_type == ECSServiceType.GPU:
-            instance_type = ec2.InstanceType.of(
-                instance_class=ec2.InstanceClass.G4DN,
-                instance_size=ec2.InstanceSize.XLARGE,
-            )
-            asg = AutoScalingGroup(
-                self,
-                self._namer("gpu-asg"),
-                vpc=self.vpc,
-                instance_type=instance_type,
-                machine_image=ami,
-                max_capacity=max_num_instances,
-                min_capacity=0,
-                # spot_price="0.35",
-                block_devices=block_devices,
-                max_instance_lifetime=max_instance_lifetime,
-                user_data=user_data,
-            )
-        else:
-            instance_type = ec2.InstanceType.of(
-                instance_class=ec2.InstanceClass.C6A,
-                instance_size=ec2.InstanceSize.XLARGE2,
-            )
-            asg = AutoScalingGroup(
-                self,
-                self._namer(f"asg-{service_type.value}"),
-                vpc=self.vpc,
-                instance_type=instance_type,
-                machine_image=ami,
-                max_capacity=max_num_instances,
-                min_capacity=0,
-                # spot_price="0.35",
-                block_devices=block_devices,
-                max_instance_lifetime=max_instance_lifetime,
-                user_data=user_data,
-            )
+        # instance_type = ec2.InstanceType.of(
+        #     instance_class=ec2.InstanceClass.C6A,
+        #     instance_size=ec2.InstanceSize.XLARGE2,
+        # )
+        instance_type = ec2.InstanceType.of(
+            instance_class=ec2.InstanceClass.G4DN,
+            instance_size=ec2.InstanceSize.XLARGE,
+        )
+        asg = AutoScalingGroup(
+            self,
+            self._namer(f"asg-{service_type.value}"),
+            vpc=self.vpc,
+            instance_type=instance_type,
+            machine_image=ami,
+            max_capacity=8,
+            min_capacity=0,
+            # spot_price="0.35",
+            block_devices=block_devices,
+            max_instance_lifetime=Duration.days(10),
+            user_data=user_data,
+        )
         WarmPool(
             self,
             id=self._namer("asg-warm-pool"),
@@ -350,7 +333,7 @@ class TaiSearchServiceStack(Stack):
 
     def _get_scalable_task(self, service: Ec2Service) -> ScalableTaskCount:
         min_task_count = 1
-        max_task_count = 2
+        max_task_count = 3
         scaling_task = service.auto_scale_task_count(
             min_capacity=min_task_count,
             max_capacity=max_task_count,

@@ -81,14 +81,29 @@ class PineconeDB:
         """Upsert vectors into pinecone db."""
         self._execute_async_pinecone_operation("upsert", documents)
 
-    def get_similar_documents(self, document: PineconeDocument, alpha:float = 0.8, doc_to_return: int = 4) -> PineconeDocuments:
+    def get_similar_documents(
+        self,
+        document: PineconeDocument,
+        alpha:float = 0.8,
+        doc_to_return: int = 4,
+        filter_by_chapters: bool = False,
+        filter_by_sections: bool = False,
+        filter_by_resource_type: bool = False,
+    ) -> PineconeDocuments:
         """
         Get similar vectors from pinecone db.
+
+        The chapter and section filters will be ORed together while
+        the resource type filter will be ANDed with the other filters.
 
         Args:
             document: The document to get similar vectors for.
             alpha: The alpha value for the hybrid convex scale  
             between 0 and 1 where 0 == sparse only and 1 == dense only
+            doc_to_return: The number of documents to return
+            filter_by_chapter: Whether to filter by chapter
+            filter_by_section: Whether to filter by section
+            filter_by_resource_type: Whether to filter by resource type
         """
         if document.sparse_values:
             assert 0 <= alpha <= 1, "alpha must be between 0 and 1"
@@ -96,6 +111,17 @@ class PineconeDB:
         else:
             dense = document.values
             sparse = None
+        and_filter: list[dict] = []
+        or_filter: list[dict] = []
+        if filter_by_chapters:
+            or_filter.append({"chapters": document.metadata.chapters})
+        if filter_by_sections:
+            or_filter.append({"sections": document.metadata.sections})
+        if filter_by_resource_type:
+            and_filter.append({"resource_type": document.metadata.resource_type})
+        if or_filter:
+            and_filter.append({"or": or_filter})
+        meta_data_filter = {"$and": and_filter} if and_filter else {}
         results = self.index.query(
             namespace=str(document.metadata.class_id),
             include_values=True,
@@ -103,16 +129,15 @@ class PineconeDB:
             vector=dense,
             sparse_vector=sparse,
             top_k=doc_to_return,
+            filter=meta_data_filter,
         )
         docs = PineconeDocuments(class_id=document.metadata.class_id, documents=[])
         matches = results.to_dict()['matches']
-        threshold = 0.65 * alpha + 7 * (1 - alpha) # 7 is arbitrary. Sparse vectors don't really have an upper bound for score
         logger.info(f"Found {len(matches)} matches")
         for result in matches:
             doc = PineconeDocument(**result)
             logger.info(f"Score: {doc.score}")
-            if doc.score > threshold:
-                docs.documents.append(doc)
+            docs.documents.append(doc)
         # sort the documents by score
         docs.documents.sort(key=lambda doc: doc.score, reverse=True)
         return docs

@@ -126,6 +126,14 @@ class Metadata(BasePydanticModel):
 
         extra = Extra.allow
 
+
+class ChunkSize(str, Enum):
+    """Define the chunk size."""
+    SMALL = "small"
+    MEDIUM = "medium"
+    LARGE = "large"
+
+
 class ChunkMetadata(Metadata):
     """Define the metadata of the class resource chunk."""
 
@@ -144,6 +152,18 @@ class ChunkMetadata(Metadata):
     chunk_id: Optional[UUID] = Field(
         default=None,
         description="The ID of the class resource chunk.",
+    )
+    sections: list[str] = Field(
+        default_factory=list,
+        description="The sections associated with the class resource chunk.",
+    )
+    chapters: list[str] = Field(
+        default_factory=list,
+        description="The chapters associated with the class resource chunk.",
+    )
+    chunk_size: ChunkSize = Field(
+        ...,
+        description="The size of the class resource chunk. Smaller provides more granularity.",
     )
 
     class Config:

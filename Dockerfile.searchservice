@@ -20,5 +20,5 @@ FROM dependencies AS runtime
 WORKDIR /app
 COPY . .
 EXPOSE 8080
-# The --max-request is to help clear the memory used by pytorch
-CMD ["gunicorn", "-w", "10", "-k", "uvicorn.workers.UvicornWorker", "taiservice.searchservice.main:create_app", "--bind", "0.0.0.0:8080", "--worker-tmp-dir", "/dev/shm", "--graceful-timeout", "450", "--timeout", "450", "--max-requests", "1"]
+# The --max-request is to restart workers to help clear the memory used by pytorch
+CMD ["gunicorn", "-w", "10", "-k", "uvicorn.workers.UvicornWorker", "taiservice.searchservice.main:create_app", "--bind", "0.0.0.0:8080", "--worker-tmp-dir", "/dev/shm", "--graceful-timeout", "450", "--timeout", "450", "--max-requests", "5"]

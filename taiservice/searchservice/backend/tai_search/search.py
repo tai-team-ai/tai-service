@@ -2,7 +2,7 @@
 import os
 import re
 from functools import partial
-from multiprocessing import current_process, cpu_count, Pool
+from multiprocessing import current_process
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any, Callable, Optional, Union, Literal
@@ -33,7 +33,7 @@ from .data_ingestor_schema import (
     InputDocument,
     InputDataIngestStrategy,
 )
-from ..shared_schemas import ChunkMetadata, BaseOpenAIConfig, ClassResourceType
+from ..shared_schemas import ChunkMetadata, BaseOpenAIConfig, ClassResourceType, Metadata, ChunkSize
 from ..databases.pinecone_db import PineconeDBConfig, PineconeDB
 from ..databases.pinecone_db_schemas import (
     PineconeDocuments,
@@ -45,10 +45,6 @@ from ..databases.document_db_schemas import (
     ClassResourceChunkDocument,
     ClassResourceDocument,
 )
-
-# the minus 10 provides some overhead so we aren't using all the resources
-# and helps minimize the likelihood of crashing the instance
-MAX_NUM_PROCESS = max(cpu_count() - 5, 1)
 
 
 class OpenAIConfig(BaseOpenAIConfig):
@@ -87,17 +83,17 @@ class IndexerConfig(BaseModel):
 
 class ResourceLimits(BaseModel):
     """Define the custom parameters for resource usage."""
-    memory_percent_threshold: Optional[float] = Field(
+    memory_percent_threshold: float = Field(
         default=80.0,
         le=80.0,
         description="The threshold for memory usage percentage beyond which system is considered as resource constrained.",
     )
-    cpu_percent_threshold: Optional[float] = Field(
+    cpu_percent_threshold: float = Field(
         default=70.0,
         le=80.0,
         description="The threshold for CPU usage percentage beyond which system is considered as resource constrained.",
     )
-    additional_memory_gb: Optional[float] = Field(
+    additional_memory_gb: float = Field(
         default=3.0,
         ge=3.0,
         description="The safety buffer of memory in GB that needs to be available apart from the estimated memory for batch processing.",
@@ -134,36 +130,13 @@ def execute_with_resource_check(func: Callable[..., Any], resource_limits: Resou
     """
     time_to_sleep = 5
     if isinstance(func, partial):
-        func_name = func.func.__name__ if func.func.__name__ else ""
+        func_name = func.func.__name__
+    else:
+        func_name = func.__name__
     while resources_constrained(resource_limits=resource_limits):
         logger.warning(f"System resources constrained. Retrying operation {func_name} after {time_to_sleep} seconds.")
         sleep(time_to_sleep)
     return func()
-
-
-def get_sparse_vectors(batch: list[str]) -> list[SparseVector]:
-    """
-    Encodes the given batch of documents into sparse vectors.
-
-    This function checks whether system resources are constrained or not before starting the
-    resource-intensive process of encoding. If resources are constrained, it retries until resources 
-    are sustainably available. Once the encoding process starts, it transforms the batch of documents 
-    into a list of 'SparseVector'. 
-
-    Args:
-        batch: The list of documents to be encoded.
-
-    Returns:
-        A list of 'SparseVector' representations of the given documents.
-    """
-    device = 'cuda' if torch.cuda.is_available() else 'cpu'
-    splade = SpladeEncoder(device=device)
-    logger.debug(f"Processing batch with {len(batch)} documents in pid {current_process().pid}")
-    partial_func = partial(splade.encode_documents, batch)
-    gb_for_batch = max(len(batch) / 50, 3)  # this is a rough estimate of the memory needed for the batch based on experience
-    vectors = execute_with_resource_check(partial_func, ResourceLimits(additional_memory_gb=gb_for_batch))
-    sparse_vectors = [SparseVector.parse_obj(vec) for vec in vectors]
-    return sparse_vectors
 
 
 class TAISearch:
@@ -193,7 +166,8 @@ class TAISearch:
         try:
             self._s3_prefix = f"{ingested_document.class_id}/{ingested_document.id}/"
             logger.info(f"Loading and splitting document: {ingested_document.id}")
-            chunk_documents = self._load_and_split_document(ingested_document)
+            chunk_documents = self._load_and_split_document(ingested_document, ChunkSize.LARGE)
+            chunk_documents.extend(self._load_and_split_document(ingested_document, ChunkSize.SMALL))
             logger.info(f"Finished loading and splitting document into {len(chunk_documents)} chunks: {ingested_document.id}")
             class_resource_document.class_resource_chunk_ids = [chunk_doc.id for chunk_doc in chunk_documents]
             logger.info(f"Uploading {len(chunk_documents)} document to cold store: {ingested_document.id}")
@@ -247,13 +221,17 @@ class TAISearch:
                 title="User Query",
                 description="User Query",
                 resource_type=ClassResourceType.TEXTBOOK,
+                chunk_size=ChunkSize.SMALL,
+                chapters=self._extract_chapter_numbers_from_query(query),
+                sections=self._extract_section_numbers(query),
             )
         )
         is_search = True if len(query.split()) < 10 else False # assume search if the query is less than 15 words
         alpha = 0.4 if is_search else 0.7 # this is gut feel, we can tune this later, search is likely to use more precise terms
         docs_to_return = 5 if is_search else 3
-        pinecone_docs = self.embed_documents(documents=[chunk_doc], embedding_type='inference')
+        pinecone_docs = self.embed_documents(documents=[chunk_doc])
         similar_docs = self._pinecone_db.get_similar_documents(document=pinecone_docs.documents[0], alpha=alpha, doc_to_return=docs_to_return)
+        threshold = 0.65 * alpha + 7 * (1 - alpha) # 7 is arbitrary. Sparse vectors don't really have an upper bound for score
         uuids = [doc.metadata.chunk_id for doc in similar_docs.documents]
         chunk_docs = self._document_db.get_class_resources(uuids, ClassResourceChunkDocument, count_towards_metrics=True)
         logger.info(f"Got similar docs: {chunk_docs}")
@@ -295,7 +273,7 @@ class TAISearch:
             document.page_content = re.sub(pattern, character * max_chars_in_a_row, document.page_content)
         return document
 
-    def _load_and_split_document(self, document: IngestedDocument) -> list[ClassResourceChunkDocument]:
+    def _load_and_split_document(self, document: IngestedDocument, chunk_size: ChunkSize) -> list[ClassResourceChunkDocument]:
         """Split and load a document."""
         split_docs: list[Document] = []
         try:
@@ -317,7 +295,7 @@ class TAISearch:
             raise RuntimeError("Failed to load and split document.") from e
         chunk_documents = []
         total_page_count = get_total_page_count(split_docs)
-        ingested_doc_metadata = document.metadata
+        ingested_doc_metadata: Metadata = document.metadata
         ingested_doc_metadata.total_page_count = total_page_count
         for split_doc in split_docs:
             chunk_doc = ClassResourceChunkDocument(
@@ -326,6 +304,9 @@ class TAISearch:
                 metadata=ChunkMetadata(
                     class_id=document.class_id,
                     page_number=get_page_number(split_doc),
+                    chapters=self._extract_chapter_numbers(split_doc),
+                    sections=self._extract_section_numbers(split_doc),
+                    chunk_size=chunk_size,
                     vector_id=uuid4(),
                     **ingested_doc_metadata.dict(),
                 ),
@@ -334,17 +315,42 @@ class TAISearch:
             chunk_documents.append(chunk_doc)
         return chunk_documents
 
-    def _get_page_number(self, documents: Document, ingested_document: IngestedDocument) -> Optional[int]:
+    def _extract_chapter_numbers_from_query(self, query: str) -> list[str]:
+        chapter_pattern = r'(chapters?\s*((\d+\s?[,and\s&]*)+))' # matches chapter 1, chapter 2, 3, 4, chapter 5 & 6, etc. to extract the numbers from a query
+        matches = re.findall(chapter_pattern, query, flags=re.IGNORECASE)
+        numbers = [] # List to hold all the chapter numbers
+        for match in matches:
+            # match is a tuple, the 2nd element contains the string where the numbers are
+            sub_matches = re.findall(r'\d+', match[1]) # Extract all the numbers from the second capturing group
+            numbers.extend(sub_matches) # Add the numbers to our list
+        # collapse duplicates
+        return list(set([str(n) for n in numbers]))
+
+    def _extract_section_numbers(self, document: Union[Document, str]) -> list[str]:
+        text = document.page_content if isinstance(document, Document) else document
+        section_pattern = r'(\d+(?:\.\d+)*)' # matches 1, 1.1, 1.2, etc.
+        matches = re.findall(section_pattern, text, flags=re.IGNORECASE)
+        return list(set(matches))
+
+    def _extract_chapter_numbers(self, document: Union[Document, str]) -> list[str]:
+        text = document.page_content if isinstance(document, Document) else document
+        chapter_pattern = r'((?<=\s)|^)chapter\s*(\d+)(?=[\s:])'
+        matches = re.findall(chapter_pattern, text, flags=re.IGNORECASE)
+        unique_headings = list(set(match[1] for match in matches))
+        return unique_headings
+
+    def _get_page_number(self, document: Document, ingested_document: IngestedDocument) -> Optional[int]:
         """Get page number for document."""
         if ingested_document.input_format == InputFormat.PDF:
-            return get_page_number(documents)
+            return get_page_number(document)
 
     def embed_documents(
         self,
         documents: Union[list[ClassResourceChunkDocument], ClassResourceChunkDocument],
-        embedding_type: Literal['inference', 'index'] = 'index',
     ) -> PineconeDocuments:
         """Embed documents."""
+        if isinstance(documents, ClassResourceChunkDocument):
+            documents = [documents]
         device = 'cuda' if torch.cuda.is_available() else 'cpu'
         logger.info(f"Using device '{device}' for vector encoding.")
         def _embed_batch(batch: list[ClassResourceChunkDocument]) -> list[PineconeDocument]:
@@ -360,7 +366,7 @@ class TAISearch:
         with ThreadPoolExecutor(max_workers=len(batches)) as executor:
             results = executor.map(_embed_batch, batches)
             vector_docs = [vector_doc for result in results for vector_doc in result]
-        sparse_vectors = self.get_sparse_vectors([doc.chunk for doc in documents], embedding_type=embedding_type)
+        sparse_vectors = self.get_sparse_vectors([doc.chunk for doc in documents])
         for vector_doc, sparse_vector in zip(vector_docs, sparse_vectors):
             vector_doc.sparse_values = sparse_vector
         class_ids = {doc.metadata.class_id for doc in vector_docs}
@@ -369,21 +375,22 @@ class TAISearch:
         return PineconeDocuments(class_id=class_id, documents=vector_docs)
 
     @staticmethod
-    def get_sparse_vectors(texts: list[str], embedding_type: Literal['inference', 'index'] = 'index') -> list[SparseVector]:
+    def get_sparse_vectors(texts: list[str]) -> list[SparseVector]:
         """Add sparse vectors to pinecone."""
-        if embedding_type == 'inference':
-            return get_sparse_vectors(texts)
-        else:
-            batch_size = 50
-            batches = [texts[i:i + batch_size] for i in range(0, len(texts), batch_size)]
-            logger.info(f"Splitting {len(texts)} documents into {len(batches)} batches.")
-            # with Pool(processes=MAX_NUM_PROCESS) as pool:
-            #     result_batches = pool.map(get_sparse_vectors, batches)
-            # sparse_vectors = [vector for batch in result_batches for vector in batch]
-            sparse_vectors = []
-            for batch in batches:
-                sparse_vectors.extend(get_sparse_vectors(batch))
-            return sparse_vectors
+        batch_size = 50
+        batches = [texts[i:i + batch_size] for i in range(0, len(texts), batch_size)]
+        logger.info(f"Splitting {len(texts)} documents into {len(batches)} batches.")
+        sparse_vectors = []
+        device = 'cuda' if torch.cuda.is_available() else 'cpu'
+        splade = SpladeEncoder(device=device)
+        for i, batch in enumerate(batches):
+            logger.debug(f"Processing batch {i + 1} of {len(batches)} with {len(batch)} documents in pid {current_process().pid}")
+            partial_func = partial(splade.encode_documents, batch)
+            gb_for_batch = max(len(batch) / 50, 3)  # this is a rough estimate of the memory needed for the batch based on experience
+            vectors = execute_with_resource_check(partial_func, ResourceLimits(additional_memory_gb=gb_for_batch))
+            sparse_vectors = [SparseVector.parse_obj(vec) for vec in vectors]
+            sparse_vectors.extend(sparse_vectors)
+        return sparse_vectors
 
     @staticmethod
     def vector_document_from_dense_vectors(

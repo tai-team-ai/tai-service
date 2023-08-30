@@ -203,7 +203,7 @@ class Backend:
             raise ServerOverloadedError("Server is overloaded, please try again later.")
         input_doc = self.to_backend_input_docs(class_resource)[0]
         ingested_doc = self._tai_search.ingest_document(input_doc)
-        if self._is_stuck_processing(ingested_doc.id): # if it's stuck, we should continue as the operations are idempotent
+        if self._is_stuck_processing_or_failed(ingested_doc.id): # if it's stuck, we should continue as the operations are idempotent
             pass
         elif self._is_duplicate_class_resource(ingested_doc):
             raise DuplicateClassResourceError(f"Duplicate class resource: {ingested_doc.id} in class {ingested_doc.class_id}")
@@ -224,7 +224,7 @@ class Backend:
         """Get the class resources."""
         docs = self._doc_db.get_class_resources(ids, ClassResourceDocument, from_class_ids=from_class_ids, count_towards_metrics=False)
         for doc in docs:
-            if self._is_stuck_processing(doc.id):
+            if self._is_stuck_processing_or_failed(doc.id):
                 self._coerce_and_update_status(doc, ClassResourceProcessingStatus.FAILED)
         return self.to_api_resources(docs)
 
@@ -307,7 +307,7 @@ class Backend:
         except json.JSONDecodeError:
             return secret
 
-    def _is_stuck_processing(self, doc_id: UUID) -> bool:
+    def _is_stuck_processing_or_failed(self, doc_id: UUID) -> bool:
         """Check if the class resource is stuck uploading."""
         class_resource_docs: list[ClassResourceDocument] = self._doc_db.get_class_resources(
             doc_id,
@@ -317,11 +317,11 @@ class Backend:
         existing_doc = class_resource_docs[0] if class_resource_docs else None
         if not existing_doc:
             return False
-        stable = existing_doc.status == ClassResourceProcessingStatus.COMPLETED \
-            or existing_doc.status == ClassResourceProcessingStatus.FAILED
-        if not stable:
+        success = existing_doc.status == ClassResourceProcessingStatus.COMPLETED
+        if not success:
             elapsed_time = (datetime.utcnow() - existing_doc.modified_timestamp).total_seconds()
-            if elapsed_time > self._runtime_settings.class_resource_processing_timeout:
+            failed = existing_doc.status == ClassResourceProcessingStatus.FAILED
+            if elapsed_time > self._runtime_settings.class_resource_processing_timeout or failed:
                 return True
         return False
 
