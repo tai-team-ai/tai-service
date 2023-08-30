@@ -76,6 +76,10 @@
       "type": "runtime"
     },
     {
+      "name": "markdown",
+      "type": "runtime"
+    },
+    {
       "name": "openai",
       "type": "runtime"
     },

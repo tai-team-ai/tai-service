@@ -1,11 +1,13 @@
 """Define the tai_search module."""
+import itertools
 import os
 import re
+import copy
 from functools import partial
 from multiprocessing import current_process
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-from typing import Any, Callable, Optional, Union, Literal
+from typing import Any, Callable, Optional, Union
 from uuid import UUID, uuid4
 import traceback
 from time import sleep
@@ -34,7 +36,7 @@ from .data_ingestor_schema import (
     InputDataIngestStrategy,
 )
 from ..shared_schemas import ChunkMetadata, BaseOpenAIConfig, ClassResourceType, Metadata, ChunkSize
-from ..databases.pinecone_db import PineconeDBConfig, PineconeDB
+from ..databases.pinecone_db import PineconeDBConfig, PineconeDB, PineconeQueryFilter
 from ..databases.pinecone_db_schemas import (
     PineconeDocuments,
     PineconeDocument,
@@ -193,7 +195,7 @@ class TAISearch:
             logger.error(traceback.format_exc())
             raise RuntimeError("Failed to index resource.") from e
 
-    def get_relevant_class_resources(self, query: str, class_id: UUID, for_tai_tutor: bool = True) -> list[ClassResourceChunkDocument]:
+    def get_relevant_class_resources(self, query: str, class_id: UUID, for_tai_tutor: bool) -> list[ClassResourceChunkDocument]:
         """
         Get the most relevant class resources.
 
@@ -211,7 +213,7 @@ class TAISearch:
             for_tai_tutor: Whether or not the query is for the TAI Tutor.
         """
         logger.info(f"Getting relevant class resources for query: {query}")
-        chunk_doc = ClassResourceChunkDocument(
+        query_for_small_chunks = ClassResourceChunkDocument(
             class_id=class_id,
             chunk=query,
             full_resource_url="https://www.google.com", # this is a dummy link as it's not needed for the query
@@ -226,13 +228,36 @@ class TAISearch:
                 sections=self._extract_section_numbers(query),
             )
         )
-        is_search = True if len(query.split()) < 10 else False # assume search if the query is less than 15 words
-        alpha = 0.4 if is_search else 0.7 # this is gut feel, we can tune this later, search is likely to use more precise terms
-        docs_to_return = 5 if is_search else 3
-        pinecone_docs = self.embed_documents(documents=[chunk_doc])
-        similar_docs = self._pinecone_db.get_similar_documents(document=pinecone_docs.documents[0], alpha=alpha, doc_to_return=docs_to_return)
-        threshold = 0.65 * alpha + 7 * (1 - alpha) # 7 is arbitrary. Sparse vectors don't really have an upper bound for score
-        uuids = [doc.metadata.chunk_id for doc in similar_docs.documents]
+        query_for_large_chunks = copy.deepcopy(query_for_small_chunks)
+        query_for_large_chunks.metadata.chunk_size = ChunkSize.LARGE
+        queries = [query_for_small_chunks, query_for_large_chunks]
+        # TODO: make the resource filter usable
+        pinecone_docs = self.embed_documents(documents=queries)
+
+        filters = [
+            PineconeQueryFilter(
+                filter_by_chapters=True,
+                filter_by_sections=True,
+                filter_by_resource_type=False,
+                alpha=0.2,
+            ),
+            PineconeQueryFilter(
+                filter_by_resource_type=False,
+                alpha=0.8,
+            ),
+        ]
+        def compute_similar_documents(params: tuple[PineconeDocument, PineconeQueryFilter]) -> list[PineconeDocument]:
+            doc, query_filter = params
+            similar_docs = self._pinecone_db.get_similar_documents(document=doc, doc_to_return=50, filter=query_filter)
+            alpha = query_filter.alpha
+            threshold = alpha * 0.60 + (1 - alpha) * 4.5 # this is a linear interpolation between 0.6 and 4.5, 4.5 is arbitrary as the is technically not an upper limit
+            return [doc for doc in similar_docs.documents if doc.score > threshold]
+        
+        with ThreadPoolExecutor(max_workers=len(pinecone_docs)) as executor:
+            results = executor.map(compute_similar_documents, zip(pinecone_docs.documents, filters))
+        relevant_documents = list(itertools.chain(*results))
+        relevant_documents: list[PineconeDocument] = sorted(relevant_documents, key=lambda doc: doc.score, reverse=True)
+        uuids = [doc.metadata.chunk_id for doc in relevant_documents]
         chunk_docs = self._document_db.get_class_resources(uuids, ClassResourceChunkDocument, count_towards_metrics=True)
         logger.info(f"Got similar docs: {chunk_docs}")
         return [doc for doc in chunk_docs if isinstance(doc, ClassResourceChunkDocument)]
@@ -288,7 +313,7 @@ class TAISearch:
             input_format = document.input_format
             if isinstance(loader, document_loaders.BSHTMLLoader):
                 input_format = InputFormat.GENERIC_TEXT # the beautiful soup loader converts html to text so we need to change the input format
-            splitter: TextSplitter = get_splitter_text_splitter(input_format)
+            splitter: TextSplitter = get_splitter_text_splitter(input_format, chunk_size)
             split_docs = loader.load_and_split(splitter) # TODO: once we use mathpix, i think we can split pdfs better. Without mathpix, the pdfs don't get split well
         except Exception as e: # pylint: disable=broad-except
             logger.critical(traceback.format_exc())
@@ -297,14 +322,21 @@ class TAISearch:
         total_page_count = get_total_page_count(split_docs)
         ingested_doc_metadata: Metadata = document.metadata
         ingested_doc_metadata.total_page_count = total_page_count
+        last_chapter = ""
+        chapters = []
         for split_doc in split_docs:
+            chapters = self._extract_chapter_numbers(split_doc)
+            if chapters:
+                last_chapter = chapters[-1]
+            elif not chapters and last_chapter:
+                chapters = [last_chapter]
             chunk_doc = ClassResourceChunkDocument(
                 id=uuid4(),
                 chunk=split_doc.page_content,
                 metadata=ChunkMetadata(
                     class_id=document.class_id,
                     page_number=get_page_number(split_doc),
-                    chapters=self._extract_chapter_numbers(split_doc),
+                    chapters=chapters,
                     sections=self._extract_section_numbers(split_doc),
                     chunk_size=chunk_size,
                     vector_id=uuid4(),

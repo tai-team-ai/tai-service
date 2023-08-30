@@ -13,6 +13,7 @@ gunicorn
 ipykernel
 langchain==0.0.229
 loguru
+markdown
 openai
 pdf2image
 pinecone-client[grpc]

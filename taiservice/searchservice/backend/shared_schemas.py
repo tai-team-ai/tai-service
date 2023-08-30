@@ -130,7 +130,6 @@ class Metadata(BasePydanticModel):
 class ChunkSize(str, Enum):
     """Define the chunk size."""
     SMALL = "small"
-    MEDIUM = "medium"
     LARGE = "large"
 
 

@@ -17,39 +17,23 @@ from pydantic import HttpUrl
 from langchain.text_splitter import TextSplitter, RecursiveCharacterTextSplitter
 from langchain import text_splitter
 from langchain.schema import Document
-# first imports are for local development, second imports are for deployment
-try:
-    from .data_ingestor_schema import (
-        IngestedDocument,
-        LatexExtension,
-        MarkdownExtension,
-        SPLITTER_STRATEGY_MAPPING,
-        Language,
-        TOTAL_PAGE_COUNT_STRINGS,
-        PAGE_NUMBER_STRINGS,
-        LOADING_STRATEGY_MAPPING,
-        InputDocument,
-        InputFormat,
-        InputDataIngestStrategy
-    )
-    from .resource_utilities import ResourceUtility, PDF, HTML
-    from ..databases.document_db_schemas import ClassResourceChunkDocument
-except ImportError:
-    from taibackend.tai_search.data_ingestor_schema import (
-        IngestedDocument,
-        LatexExtension,
-        MarkdownExtension,
-        SPLITTER_STRATEGY_MAPPING,
-        Language,
-        TOTAL_PAGE_COUNT_STRINGS,
-        PAGE_NUMBER_STRINGS,
-        LOADING_STRATEGY_MAPPING,
-        InputDocument,
-        InputFormat,
-        InputDataIngestStrategy,
-    )
-    from taibackend.tai_search.resource_utilities import ResourceUtility, PDF, HTML
-    from taibackend.databases.document_db_schemas import ClassResourceChunkDocument
+from .data_ingestor_schema import (
+    IngestedDocument,
+    LatexExtension,
+    MarkdownExtension,
+    SPLITTER_STRATEGY_MAPPING,
+    Language,
+    TOTAL_PAGE_COUNT_STRINGS,
+    PAGE_NUMBER_STRINGS,
+    LOADING_STRATEGY_MAPPING,
+    InputDocument,
+    InputFormat,
+    InputDataIngestStrategy
+)
+from .resource_utilities import ResourceUtility, PDF, HTML
+from ..databases.document_db_schemas import ClassResourceChunkDocument
+from ..shared_schemas import ChunkSize
+
 
 def number_tokens(text: str) -> int:
     """Get the number of tokens in the text."""
@@ -58,13 +42,22 @@ def number_tokens(text: str) -> int:
     num_tokens = len(encoding.encode(text))
     return num_tokens
 
-def get_splitter_text_splitter(input_format: InputFormat) -> TextSplitter:
+
+CHUNK_SIZE_TO_CHAR_COUNT_MAPPING ={
+    ChunkSize.SMALL: 500,
+    ChunkSize.LARGE: 1200,
+}
+OVERLAP_SIZE_TO_CHAR_COUNT_MAPPING = {
+    ChunkSize.SMALL: 100,
+    ChunkSize.LARGE: 300,
+}
+
+def get_splitter_text_splitter(input_format: InputFormat, chunk_size: ChunkSize) -> TextSplitter:
     """Get the splitter strategy."""
     strategy_instructions = SPLITTER_STRATEGY_MAPPING.get(input_format)
     kwargs = {
-        'chunk_size': 250,
-        'chunk_overlap': 50,
-        'length_function': number_tokens,
+        'chunk_size': CHUNK_SIZE_TO_CHAR_COUNT_MAPPING[chunk_size],
+        'chunk_overlap': OVERLAP_SIZE_TO_CHAR_COUNT_MAPPING[chunk_size],
     }
     if strategy_instructions is None:
         raise ValueError("The input format is not supported.")

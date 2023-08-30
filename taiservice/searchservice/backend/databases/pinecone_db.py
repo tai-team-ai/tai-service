@@ -1,5 +1,6 @@
 """Define the pinecone database."""
 from concurrent.futures import ThreadPoolExecutor, Future
+from dataclasses import dataclass
 from multiprocessing.pool import ApplyResult
 from enum import Enum
 import os
@@ -33,6 +34,14 @@ class PineconeDBConfig(BaseModel):
         ...,
         description="The name of the pinecone index.",
     )
+
+@dataclass
+class PineconeQueryFilter:
+    """Define the pinecone query filter."""
+    alpha: float = 0.8
+    filter_by_chapters: bool = False
+    filter_by_sections: bool = False
+    filter_by_resource_type: bool = False
 
 
 class PineconeDB:
@@ -84,11 +93,8 @@ class PineconeDB:
     def get_similar_documents(
         self,
         document: PineconeDocument,
-        alpha:float = 0.8,
         doc_to_return: int = 4,
-        filter_by_chapters: bool = False,
-        filter_by_sections: bool = False,
-        filter_by_resource_type: bool = False,
+        filter: PineconeQueryFilter = PineconeQueryFilter(),
     ) -> PineconeDocuments:
         """
         Get similar vectors from pinecone db.
@@ -106,21 +112,21 @@ class PineconeDB:
             filter_by_resource_type: Whether to filter by resource type
         """
         if document.sparse_values:
-            assert 0 <= alpha <= 1, "alpha must be between 0 and 1"
-            dense, sparse = hybrid_convex_scale(document.values, document.sparse_values.dict(), alpha)
+            assert 0 <= filter.alpha <= 1, "alpha must be between 0 and 1"
+            dense, sparse = hybrid_convex_scale(document.values, document.sparse_values.dict(), filter.alpha)
         else:
             dense = document.values
             sparse = None
         and_filter: list[dict] = []
         or_filter: list[dict] = []
-        if filter_by_chapters:
-            or_filter.append({"chapters": document.metadata.chapters})
-        if filter_by_sections:
-            or_filter.append({"sections": document.metadata.sections})
-        if filter_by_resource_type:
+        if filter.filter_by_chapters:
+            or_filter.append({"chapters": {"$in": document.metadata.chapters}})
+        if filter.filter_by_sections:
+            or_filter.append({"sections": {"$in": document.metadata.sections}})
+        if filter.filter_by_resource_type:
             and_filter.append({"resource_type": document.metadata.resource_type})
         if or_filter:
-            and_filter.append({"or": or_filter})
+            and_filter.append({"$or": or_filter})
         meta_data_filter = {"$and": and_filter} if and_filter else {}
         results = self.index.query(
             namespace=str(document.metadata.class_id),

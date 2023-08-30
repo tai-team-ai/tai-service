@@ -73,6 +73,7 @@ project: Project = AwsCdkPythonApp(
         "psutil",
         "gunicorn",
         "uvicorn[standard]", # installs high performance ASGI server
+        "markdown",
     ],
     dev_deps=[
         "black",
