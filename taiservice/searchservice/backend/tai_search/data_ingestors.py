@@ -17,7 +17,10 @@ from pydantic import HttpUrl
 from langchain.text_splitter import TextSplitter, RecursiveCharacterTextSplitter
 from langchain import text_splitter
 from langchain.schema import Document
-from langchain.document_loaders.youtube import ALLOWED_NETLOCK as YOUTUBE_NETLOCS
+from langchain.document_loaders.youtube import (
+    ALLOWED_NETLOCK as YOUTUBE_NETLOCS,
+    YoutubeLoader,
+)
 from .data_ingestor_schema import (
     IngestedDocument,
     LatexExtension,
@@ -88,20 +91,9 @@ class Ingestor(ABC):
     """Define the ingestor class."""
 
     @classmethod
+    @abstractmethod
     def ingest_data(cls, input_data: InputDocument, bucket_name: str) -> IngestedDocument:
         """Ingest the data."""
-        doc = cls._ingest_data(input_data)
-        cls._upload_resource_to_cold_store_and_update_ingested_doc(
-            bucket_name=bucket_name,
-            input_doc=input_data,
-            ingested_doc=doc,
-        )
-        return doc
-
-    @staticmethod
-    @abstractmethod
-    def _ingest_data(input_data: InputDocument) -> IngestedDocument:
-        """This should be implemented for each strategy."""
 
     @staticmethod
     def _get_object_prefix(ingested_doc: IngestedDocument) -> str:
@@ -184,7 +176,7 @@ class Ingestor(ABC):
             split_resource_paths = PDF.split_resource(input_path=ingested_doc.data_pointer)
             split_objects_keys = [f"{object_prefix}{i +  1}/{path.name}" for i, path in enumerate(split_resource_paths)]
             return cls._upload_to_cold_store(split_resource_paths, split_objects_keys, bucket_name)
-
+        # TODO need to screenshot youtube videos, and create snippet urls for youtube videos with timestamps
         screenshot_urls = cls.run_screenshot_op(screenshot_upload_resource)
         if isinstance(screenshot_urls, str) and ingested_doc.input_format != InputFomat.HTML:
             screenshot_urls = [screenshot_urls]
@@ -287,7 +279,7 @@ class Ingestor(ABC):
         response.raise_for_status()  # Raise an error if the download fails
         with open(tmp_path, "wb") as f:
             f.write(response.content)
-        file_type = cls._get_input_type(str(tmp_path.resolve()))
+        file_type = cls._get_input_format(str(tmp_path.resolve()))
         document = IngestedDocument(
             data_pointer=tmp_path,
             input_format=file_type,
@@ -305,10 +297,16 @@ class S3ObjectIngestor(Ingestor):
     """
 
     @classmethod
-    def _ingest_data(cls, input_data: InputDocument) -> IngestedDocument:
+    def ingest_data(cls, input_data: InputDocument, bucket_name: str) -> IngestedDocument:
         """Ingest the data from S3."""
         # sign if needed to dowload from private bucket
-        return cls._download_from_url(input_data)
+        doc = cls._download_from_url(input_data)
+        cls._upload_resource_to_cold_store_and_update_ingested_doc(
+            bucket_name=bucket_name,
+            input_doc=input_data,
+            ingested_doc=doc,
+        )
+        return doc
 
 
 class WebPageIngestor(Ingestor):
@@ -319,9 +317,15 @@ class WebPageIngestor(Ingestor):
     """
 
     @classmethod
-    def _ingest_data(cls, input_data: InputDocument) -> IngestedDocument:
+    def ingest_data(cls, input_data: InputDocument, bucket_name: str) -> IngestedDocument:
         """Ingest the data from a URL."""
-        return cls._download_from_url(input_data)
+        doc = cls._download_from_url(input_data)
+        cls._upload_resource_to_cold_store_and_update_ingested_doc(
+            bucket_name=bucket_name,
+            input_doc=input_data,
+            ingested_doc=doc,
+        )
+        return doc
 
 
 class RawUrlIngestor(Ingestor):
@@ -331,12 +335,25 @@ class RawUrlIngestor(Ingestor):
     This class is used for ingesting data from a raw URL.
     """
 
+    @staticmethod
+    def is_raw_url(url: str) -> bool:
+        """Check if the url is a raw url."""
+        parsed_url = urllib.parse.urlparse(url)
+        netloc = parsed_url.netloc
+        if netloc in YOUTUBE_NETLOCS:
+            return True
+        return False
+
     @classmethod
-    def _ingest_data(cls, input_data: InputDocument) -> IngestedDocument:
+    def ingest_data(cls, input_data: InputDocument, bucket_name: str) -> IngestedDocument:
         """Ingest the data from a raw URL."""
-        url_type = cls._get_input_type(str(input_data.full_resource_url))
+        url_type = cls._get_input_format(str(input_data.full_resource_url))
+        if url_type == InputFomat.YOUTUBE_VIDEO:
+            data_pointer = YoutubeLoader.extract_video_id(input_data.full_resource_url)
+        else:
+            data_pointer = input_data.full_resource_url
         document = IngestedDocument(
-            data_pointer=input_data.full_resource_url,
+            data_pointer=data_pointer,
             input_format=url_type,
             loading_strategy=LOADING_STRATEGY_MAPPING[url_type],
             **input_data.dict(),

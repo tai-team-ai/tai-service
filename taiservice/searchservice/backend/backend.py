@@ -120,6 +120,7 @@ class Backend:
                 full_resource_url=resource.full_resource_url,
                 preview_image_url=resource.preview_image_url,
                 status=resource.status,
+                input_data_ingest_strategy=tai_search.TAISearch.get_input_document_ingest_strategy(resource.full_resource_url),
                 metadata=DBResourceMetadata(
                     title=metadata.title,
                     description=metadata.description,

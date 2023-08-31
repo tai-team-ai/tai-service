@@ -28,6 +28,7 @@ from .data_ingestors import (
     S3ObjectIngestor,
     WebPageIngestor,
     Ingestor,
+    RawUrlIngestor,
 )
 from .data_ingestor_schema import (
     IngestedDocument,
@@ -228,6 +229,7 @@ class TAISearch:
             chunk=query,
             full_resource_url="https://www.google.com",  # this is a dummy link as it's not needed for the query
             id=uuid4(),
+            preview_image_url="https://www.google.com",  # this is a dummy link as it's not needed for the query
             metadata=ChunkMetadata(
                 class_id=class_id,
                 title="User Query",
@@ -363,21 +365,16 @@ class TAISearch:
         try:
             Loader: BaseLoader = getattr(document_loaders, document.loading_strategy)
             data_pointer = document.data_pointer
-            try:
-                # try to treat the pointer as a Path object and resolve it and convert to str
-                data_pointer = str(Path(document.data_pointer).resolve())
-            except Exception:  # pylint: disable=broad-except
-                logger.warning(f"Failed to resolve path: {data_pointer}")
+            if isinstance(data_pointer, Path):
+                data_pointer = str(data_pointer.resolve())
             loader: BaseLoader = Loader(data_pointer)
             input_format = document.input_format
             if isinstance(loader, document_loaders.BSHTMLLoader):
-                input_format = (
-                    InputFomat.GENERIC_TEXT
-                )  # the beautiful soup loader converts html to text so we need to change the input format
+                # the beautiful soup loader converts html to text so we need to change the input format
+                input_format = InputFomat.GENERIC_TEXT  
             splitter: TextSplitter = get_text_splitter(input_format, chunk_size)
-            split_docs = loader.load_and_split(
-                splitter
-            )  # TODO: once we use mathpix, i think we can split pdfs better. Without mathpix, the pdfs don't get split well
+            # TODO: once we use mathpix, i think we can split pdfs better. Without mathpix, the pdfs don't get split well
+            split_docs = loader.load_and_split(splitter)  
         except Exception as e:  # pylint: disable=broad-except
             logger.critical(traceback.format_exc())
             raise RuntimeError("Failed to load and split document.") from e
@@ -515,9 +512,19 @@ class TAISearch:
         mapping: dict[InputDataIngestStrategy, Ingestor] = {
             InputDataIngestStrategy.S3_FILE_DOWNLOAD: S3ObjectIngestor,
             InputDataIngestStrategy.URL_DOWNLOAD: WebPageIngestor,
+            InputDataIngestStrategy.RAW_URL: RawUrlIngestor,
         }
         try:
             ingestor = mapping[document.input_data_ingest_strategy]
         except KeyError as e:  # pylint: disable=broad-except
             raise NotImplementedError(f"Unsupported input data ingest strategy: {document.input_data_ingest_strategy}") from e
         return ingestor.ingest_data(document, self._cold_store_bucket_name)
+
+    @staticmethod
+    def get_input_document_ingest_strategy(url: str) -> InputDataIngestStrategy:
+        if re.match(r"https://.*\.s3\.amazonaws\.com/.*", url):
+            return InputDataIngestStrategy.S3_FILE_DOWNLOAD
+        elif RawUrlIngestor.is_raw_url(url):
+            return InputDataIngestStrategy.RAW_URL
+        else:
+            return InputDataIngestStrategy.URL_DOWNLOAD

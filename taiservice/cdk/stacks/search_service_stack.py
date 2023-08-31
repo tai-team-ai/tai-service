@@ -3,6 +3,7 @@ from enum import Enum
 import os
 from typing import Optional, Any
 from constructs import Construct
+from loguru import logger
 from aws_cdk import (
     Stack,
     aws_ec2 as ec2,
@@ -207,17 +208,11 @@ class TaiSearchServiceStack(Stack):
                 resources=[get_secret_arn_from_name(secret) for secret in self._search_service_settings.secret_names],
             ),
         )
-        cluster: Cluster = self._get_cluster()
+        cluster, capacity_provider_mapping = self._get_cluster()
         capacity_provider_strategies: list[CapacityProviderStrategy] = []
-        for name in cluster.capacity_provider_names:
-            if ECSServiceType.NO_GPU.value in name:
-                weight = 0
-            elif ECSServiceType.GPU.value in name:
-                weight = 1
-            else:
-                raise ValueError(
-                    f"Capacity provider name {name} does not contain either {ECSServiceType.NO_GPU.value} or {ECSServiceType.GPU.value}"
-                )
+        for name, service_type in capacity_provider_mapping.items():
+            weight = 1 if service_type == ECSServiceType.GPU else 0
+            logger.info(f"Adding capacity provider strategy with weight {weight} for capacity provider '{name}'")
             capacity_provider_strategies.append(
                 CapacityProviderStrategy(
                     capacity_provider=name,
@@ -254,7 +249,7 @@ class TaiSearchServiceStack(Stack):
                 )
             )
 
-    def _get_cluster(self) -> Cluster:
+    def _get_cluster(self) -> tuple[Cluster, dict[str, ECSServiceType]]:
         cluster = Cluster(
             self,
             self._namer("cluster"),
@@ -263,20 +258,23 @@ class TaiSearchServiceStack(Stack):
         no_gpu_asg = self._get_auto_scaling_group(ECSServiceType.NO_GPU, cluster)
         gpu_asg = self._get_auto_scaling_group(ECSServiceType.GPU, cluster)
         asgs_and_types = [
-            # (no_gpu_asg, ECSServiceType.NO_GPU),
+            (no_gpu_asg, ECSServiceType.NO_GPU),
             (gpu_asg, ECSServiceType.GPU),
         ]
+        capacity_provider_mapping = {}
         for asg, service_type in asgs_and_types:
-            print(f"Adding {service_type.value} ASG to cluster")
+            logger.info(f"Adding {service_type.value} ASG to cluster")
+            name = self._namer(f"capacity-provider-{service_type.value}")
+            capacity_provider_mapping[name] = service_type
             cluster.add_asg_capacity_provider(
                 provider=AsgCapacityProvider(
                     self,
-                    self._namer(f"asg-provider-{service_type.value}"),
+                    name,
                     auto_scaling_group=asg,
-                    capacity_provider_name=self._namer(f"capacity-provider-{service_type.value}"),
-                ),
+                    capacity_provider_name=name,
+                )
             )
-        return cluster
+        return cluster, capacity_provider_mapping
 
     def _get_auto_scaling_group(self, service_type: ECSServiceType, cluster: Cluster) -> AutoScalingGroup:
         block_devices = [
@@ -292,7 +290,7 @@ class TaiSearchServiceStack(Stack):
         ]
         user_data = ec2.UserData.for_linux()
         # this is necessary for the warm pool to work with ECS
-        user_data.add_commands(f"echo -e 'ECS_CLUSTER={cluster.cluster_name}\nECS_WARM_POOLS_CHECK=true' >> /etc/ecs/ecs.config")
+        user_data.add_commands(f"echo -e 'ECS_WARM_POOLS_CHECK=true' >> /etc/ecs/ecs.config")
         if service_type == ECSServiceType.GPU:
             instance_type = ec2.InstanceType.of(
                 instance_class=ec2.InstanceClass.G4DN,

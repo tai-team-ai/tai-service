@@ -68,6 +68,7 @@ class InputDataIngestStrategy(str, Enum):
 
     S3_FILE_DOWNLOAD = "s3_file_download"
     URL_DOWNLOAD = "url_download"
+    RAW_URL = "raw_url"
     # WEB_CRAWL = "web_crawl"
 
 
@@ -87,6 +88,7 @@ SPLITTER_STRATEGY_MAPPING = {
     InputFomat.LATEX: Language.LATEX,
     InputFomat.MARKDOWN: Language.MARKDOWN,
     InputFomat.HTML: Language.HTML,
+    InputFomat.YOUTUBE_VIDEO: SplitterStrategy.RecursiveCharacterTextSplitter,
 }
 TOTAL_PAGE_COUNT_STRINGS = [
     "total_pages",
@@ -105,25 +107,11 @@ class InputDocument(BaseClassResourceDocument):
         description="The strategy for ingesting the input data.",
     )
 
-    @root_validator(pre=True)
-    def set_input_data_ingest_strategy(cls, values: dict) -> dict:
-        """Set the input data ingest strategy."""
-        url_field_name = "full_resource_url"
-        url: HttpUrl = values.get(url_field_name)
-        values["input_data_ingest_strategy"] = InputDataIngestStrategy.URL_DOWNLOAD
-        if url.startswith("s3://"):
-            _, bucket_domain_name, *path = url.split("/")
-            values[url_field_name] = f"https://{bucket_domain_name}/{'/'.join(path)}"
-            values["input_data_ingest_strategy"] = InputDataIngestStrategy.S3_FILE_DOWNLOAD
-        elif re.match(r"https://.*\.s3\.amazonaws\.com/.*", url):
-            values["input_data_ingest_strategy"] = InputDataIngestStrategy.S3_FILE_DOWNLOAD
-        return values
-
 
 class IngestedDocument(StatefulClassResourceDocument):
     """Define the ingested document."""
 
-    data_pointer: Union[Path, str, HttpUrl] = Field(
+    data_pointer: Union[HttpUrl, str, Path] = Field(
         ...,
         description=(
             "This field should 'point' to the data. This will mean different things "
@@ -132,7 +120,7 @@ class IngestedDocument(StatefulClassResourceDocument):
             "example, if the loading strategy is copy and paste, then this field will be a string."
         ),
     )
-    input_format: Union[InputFomat, UrlType] = Field(
+    input_format: InputFomat = Field(
         ...,
         description="The format of the input document.",
     )
@@ -147,12 +135,11 @@ class IngestedDocument(StatefulClassResourceDocument):
         data_pointer = values.get("data_pointer")
         if isinstance(data_pointer, Path):
             hashed_document_contents = sha1(data_pointer.read_bytes()).hexdigest()
+        elif isinstance(data_pointer, HttpUrl):
+            url = data_pointer.split("?")[0]
+            hashed_document_contents = sha1(url.encode()).hexdigest()
         elif isinstance(data_pointer, str):
             hashed_document_contents = sha1(data_pointer.encode()).hexdigest()
-        elif isinstance(data_pointer, HttpUrl):
-            response = requests.get(data_pointer, timeout=10)
-            assert response.status_code == 200, "Could not get the data from the url."
-            hashed_document_contents = sha1(response.content).hexdigest()
         else:
             raise ValueError("The data pointer must be a path, string, or url.")
         values["hashed_document_contents"] = hashed_document_contents
