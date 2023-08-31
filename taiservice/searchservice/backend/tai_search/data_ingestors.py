@@ -273,7 +273,9 @@ class Ingestor(ABC):
 
     @classmethod
     def _download_from_url(cls, input_data: InputDocument) -> IngestedDocument:
-        tmp_path: Path = Path("/tmp") / str(uuid4()) / input_data.full_resource_url.split("/")[-1]
+        # get just the last part of the path without the query param
+        final_path = urllib.parse.urlparse(input_data.full_resource_url).path.split("/")[-1]
+        tmp_path: Path = Path("/tmp") / str(uuid4()) / final_path
         tmp_path.parent.mkdir(parents=True, exist_ok=True)
         response = requests.get(input_data.full_resource_url, timeout=10)
         response.raise_for_status()  # Raise an error if the download fails

@@ -280,8 +280,8 @@ class Backend:
         small_docs = self.to_api_resources(docs.get(ChunkSize.SMALL, []))
         large_docs = self.to_api_resources(docs.get(ChunkSize.LARGE, []))
         search_results = SearchResults(
-            suggested_resources=small_docs,
-            other_resources=large_docs,
+            suggested_resources=large_docs[:1] + small_docs[:2],
+            other_resources=large_docs[1:4] + small_docs[2:6],
             **search_query.dict(),
         )
         return search_results

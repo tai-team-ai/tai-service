@@ -119,11 +119,11 @@ class PineconeDB:
             sparse = None
         and_filter: list[dict] = [{"chunk_size": document.metadata.chunk_size}]
         or_filter: list[dict] = []
-        if filter.filter_by_chapters:
+        if filter.filter_by_chapters and document.metadata.chapters:
             or_filter.append({"chapters": {"$in": document.metadata.chapters}})
-        if filter.filter_by_sections:
+        if filter.filter_by_sections and document.metadata.sections:
             or_filter.append({"sections": {"$in": document.metadata.sections}})
-        if filter.filter_by_resource_type:
+        if filter.filter_by_resource_type and document.metadata.resource_type:
             and_filter.append({"resource_type": document.metadata.resource_type})
         if or_filter:
             and_filter.append({"$or": or_filter})

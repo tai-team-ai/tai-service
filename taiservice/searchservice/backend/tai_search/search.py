@@ -245,17 +245,16 @@ class TAISearch:
         queries = [query_for_small_chunks, query_for_large_chunks]
         # TODO: make the resource filter usable
         pinecone_docs = self.embed_documents(documents=queries)
-
         filters = [
             PineconeQueryFilter(
                 filter_by_chapters=True,
                 filter_by_sections=True,
                 filter_by_resource_type=False,
-                alpha=0.2,
+                alpha=0.5 if for_tai_tutor else 0.7,
             ),
             PineconeQueryFilter(
                 filter_by_resource_type=False,
-                alpha=0.8,
+                alpha=0.5 if for_tai_tutor else 0.7,
             ),
         ]
 
@@ -264,7 +263,7 @@ class TAISearch:
             similar_docs = self._pinecone_db.get_similar_documents(document=doc, doc_to_return=50, filter=query_filter)
             alpha = query_filter.alpha
             threshold = (
-                alpha * 0.60 + (1 - alpha) * 4.5
+                alpha * 0.60 + (1 - alpha) * 4.0
             )  # this is a linear interpolation between 0.6 and 4.5, 4.5 is arbitrary as the is technically not an upper limit
             return [doc for doc in similar_docs.documents if doc.score > threshold]
 
@@ -371,10 +370,10 @@ class TAISearch:
             input_format = document.input_format
             if isinstance(loader, document_loaders.BSHTMLLoader):
                 # the beautiful soup loader converts html to text so we need to change the input format
-                input_format = InputFomat.GENERIC_TEXT  
+                input_format = InputFomat.GENERIC_TEXT
             splitter: TextSplitter = get_text_splitter(input_format, chunk_size)
             # TODO: once we use mathpix, i think we can split pdfs better. Without mathpix, the pdfs don't get split well
-            split_docs = loader.load_and_split(splitter)  
+            split_docs = loader.load_and_split(splitter)
         except Exception as e:  # pylint: disable=broad-except
             logger.critical(traceback.format_exc())
             raise RuntimeError("Failed to load and split document.") from e
