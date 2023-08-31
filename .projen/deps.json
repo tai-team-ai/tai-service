@@ -160,6 +160,10 @@
       "type": "runtime"
     },
     {
+      "name": "youtube-transcript-api",
+      "type": "runtime"
+    },
+    {
       "name": "pytest",
       "version": "6.2.1",
       "type": "test"

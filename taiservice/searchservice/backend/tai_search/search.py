@@ -22,20 +22,26 @@ from langchain.text_splitter import TextSplitter
 from langchain.schema import Document
 from pinecone_text.sparse import SpladeEncoder
 from .data_ingestors import (
-    get_splitter_text_splitter,
+    get_text_splitter,
     get_page_number,
     get_total_page_count,
     S3ObjectIngestor,
-    URLIngestor,
+    WebPageIngestor,
     Ingestor,
 )
 from .data_ingestor_schema import (
     IngestedDocument,
-    InputFormat,
+    InputFomat,
     InputDocument,
     InputDataIngestStrategy,
 )
-from ..shared_schemas import ChunkMetadata, BaseOpenAIConfig, ClassResourceType, Metadata, ChunkSize
+from ..shared_schemas import (
+    ChunkMetadata,
+    BaseOpenAIConfig,
+    ClassResourceType,
+    Metadata,
+    ChunkSize,
+)
 from ..databases.pinecone_db import PineconeDBConfig, PineconeDB, PineconeQueryFilter
 from ..databases.pinecone_db_schemas import (
     PineconeDocuments,
@@ -51,6 +57,7 @@ from ..databases.document_db_schemas import (
 
 class OpenAIConfig(BaseOpenAIConfig):
     """Define the OpenAI config."""
+
     batch_size: int = Field(
         ...,
         ge=1,
@@ -61,6 +68,7 @@ class OpenAIConfig(BaseOpenAIConfig):
 
 class IndexerConfig(BaseModel):
     """Define the tai_search config."""
+
     pinecone_db_config: PineconeDBConfig = Field(
         ...,
         description="The pinecone db config.",
@@ -85,6 +93,7 @@ class IndexerConfig(BaseModel):
 
 class ResourceLimits(BaseModel):
     """Define the custom parameters for resource usage."""
+
     memory_percent_threshold: float = Field(
         default=80.0,
         le=80.0,
@@ -110,8 +119,11 @@ def resources_constrained(resource_limits: ResourceLimits) -> bool:
     cpu_usage = psutil.cpu_percent()
     available_memory = psutil.virtual_memory().available / 1024 / 1024 / 1024  # convert to GB
     logger.debug(f"Memory usage: {memory_usage}%, CPU usage: {cpu_usage}%, Available memory: {available_memory}GB")
-    are_resources_constrained = memory_usage > resource_limits.memory_percent_threshold or \
-        cpu_usage > resource_limits.cpu_percent_threshold or available_memory < resource_limits.additional_memory_gb
+    are_resources_constrained = (
+        memory_usage > resource_limits.memory_percent_threshold
+        or cpu_usage > resource_limits.cpu_percent_threshold
+        or available_memory < resource_limits.additional_memory_gb
+    )
     return are_resources_constrained
 
 
@@ -120,7 +132,7 @@ def execute_with_resource_check(func: Callable[..., Any], resource_limits: Resou
     Executes the given partial function based on system resource availability.
 
     This function checks whether system resources are constrained or not before starting the
-    resource-intensive process. If resources are constrained, it retries until resources 
+    resource-intensive process. If resources are constrained, it retries until resources
     are sustainably available.
 
     Args:
@@ -143,6 +155,7 @@ def execute_with_resource_check(func: Callable[..., Any], resource_limits: Resou
 
 class TAISearch:
     """Define the tai_search class."""
+
     def __init__(
         self,
         tai_search_config: IndexerConfig,
@@ -162,7 +175,7 @@ class TAISearch:
     def index_resource(
         self,
         ingested_document: IngestedDocument,
-        class_resource_document: ClassResourceDocument
+        class_resource_document: ClassResourceDocument,
     ) -> None:
         """Index a document."""
         try:
@@ -172,15 +185,10 @@ class TAISearch:
             chunk_documents.extend(self._load_and_split_document(ingested_document, ChunkSize.SMALL))
             logger.info(f"Finished loading and splitting document into {len(chunk_documents)} chunks: {ingested_document.id}")
             class_resource_document.class_resource_chunk_ids = [chunk_doc.id for chunk_doc in chunk_documents]
-            logger.info(f"Uploading {len(chunk_documents)} document to cold store: {ingested_document.id}")
-            partial_func = partial(
-                Ingestor.upload_document_to_cold_store,
-                bucket_name=self._cold_store_bucket_name,
-                ingested_doc=ingested_document,
-                chunks=chunk_documents,
-            )
-            execute_with_resource_check(partial_func)
-            logger.info(f"Finished uploading {len(chunk_documents)}  chunks to cold store: {ingested_document.id}")
+            if ingested_document.input_format == InputFomat.PDF or ingested_document.input_format == InputFomat.HTML:
+                logger.info(f"Uploading {len(chunk_documents)} document to cold store: {ingested_document.id}")
+                self._upload_docs_to_s3(chunk_documents, ingested_document)
+                logger.info(f"Finished uploading {len(chunk_documents)}  chunks to cold store: {ingested_document.id}")
             logger.info(f"Embedding {len(chunk_documents)} chunks: {ingested_document.id}")
             partial_func = partial(self.embed_documents, chunk_documents)
             vector_documents = execute_with_resource_check(partial_func)
@@ -195,12 +203,14 @@ class TAISearch:
             logger.error(traceback.format_exc())
             raise RuntimeError("Failed to index resource.") from e
 
-    def get_relevant_class_resources(self, query: str, class_id: UUID, for_tai_tutor: bool) -> list[ClassResourceChunkDocument]:
+    def get_relevant_class_resources(
+        self, query: str, class_id: UUID, for_tai_tutor: bool
+    ) -> dict[ChunkSize, list[ClassResourceChunkDocument]]:
         """
         Get the most relevant class resources.
 
         If the for_tai_tutor flag is set, then the results will include the top three
-        resources for the class, 1 larger context piece and two shorter snippets. The 
+        resources for the class, 1 larger context piece and two shorter snippets. The
         thought behind this is to get context for the topic and then more specific
         examples for the tutor to utilize without spending too many tokens.
         If the for_tai_tutor flag is not set, then the results will include the top
@@ -216,7 +226,7 @@ class TAISearch:
         query_for_small_chunks = ClassResourceChunkDocument(
             class_id=class_id,
             chunk=query,
-            full_resource_url="https://www.google.com", # this is a dummy link as it's not needed for the query
+            full_resource_url="https://www.google.com",  # this is a dummy link as it's not needed for the query
             id=uuid4(),
             metadata=ChunkMetadata(
                 class_id=class_id,
@@ -226,7 +236,7 @@ class TAISearch:
                 chunk_size=ChunkSize.SMALL,
                 chapters=self._extract_chapter_numbers_from_query(query),
                 sections=self._extract_section_numbers(query),
-            )
+            ),
         )
         query_for_large_chunks = copy.deepcopy(query_for_small_chunks)
         query_for_large_chunks.metadata.chunk_size = ChunkSize.LARGE
@@ -246,21 +256,72 @@ class TAISearch:
                 alpha=0.8,
             ),
         ]
+
         def compute_similar_documents(params: tuple[PineconeDocument, PineconeQueryFilter]) -> list[PineconeDocument]:
             doc, query_filter = params
             similar_docs = self._pinecone_db.get_similar_documents(document=doc, doc_to_return=50, filter=query_filter)
             alpha = query_filter.alpha
-            threshold = alpha * 0.60 + (1 - alpha) * 4.5 # this is a linear interpolation between 0.6 and 4.5, 4.5 is arbitrary as the is technically not an upper limit
+            threshold = (
+                alpha * 0.60 + (1 - alpha) * 4.5
+            )  # this is a linear interpolation between 0.6 and 4.5, 4.5 is arbitrary as the is technically not an upper limit
             return [doc for doc in similar_docs.documents if doc.score > threshold]
-        
+
         with ThreadPoolExecutor(max_workers=len(pinecone_docs)) as executor:
             results = executor.map(compute_similar_documents, zip(pinecone_docs.documents, filters))
         relevant_documents = list(itertools.chain(*results))
-        relevant_documents: list[PineconeDocument] = sorted(relevant_documents, key=lambda doc: doc.score, reverse=True)
         uuids = [doc.metadata.chunk_id for doc in relevant_documents]
         chunk_docs = self._document_db.get_class_resources(uuids, ClassResourceChunkDocument, count_towards_metrics=True)
         logger.info(f"Got similar docs: {chunk_docs}")
-        return [doc for doc in chunk_docs if isinstance(doc, ClassResourceChunkDocument)]
+        chunk_docs = [doc for doc in chunk_docs if isinstance(doc, ClassResourceChunkDocument)]
+        chunk_docs = self._sort_chunk_docs_by_pinecone_scores(relevant_documents, chunk_docs)
+        return self._group_by_chunk_size(chunk_docs)
+
+    def _upload_docs_to_s3(self, chunk_documents: list[ClassResourceChunkDocument], ingested_document: IngestedDocument) -> None:
+        partial_func = partial(
+            Ingestor.upload_document_to_cold_store,
+            bucket_name=self._cold_store_bucket_name,
+            ingested_doc=ingested_document,
+            chunks=chunk_documents,
+        )
+        execute_with_resource_check(partial_func)
+
+    def _group_by_chunk_size(
+        self, chunk_documents: list[ClassResourceChunkDocument]
+    ) -> dict[ChunkSize, list[ClassResourceChunkDocument]]:
+        """Group chunk documents by chunk size."""
+        chunk_size_mapping = {
+            ChunkSize.SMALL: [],
+            ChunkSize.LARGE: [],
+        }
+        for chunk_doc in chunk_documents:
+            chunk_size_mapping[chunk_doc.metadata.chunk_size].append(chunk_doc)
+        return chunk_size_mapping
+
+    def _sort_chunk_docs_by_pinecone_scores(
+        self,
+        pinecone_documents: list[PineconeDocument],
+        chunk_documents: list[ClassResourceChunkDocument],
+    ) -> list[ClassResourceChunkDocument]:
+        """
+        Sort chunk documents based on the scores in corresponding Pinecone vector documents.
+
+        Args:
+            pinecone_documents: A list of Pinecone vector documents.
+            chunk_documents: A list of chunk documents.
+
+        Returns:
+            A list of sorted chunk documents.
+        """
+        # Create a mapping of chunk_id to score from the Pinecone documents.
+        score_mapping = {doc.metadata.chunk_id: doc.score for doc in pinecone_documents}
+        # Filter out chunk documents without corresponding scores in Pinecone documents and sort the remaining ones.
+        filtered_chunk_documents = [doc for doc in chunk_documents if doc.id in score_mapping]
+        sorted_chunk_documents = sorted(
+            filtered_chunk_documents,
+            key=lambda doc: score_mapping[doc.id],
+            reverse=True,
+        )
+        return sorted_chunk_documents
 
     def _load_vectors_to_vector_store(self, vector_documents: PineconeDocuments) -> None:
         """Load vectors to vector store."""
@@ -272,17 +333,15 @@ class TAISearch:
             logger.critical(traceback.format_exc())
             raise RuntimeError("Failed to load vectors to vector store.") from e
 
-    def _load_class_resources_to_db(self, document: ClassResourceDocument, chunk_documents: list[ClassResourceChunkDocument]) -> None:
+    def _load_class_resources_to_db(
+        self,
+        document: ClassResourceDocument,
+        chunk_documents: list[ClassResourceChunkDocument],
+    ) -> None:
         """Load the document to the db."""
-        chunk_mapping = {
-            chunk_doc.id: chunk_doc
-            for chunk_doc in chunk_documents
-        }
+        chunk_mapping = {chunk_doc.id: chunk_doc for chunk_doc in chunk_documents}
         try:
-            failed_docs = self._document_db.upsert_class_resources(
-                documents=[document],
-                chunk_mapping=chunk_mapping
-            )
+            failed_docs = self._document_db.upsert_class_resources(documents=[document], chunk_mapping=chunk_mapping)
         except Exception as e:
             logger.critical(traceback.format_exc())
             raise RuntimeError("Failed to load document to db.") from e
@@ -294,7 +353,7 @@ class TAISearch:
         max_chars_in_a_row = 3
         characters_to_collapse = ["\n", "\t", " "]
         for character in characters_to_collapse:
-            pattern = f'{character}{{{max_chars_in_a_row},}}'
+            pattern = f"{character}{{{max_chars_in_a_row},}}"
             document.page_content = re.sub(pattern, character * max_chars_in_a_row, document.page_content)
         return document
 
@@ -307,15 +366,19 @@ class TAISearch:
             try:
                 # try to treat the pointer as a Path object and resolve it and convert to str
                 data_pointer = str(Path(document.data_pointer).resolve())
-            except Exception: # pylint: disable=broad-except
+            except Exception:  # pylint: disable=broad-except
                 logger.warning(f"Failed to resolve path: {data_pointer}")
             loader: BaseLoader = Loader(data_pointer)
             input_format = document.input_format
             if isinstance(loader, document_loaders.BSHTMLLoader):
-                input_format = InputFormat.GENERIC_TEXT # the beautiful soup loader converts html to text so we need to change the input format
-            splitter: TextSplitter = get_splitter_text_splitter(input_format, chunk_size)
-            split_docs = loader.load_and_split(splitter) # TODO: once we use mathpix, i think we can split pdfs better. Without mathpix, the pdfs don't get split well
-        except Exception as e: # pylint: disable=broad-except
+                input_format = (
+                    InputFomat.GENERIC_TEXT
+                )  # the beautiful soup loader converts html to text so we need to change the input format
+            splitter: TextSplitter = get_text_splitter(input_format, chunk_size)
+            split_docs = loader.load_and_split(
+                splitter
+            )  # TODO: once we use mathpix, i think we can split pdfs better. Without mathpix, the pdfs don't get split well
+        except Exception as e:  # pylint: disable=broad-except
             logger.critical(traceback.format_exc())
             raise RuntimeError("Failed to load and split document.") from e
         chunk_documents = []
@@ -348,32 +411,32 @@ class TAISearch:
         return chunk_documents
 
     def _extract_chapter_numbers_from_query(self, query: str) -> list[str]:
-        chapter_pattern = r'(chapters?\s*((\d+\s?[,and\s&]*)+))' # matches chapter 1, chapter 2, 3, 4, chapter 5 & 6, etc. to extract the numbers from a query
+        chapter_pattern = r"(chapters?\s*((\d+\s?[,and\s&]*)+))"  # matches chapter 1, chapter 2, 3, 4, chapter 5 & 6, etc. to extract the numbers from a query
         matches = re.findall(chapter_pattern, query, flags=re.IGNORECASE)
-        numbers = [] # List to hold all the chapter numbers
+        numbers = []  # List to hold all the chapter numbers
         for match in matches:
             # match is a tuple, the 2nd element contains the string where the numbers are
-            sub_matches = re.findall(r'\d+', match[1]) # Extract all the numbers from the second capturing group
-            numbers.extend(sub_matches) # Add the numbers to our list
+            sub_matches = re.findall(r"\d+", match[1])  # Extract all the numbers from the second capturing group
+            numbers.extend(sub_matches)  # Add the numbers to our list
         # collapse duplicates
         return list(set([str(n) for n in numbers]))
 
     def _extract_section_numbers(self, document: Union[Document, str]) -> list[str]:
         text = document.page_content if isinstance(document, Document) else document
-        section_pattern = r'(\d+(?:\.\d+)*)' # matches 1, 1.1, 1.2, etc.
+        section_pattern = r"(\d+(?:\.\d+)*)"  # matches 1, 1.1, 1.2, etc.
         matches = re.findall(section_pattern, text, flags=re.IGNORECASE)
         return list(set(matches))
 
     def _extract_chapter_numbers(self, document: Union[Document, str]) -> list[str]:
         text = document.page_content if isinstance(document, Document) else document
-        chapter_pattern = r'((?<=\s)|^)chapter\s*(\d+)(?=[\s:])'
+        chapter_pattern = r"((?<=\s)|^)chapter\s*(\d+)(?=[\s:])"
         matches = re.findall(chapter_pattern, text, flags=re.IGNORECASE)
         unique_headings = list(set(match[1] for match in matches))
         return unique_headings
 
     def _get_page_number(self, document: Document, ingested_document: IngestedDocument) -> Optional[int]:
         """Get page number for document."""
-        if ingested_document.input_format == InputFormat.PDF:
+        if ingested_document.input_format == InputFomat.PDF:
             return get_page_number(document)
 
     def embed_documents(
@@ -383,14 +446,18 @@ class TAISearch:
         """Embed documents."""
         if isinstance(documents, ClassResourceChunkDocument):
             documents = [documents]
-        device = 'cuda' if torch.cuda.is_available() else 'cpu'
+        device = "cuda" if torch.cuda.is_available() else "cpu"
         logger.info(f"Using device '{device}' for vector encoding.")
-        def _embed_batch(batch: list[ClassResourceChunkDocument]) -> list[PineconeDocument]:
+
+        def _embed_batch(
+            batch: list[ClassResourceChunkDocument],
+        ) -> list[PineconeDocument]:
             """Embed a batch of documents."""
             texts = [document.chunk for document in batch]
             dense_vectors = self._embedding_strategy.embed_documents(texts)
-            vector_docs =  self.vector_document_from_dense_vectors(dense_vectors, batch)
+            vector_docs = self.vector_document_from_dense_vectors(dense_vectors, batch)
             return vector_docs
+
         if isinstance(documents, ClassResourceChunkDocument):
             documents = [documents]
         batches = [documents[i : i + self._batch_size] for i in range(0, len(documents), self._batch_size)]
@@ -402,7 +469,8 @@ class TAISearch:
         for vector_doc, sparse_vector in zip(vector_docs, sparse_vectors):
             vector_doc.sparse_values = sparse_vector
         class_ids = {doc.metadata.class_id for doc in vector_docs}
-        if len(class_ids) != 1: raise RuntimeError(f"All documents must have the same class id. You provided: {class_ids}")
+        if len(class_ids) != 1:
+            raise RuntimeError(f"All documents must have the same class id. You provided: {class_ids}")
         class_id = class_ids.pop()
         return PineconeDocuments(class_id=class_id, documents=vector_docs)
 
@@ -410,15 +478,17 @@ class TAISearch:
     def get_sparse_vectors(texts: list[str]) -> list[SparseVector]:
         """Add sparse vectors to pinecone."""
         batch_size = 50
-        batches = [texts[i:i + batch_size] for i in range(0, len(texts), batch_size)]
+        batches = [texts[i : i + batch_size] for i in range(0, len(texts), batch_size)]
         logger.info(f"Splitting {len(texts)} documents into {len(batches)} batches.")
         sparse_vectors = []
-        device = 'cuda' if torch.cuda.is_available() else 'cpu'
+        device = "cuda" if torch.cuda.is_available() else "cpu"
         splade = SpladeEncoder(device=device)
         for i, batch in enumerate(batches):
             logger.debug(f"Processing batch {i + 1} of {len(batches)} with {len(batch)} documents in pid {current_process().pid}")
             partial_func = partial(splade.encode_documents, batch)
-            gb_for_batch = max(len(batch) / 50, 3)  # this is a rough estimate of the memory needed for the batch based on experience
+            gb_for_batch = max(
+                len(batch) / 50, 3
+            )  # this is a rough estimate of the memory needed for the batch based on experience
             vectors = execute_with_resource_check(partial_func, ResourceLimits(additional_memory_gb=gb_for_batch))
             sparse_vectors = [SparseVector.parse_obj(vec) for vec in vectors]
             sparse_vectors.extend(sparse_vectors)
@@ -444,10 +514,10 @@ class TAISearch:
         """Ingest a document."""
         mapping: dict[InputDataIngestStrategy, Ingestor] = {
             InputDataIngestStrategy.S3_FILE_DOWNLOAD: S3ObjectIngestor,
-            InputDataIngestStrategy.URL_DOWNLOAD: URLIngestor,
+            InputDataIngestStrategy.URL_DOWNLOAD: WebPageIngestor,
         }
         try:
             ingestor = mapping[document.input_data_ingest_strategy]
-        except KeyError as e: # pylint: disable=broad-except
+        except KeyError as e:  # pylint: disable=broad-except
             raise NotImplementedError(f"Unsupported input data ingest strategy: {document.input_data_ingest_strategy}") from e
         return ingestor.ingest_data(document, self._cold_store_bucket_name)

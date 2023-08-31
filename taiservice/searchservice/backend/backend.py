@@ -44,6 +44,7 @@ from .databases.errors import DuplicateClassResourceError
 from .shared_schemas import (
     Metadata as DBResourceMetadata,
     ClassResourceProcessingStatus,
+    ChunkSize,
 ) 
 from .tai_search import search as tai_search
 
@@ -275,10 +276,11 @@ class Backend:
     def search(self, search_query: ResourceSearchQuery, for_tai_tutor: bool) -> SearchResults:
         """Search for class resources."""
         docs = self._tai_search.get_relevant_class_resources(search_query.query, search_query.class_id, for_tai_tutor)
-        docs = self.to_api_resources(docs)
+        small_docs = self.to_api_resources(docs.get(ChunkSize.SMALL, []))
+        large_docs = self.to_api_resources(docs.get(ChunkSize.LARGE, []))
         search_results = SearchResults(
-            suggested_resources=docs[:4],
-            other_resources=docs[4:],
+            suggested_resources=small_docs,
+            other_resources=large_docs,
             **search_query.dict(),
         )
         return search_results

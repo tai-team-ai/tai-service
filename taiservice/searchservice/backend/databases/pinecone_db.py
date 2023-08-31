@@ -117,7 +117,7 @@ class PineconeDB:
         else:
             dense = document.values
             sparse = None
-        and_filter: list[dict] = []
+        and_filter: list[dict] = [{"chunk_size": document.metadata.chunk_size}]
         or_filter: list[dict] = []
         if filter.filter_by_chapters:
             or_filter.append({"chapters": {"$in": document.metadata.chapters}})

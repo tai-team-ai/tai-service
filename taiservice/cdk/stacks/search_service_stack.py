@@ -69,8 +69,10 @@ PROTOCOL_TO_LISTENER_PORT = {
     ApplicationProtocol.HTTPS: 443,
 }
 
+
 class ECSServiceType(str, Enum):
     """Define the ECS service type."""
+
     NO_GPU = "NO_GPU"
     GPU = "GPU"
 
@@ -202,10 +204,27 @@ class TaiSearchServiceStack(Stack):
                 actions=[
                     "secretsmanager:GetSecretValue",
                 ],
-                resources=[get_secret_arn_from_name(secret) for secret in self._search_service_settings.secret_names]
+                resources=[get_secret_arn_from_name(secret) for secret in self._search_service_settings.secret_names],
             ),
         )
         cluster: Cluster = self._get_cluster()
+        capacity_provider_strategies: list[CapacityProviderStrategy] = []
+        for name in cluster.capacity_provider_names:
+            if ECSServiceType.NO_GPU.value in name:
+                weight = 0
+            elif ECSServiceType.GPU.value in name:
+                weight = 1
+            else:
+                raise ValueError(
+                    f"Capacity provider name {name} does not contain either {ECSServiceType.NO_GPU.value} or {ECSServiceType.GPU.value}"
+                )
+            capacity_provider_strategies.append(
+                CapacityProviderStrategy(
+                    capacity_provider=name,
+                    base=0,
+                    weight=weight,
+                )
+            )
         self._get_container_definition(task_definition, container_port)
         security_group = self._get_ec2_security_group(target_port)
         service: Ec2Service = Ec2Service(
@@ -219,11 +238,7 @@ class TaiSearchServiceStack(Stack):
             security_groups=[security_group, sg_for_connecting_to_db],
             circuit_breaker=DeploymentCircuitBreaker(rollback=True),
             placement_strategies=[PlacementStrategy.spread_across_instances()],
-            capacity_provider_strategies=[CapacityProviderStrategy(
-                capacity_provider=self._namer("capacity-provider-no-gpu"),
-                base=0,
-                weight=1,
-            )],
+            capacity_provider_strategies=capacity_provider_strategies,
             health_check_grace_period=Duration.seconds(450),
         )
         return service
@@ -231,11 +246,13 @@ class TaiSearchServiceStack(Stack):
     def _create_docker_file(self, target_port: int) -> None:
         docker_file_path = os.path.join(CWD, DOCKER_FILE_NAME)
         with open(docker_file_path, "w", encoding="utf-8") as f:
-            f.write(self._search_service_settings.get_docker_file_contents(
-                target_port,
-                FULLY_QUALIFIED_HANDLER_NAME,
-                worker_count=10,
-            ))
+            f.write(
+                self._search_service_settings.get_docker_file_contents(
+                    target_port,
+                    FULLY_QUALIFIED_HANDLER_NAME,
+                    worker_count=10,
+                )
+            )
 
     def _get_cluster(self) -> Cluster:
         cluster = Cluster(
@@ -244,22 +261,24 @@ class TaiSearchServiceStack(Stack):
             vpc=self.vpc,
         )
         no_gpu_asg = self._get_auto_scaling_group(ECSServiceType.NO_GPU, cluster)
-        cluster.add_asg_capacity_provider(
-            provider=AsgCapacityProvider(
-                self,
-                self._namer("asg-provider-no-gpu"),
-                auto_scaling_group=no_gpu_asg,
-                capacity_provider_name=self._namer("capacity-provider-no-gpu"),
-            ),
-        )
+        gpu_asg = self._get_auto_scaling_group(ECSServiceType.GPU, cluster)
+        asgs_and_types = [
+            # (no_gpu_asg, ECSServiceType.NO_GPU),
+            (gpu_asg, ECSServiceType.GPU),
+        ]
+        for asg, service_type in asgs_and_types:
+            print(f"Adding {service_type.value} ASG to cluster")
+            cluster.add_asg_capacity_provider(
+                provider=AsgCapacityProvider(
+                    self,
+                    self._namer(f"asg-provider-{service_type.value}"),
+                    auto_scaling_group=asg,
+                    capacity_provider_name=self._namer(f"capacity-provider-{service_type.value}"),
+                ),
+            )
         return cluster
 
     def _get_auto_scaling_group(self, service_type: ECSServiceType, cluster: Cluster) -> AutoScalingGroup:
-        ami = EcsOptimizedImage.amazon_linux2(
-            hardware_type=AmiHardwareType.GPU,
-        ) if service_type == ECSServiceType.GPU else EcsOptimizedImage.amazon_linux2(
-            hardware_type=AmiHardwareType.STANDARD,
-        )
         block_devices = [
             BlockDevice(
                 device_name="/dev/xvda",
@@ -267,28 +286,33 @@ class TaiSearchServiceStack(Stack):
                     volume_type=EbsDeviceVolumeType.IO1,
                     delete_on_termination=True,
                     volume_size=200,
-                    iops=10000, # must be 50x the volume size or less
+                    iops=10000,  # must be 50x the volume size or less
                 ),
             ),
         ]
         user_data = ec2.UserData.for_linux()
         # this is necessary for the warm pool to work with ECS
         user_data.add_commands(f"echo -e 'ECS_CLUSTER={cluster.cluster_name}\nECS_WARM_POOLS_CHECK=true' >> /etc/ecs/ecs.config")
-        # instance_type = ec2.InstanceType.of(
-        #     instance_class=ec2.InstanceClass.C6A,
-        #     instance_size=ec2.InstanceSize.XLARGE2,
-        # )
-        instance_type = ec2.InstanceType.of(
-            instance_class=ec2.InstanceClass.G4DN,
-            instance_size=ec2.InstanceSize.XLARGE,
-        )
+        if service_type == ECSServiceType.GPU:
+            instance_type = ec2.InstanceType.of(
+                instance_class=ec2.InstanceClass.G4DN,
+                instance_size=ec2.InstanceSize.XLARGE,
+            )
+            ami = EcsOptimizedImage.amazon_linux2(hardware_type=AmiHardwareType.GPU)
+        else:
+            instance_type = ec2.InstanceType.of(
+                instance_class=ec2.InstanceClass.C6A,
+                instance_size=ec2.InstanceSize.XLARGE2,
+            )
+            ami = EcsOptimizedImage.amazon_linux2(hardware_type=AmiHardwareType.STANDARD)
         asg = AutoScalingGroup(
             self,
             self._namer(f"asg-{service_type.value}"),
+            auto_scaling_group_name=self._namer(f"asg-{service_type.value}"),
             vpc=self.vpc,
             instance_type=instance_type,
             machine_image=ami,
-            max_capacity=8,
+            max_capacity=3,
             min_capacity=0,
             # spot_price="0.35",
             block_devices=block_devices,
@@ -297,7 +321,7 @@ class TaiSearchServiceStack(Stack):
         )
         WarmPool(
             self,
-            id=self._namer("asg-warm-pool"),
+            id=self._namer(f"asg-warm-pool-{service_type.value}"),
             auto_scaling_group=asg,
             reuse_on_scale_in=False,
         )
@@ -309,7 +333,7 @@ class TaiSearchServiceStack(Stack):
             image=ContainerImage.from_asset(directory=CWD, file=DOCKER_FILE_NAME),
             environment=self._search_service_settings.dict(for_environment=True, export_aws_vars=True),
             logging=LogDriver.aws_logs(stream_prefix=self._namer("log")),
-            gpu_count=0,
+            gpu_count=1,
             memory_reservation_mib=15000,
             stop_timeout=Duration.seconds(600),
         )
@@ -341,36 +365,33 @@ class TaiSearchServiceStack(Stack):
         scaling_task.scale_on_cpu_utilization(
             id=self._namer("task-cpu-scaling"),
             target_utilization_percent=50,
-            scale_out_cooldown=Duration.seconds(300), # we should be fast because of the warm pool
+            scale_out_cooldown=Duration.seconds(300),  # we should be fast because of the warm pool
             disable_scale_in=False,
         )
         scaling_task.scale_on_memory_utilization(
             id=self._namer("task-memory-scaling"),
             target_utilization_percent=75,
-            scale_out_cooldown=Duration.seconds(300), # we should be fast because of the warm pool
+            scale_out_cooldown=Duration.seconds(300),  # we should be fast because of the warm pool
             disable_scale_in=False,
         )
         scaling_task.scale_on_schedule(
             id=self._namer("scale-up"),
-            schedule=Schedule.cron(hour="12", minute="0", week_day="*"), # 6am MST
+            schedule=Schedule.cron(hour="12", minute="0", week_day="*"),  # 6am MST
             min_capacity=min_task_count,
             max_capacity=max_task_count,
         )
         scaling_task.scale_on_schedule(
             self._namer("scale-down"),
-            schedule=Schedule.cron(hour="6", minute="0", week_day="*"), # 12am MST
+            schedule=Schedule.cron(hour="6", minute="0", week_day="*"),  # 12am MST
             min_capacity=0,
             max_capacity=0,
         )
         return scaling_task
 
-    def _get_target_group(self, services: list[Ec2Service], target_port: int, target_protocol: ApplicationProtocol) -> ApplicationTargetGroup:
-        alb: ApplicationLoadBalancer = ApplicationLoadBalancer(
-            self,
-            self._namer("alb"),
-            vpc=self.vpc,
-            internet_facing=True
-        )
+    def _get_target_group(
+        self, services: list[Ec2Service], target_port: int, target_protocol: ApplicationProtocol
+    ) -> ApplicationTargetGroup:
+        alb: ApplicationLoadBalancer = ApplicationLoadBalancer(self, self._namer("alb"), vpc=self.vpc, internet_facing=True)
         self._service_url = alb.load_balancer_dns_name
         listener = alb.add_listener(
             self._namer("listener"),
@@ -391,17 +412,9 @@ class TaiSearchServiceStack(Stack):
         )
         return target_group
 
-
-    def get_search_service_NEW(
-        self,
-        sg_for_connecting_to_db: ec2.SecurityGroup
-    ) -> ApplicationLoadBalancedServiceBase:
+    def get_search_service_NEW(self, sg_for_connecting_to_db: ec2.SecurityGroup) -> ApplicationLoadBalancedServiceBase:
         alb: ApplicationLoadBalancer = ApplicationLoadBalancer(
-            self,
-            id=self._namer("alb"),
-            load_balancer_name=self._namer("alb"),
-            vpc=self.vpc,
-            internet_facing=True
+            self, id=self._namer("alb"), load_balancer_name=self._namer("alb"), vpc=self.vpc, internet_facing=True
         )
         self._service_url = alb.load_balancer_dns_name
         protocol = ApplicationProtocol.HTTPS

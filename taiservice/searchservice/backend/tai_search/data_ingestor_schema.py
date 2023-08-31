@@ -7,31 +7,27 @@ from typing import Union
 from pydantic import Field, root_validator, validator, HttpUrl
 from langchain.text_splitter import Language
 import requests
-# first imports are for local development, second imports are for deployment
-try:
-    from ..shared_schemas import (
-        BaseClassResourceDocument,
-        StatefulClassResourceDocument
-    )
-except ImportError:
-    from taibackend.shared_schemas import (
-        BaseClassResourceDocument,
-        StatefulClassResourceDocument,
-    )
+from ..shared_schemas import (
+    BaseClassResourceDocument,
+    StatefulClassResourceDocument,
+)
 
 
-class InputFormat(str, Enum):
+class InputFomat(str, Enum):
     """Define the supported input formats."""
+
     PDF = "pdf"
     GENERIC_TEXT = "generic_text"
     LATEX = "latex"
     MARKDOWN = "markdown"
     HTML = "html"
     RAW_URL = "raw_url"
+    YOUTUBE_VIDEO = "youtube_video"
 
 
 class MarkdownExtension(str, Enum):
     """Define the markdown extensions."""
+
     MARKDOWN = ".markdown"
     MD = ".md"
     MKD = ".mkd"
@@ -44,18 +40,24 @@ class MarkdownExtension(str, Enum):
 
 class LatexExtension(str, Enum):
     """Define the latex extensions."""
+
     TEX = ".tex"
     LATEX = ".latex"
 
 
+# These loading strategies must match the corresponding class name in langchain
 class LoadingStrategy(str, Enum):
     """Define the loading strategies."""
+
     PyMuPDFLoader = "PyMuPDFLoader"
     UnstructuredMarkdownLoader = "UnstructuredMarkdownLoader"
     BSHTMLLoader = "BSHTMLLoader"
+    YoutubeLoader = "YoutubeLoader"
+
 
 class SplitterStrategy(str, Enum):
     """Define the splitter strategies."""
+
     RecursiveCharacterTextSplitter = "RecursiveCharacterTextSplitter"
     LatexTextSplitter = "LatexTextSplitter"
     MarkdownTextSplitter = "MarkdownTextSplitter"
@@ -63,32 +65,41 @@ class SplitterStrategy(str, Enum):
 
 class InputDataIngestStrategy(str, Enum):
     """Define the input types."""
+
     S3_FILE_DOWNLOAD = "s3_file_download"
     URL_DOWNLOAD = "url_download"
     # WEB_CRAWL = "web_crawl"
 
 
 LOADING_STRATEGY_MAPPING = {
-    InputFormat.PDF: LoadingStrategy.PyMuPDFLoader,
-    InputFormat.GENERIC_TEXT: LoadingStrategy.UnstructuredMarkdownLoader,
-    InputFormat.LATEX: LoadingStrategy.UnstructuredMarkdownLoader,
-    InputFormat.MARKDOWN: LoadingStrategy.UnstructuredMarkdownLoader,
-    InputFormat.HTML: LoadingStrategy.BSHTMLLoader,
+    InputFomat.PDF: LoadingStrategy.PyMuPDFLoader,
+    InputFomat.GENERIC_TEXT: LoadingStrategy.UnstructuredMarkdownLoader,
+    InputFomat.LATEX: LoadingStrategy.UnstructuredMarkdownLoader,
+    InputFomat.MARKDOWN: LoadingStrategy.UnstructuredMarkdownLoader,
+    InputFomat.HTML: LoadingStrategy.BSHTMLLoader,
+    InputFomat.YOUTUBE_VIDEO: LoadingStrategy.YoutubeLoader,
 }
 
+
 SPLITTER_STRATEGY_MAPPING = {
-    InputFormat.PDF: SplitterStrategy.RecursiveCharacterTextSplitter,
-    InputFormat.GENERIC_TEXT: SplitterStrategy.RecursiveCharacterTextSplitter,
-    InputFormat.LATEX: Language.LATEX,
-    InputFormat.MARKDOWN: Language.MARKDOWN,
-    InputFormat.HTML: Language.HTML,
+    InputFomat.PDF: SplitterStrategy.RecursiveCharacterTextSplitter,
+    InputFomat.GENERIC_TEXT: SplitterStrategy.RecursiveCharacterTextSplitter,
+    InputFomat.LATEX: Language.LATEX,
+    InputFomat.MARKDOWN: Language.MARKDOWN,
+    InputFomat.HTML: Language.HTML,
 }
-TOTAL_PAGE_COUNT_STRINGS = ["total_pages", "total_page_count", "total_page_counts", "page_count"]
+TOTAL_PAGE_COUNT_STRINGS = [
+    "total_pages",
+    "total_page_count",
+    "total_page_counts",
+    "page_count",
+]
 PAGE_NUMBER_STRINGS = ["page_number", "page_numbers", "page_num", "page_nums", "page"]
 
 
 class InputDocument(BaseClassResourceDocument):
     """Define the input document."""
+
     input_data_ingest_strategy: InputDataIngestStrategy = Field(
         ...,
         description="The strategy for ingesting the input data.",
@@ -111,15 +122,17 @@ class InputDocument(BaseClassResourceDocument):
 
 class IngestedDocument(StatefulClassResourceDocument):
     """Define the ingested document."""
+
     data_pointer: Union[Path, str, HttpUrl] = Field(
         ...,
-        description=("This field should 'point' to the data. This will mean different things "
+        description=(
+            "This field should 'point' to the data. This will mean different things "
             "depending on the input format and loading strategy. For example, if the input format "
             "is PDF and the loading strategy is PyMuPDF, then this field will be a path object, as another "
             "example, if the loading strategy is copy and paste, then this field will be a string."
         ),
     )
-    input_format: InputFormat = Field(
+    input_format: Union[InputFomat, UrlType] = Field(
         ...,
         description="The format of the input document.",
     )
@@ -145,10 +158,11 @@ class IngestedDocument(StatefulClassResourceDocument):
         values["hashed_document_contents"] = hashed_document_contents
         return values
 
-
     @validator("loading_strategy")
     def verify_loading_strategy(cls, loading_strategy: LoadingStrategy, values: dict) -> LoadingStrategy:
         """Verify the loading strategy."""
         if values.get("input_format") is not None:
-            assert loading_strategy == LOADING_STRATEGY_MAPPING[values.get("input_format")], "The loading strategy must match the input format."
+            assert (
+                loading_strategy == LOADING_STRATEGY_MAPPING[values.get("input_format")]
+            ), "The loading strategy must match the input format."
         return loading_strategy

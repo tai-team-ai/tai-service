@@ -179,7 +179,7 @@ class SearchServiceSettings(BaseSettings):
             "# The --max-request is to restart workers to help clear the memory used by pytorch",
             f'CMD ["gunicorn", "-w", "{worker_count}", "-k", "uvicorn.workers.UvicornWorker", '
             f'"{fully_qualified_handler_path}", "--bind", "0.0.0.0:{port}", "--worker-tmp-dir", "/dev/shm", '
-            '"--graceful-timeout", "450", "--timeout", "450", "--max-requests", "5"]',
+            '"--graceful-timeout", "900", "--timeout", "900", "--max-requests", "10"]',
             # f'CMD [".venv/bin/python", "-m", "uvicorn", "{fully_qualified_handler_path}", "--host", "0.0.0.0", "--port", "{port}", "--factory"]',
         ]
         return "\n".join(docker_file)

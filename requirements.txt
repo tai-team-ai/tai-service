@@ -34,3 +34,4 @@ tai-aws-account-bootstrap
 tiktoken
 unstructured
 uvicorn[standard]
+youtube-transcript-api

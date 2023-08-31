@@ -17,6 +17,7 @@ from pydantic import HttpUrl
 from langchain.text_splitter import TextSplitter, RecursiveCharacterTextSplitter
 from langchain import text_splitter
 from langchain.schema import Document
+from langchain.document_loaders.youtube import ALLOWED_NETLOCK as YOUTUBE_NETLOCS
 from .data_ingestor_schema import (
     IngestedDocument,
     LatexExtension,
@@ -27,8 +28,8 @@ from .data_ingestor_schema import (
     PAGE_NUMBER_STRINGS,
     LOADING_STRATEGY_MAPPING,
     InputDocument,
-    InputFormat,
-    InputDataIngestStrategy
+    InputFomat,
+    InputDataIngestStrategy,
 )
 from .resource_utilities import ResourceUtility, PDF, HTML
 from ..databases.document_db_schemas import ClassResourceChunkDocument
@@ -43,21 +44,22 @@ def number_tokens(text: str) -> int:
     return num_tokens
 
 
-CHUNK_SIZE_TO_CHAR_COUNT_MAPPING ={
+CHUNK_SIZE_TO_CHAR_COUNT_MAPPING = {
     ChunkSize.SMALL: 500,
-    ChunkSize.LARGE: 1200,
+    ChunkSize.LARGE: 2000,
 }
 OVERLAP_SIZE_TO_CHAR_COUNT_MAPPING = {
     ChunkSize.SMALL: 100,
     ChunkSize.LARGE: 300,
 }
 
-def get_splitter_text_splitter(input_format: InputFormat, chunk_size: ChunkSize) -> TextSplitter:
+
+def get_text_splitter(input_format: InputFomat, chunk_size: ChunkSize) -> TextSplitter:
     """Get the splitter strategy."""
     strategy_instructions = SPLITTER_STRATEGY_MAPPING.get(input_format)
     kwargs = {
-        'chunk_size': CHUNK_SIZE_TO_CHAR_COUNT_MAPPING[chunk_size],
-        'chunk_overlap': OVERLAP_SIZE_TO_CHAR_COUNT_MAPPING[chunk_size],
+        "chunk_size": CHUNK_SIZE_TO_CHAR_COUNT_MAPPING[chunk_size],
+        "chunk_overlap": OVERLAP_SIZE_TO_CHAR_COUNT_MAPPING[chunk_size],
     }
     if strategy_instructions is None:
         raise ValueError("The input format is not supported.")
@@ -81,8 +83,10 @@ def get_page_number(doc: Document) -> Optional[int]:
         if key in doc.metadata:
             return doc.metadata[key]
 
+
 class Ingestor(ABC):
     """Define the ingestor class."""
+
     @classmethod
     def ingest_data(cls, input_data: InputDocument, bucket_name: str) -> IngestedDocument:
         """Ingest the data."""
@@ -109,12 +113,12 @@ class Ingestor(ABC):
     @staticmethod
     def _screenshot_resource(
         data_pointer: Union[HttpUrl, Path],
-        input_format: InputFormat,
+        input_format: InputFomat,
         first_page_only: bool = True,
     ) -> list[Path]:
-        screenshot_strategy_mapping: dict[InputFormat, ResourceUtility] = {
-            InputFormat.HTML: HTML,
-            InputFormat.PDF: PDF,
+        screenshot_strategy_mapping: dict[InputFomat, ResourceUtility] = {
+            InputFomat.HTML: HTML,
+            InputFomat.PDF: PDF,
         }
         resource_utility = screenshot_strategy_mapping[input_format]
         last_page_to_screenshot = 1 if first_page_only else None
@@ -130,9 +134,9 @@ class Ingestor(ABC):
             urls = []
             for filepath, object_key in zip(file_paths, object_keys):
                 bucket.upload_file(str(filepath.resolve()), object_key)
-                urls.append(f'''https://{bucket_name}.s3.amazonaws.com/{urllib.parse.quote(object_key, safe="~()*!.'")}''')
+                urls.append(f"""https://{bucket_name}.s3.amazonaws.com/{urllib.parse.quote(object_key, safe="~()*!.'")}""")
             return urls[0] if is_length_one else urls
-        except Exception as e: # pylint: disable=broad-except
+        except Exception as e:  # pylint: disable=broad-except
             logger.critical(f"Failed to upload to s3: {e}")
             raise RuntimeError(f"Failed to upload to s3: {e}") from e
 
@@ -141,7 +145,7 @@ class Ingestor(ABC):
         """Run the screenshot operation."""
         try:
             return func(*args, **kwargs)
-        except Exception as e: # pylint: disable=broad-except
+        except Exception as e:  # pylint: disable=broad-except
             logger.warning(f"Failed to create screenshots: {e}")
             logger.warning(traceback.format_exc())
             logger.warning("Skipping screenshot upload")
@@ -166,18 +170,25 @@ class Ingestor(ABC):
         """Put the ingested document to s3."""
         object_prefix = cls._get_object_prefix(ingested_doc)
         screenshot_urls, split_resource_urls = [], []
+
         def screenshot_upload_resource() -> Union[list[HttpUrl], HttpUrl]:
-            screenshot_paths = cls._screenshot_resource(ingested_doc.data_pointer, ingested_doc.input_format, first_page_only=False)
+            screenshot_paths = cls._screenshot_resource(
+                ingested_doc.data_pointer,
+                ingested_doc.input_format,
+                first_page_only=False,
+            )
             screenshot_object_keys = [f"{object_prefix}{i + 1}/{path.name}" for i, path in enumerate(screenshot_paths)]
             return cls._upload_to_cold_store(screenshot_paths, screenshot_object_keys, bucket_name)
+
         def split_and_upload_pdf() -> Union[list[HttpUrl], HttpUrl]:
             split_resource_paths = PDF.split_resource(input_path=ingested_doc.data_pointer)
             split_objects_keys = [f"{object_prefix}{i +  1}/{path.name}" for i, path in enumerate(split_resource_paths)]
             return cls._upload_to_cold_store(split_resource_paths, split_objects_keys, bucket_name)
+
         screenshot_urls = cls.run_screenshot_op(screenshot_upload_resource)
-        if isinstance(screenshot_urls, str) and ingested_doc.input_format != InputFormat.HTML:
+        if isinstance(screenshot_urls, str) and ingested_doc.input_format != InputFomat.HTML:
             screenshot_urls = [screenshot_urls]
-        if ingested_doc.input_format == InputFormat.PDF:
+        if ingested_doc.input_format == InputFomat.PDF:
             split_resource_urls = cls.run_split_resource_op(split_and_upload_pdf)
             if isinstance(split_resource_urls, str):
                 split_resource_urls = [split_resource_urls]
@@ -199,8 +210,11 @@ class Ingestor(ABC):
     ) -> None:
         """Put the ingested document to s3."""
         object_prefix = cls._get_object_prefix(ingested_doc)
-        is_webpage_html = ingested_doc.input_format == InputFormat.HTML \
+        is_webpage_html = (
+            ingested_doc.input_format == InputFomat.HTML
             and input_doc.input_data_ingest_strategy == InputDataIngestStrategy.URL_DOWNLOAD
+        )
+
         def screenshot_resource() -> None:
             if is_webpage_html:
                 data_pointer = input_doc.full_resource_url
@@ -208,40 +222,55 @@ class Ingestor(ABC):
                 data_pointer = ingested_doc.data_pointer
             screenshot_path = Ingestor._screenshot_resource(data_pointer, ingested_doc.input_format)[0]
             screenshot_object_key = f"{object_prefix}{screenshot_path.name}"
-            ingested_doc.preview_image_url = cls._upload_to_cold_store(
-                [screenshot_path],
-                [screenshot_object_key],
-                bucket_name
-            )
+            ingested_doc.preview_image_url = cls._upload_to_cold_store([screenshot_path], [screenshot_object_key], bucket_name)
+
         def upload_raw_resource_to_cold_store() -> None:
             if not is_webpage_html:
                 ingested_doc.full_resource_url = cls._upload_to_cold_store(
                     [ingested_doc.data_pointer],
                     [f"{object_prefix}{ingested_doc.data_pointer.name}"],
-                    bucket_name
+                    bucket_name,
                 )
+
         cls.run_screenshot_op(screenshot_resource)
         cls.run_split_resource_op(upload_raw_resource_to_cold_store)
 
     @staticmethod
-    def _get_file_type(path: Path) -> InputFormat:
+    def _get_input_format(input_pointer: str) -> InputFomat:
         """Get the file type."""
+
         def check_file_type(path: Path, extension_enum: Enum) -> bool:
             """Check if the file type matches given extensions."""
             return path.suffix in [extension.value for extension in extension_enum]
-        def get_text_file_type(path: Path, file_contents: str) -> InputFormat:
+
+        def get_text_file_type(path: Path, file_contents: str) -> InputFomat:
             """Get the text file type."""
             if check_file_type(path, LatexExtension):
-                return InputFormat.LATEX
+                return InputFomat.LATEX
             elif check_file_type(path, MarkdownExtension):
-                return InputFormat.MARKDOWN
+                return InputFomat.MARKDOWN
             elif bool(BeautifulSoup(file_contents, "html.parser").find()):
-                return InputFormat.HTML
-            return InputFormat.GENERIC_TEXT
+                return InputFomat.HTML
+            return InputFomat.GENERIC_TEXT
+
+        def get_url_type(url: str) -> InputFomat:
+            parsed_url = urllib.parse.urlparse(url)
+            netloc = parsed_url.netloc
+            path = parsed_url.path
+            if netloc in YOUTUBE_NETLOCS and path.startswith("/watch"):
+                return InputFomat.YOUTUBE_VIDEO
+            else:
+                raise ValueError(f"Unsupported url type: {url}")
+
         try:
+            return get_url_type(input_pointer)
+        except ValueError as e:
+            logger.error(e)
+        try:
+            path = Path(input_pointer)
             kind = filetype.guess(path)
             if kind:
-                return InputFormat(kind.extension)
+                return InputFomat(kind.extension)
             else:
                 with open(path, "r", encoding="utf-8") as f:
                     return get_text_file_type(path, f.read())
@@ -250,6 +279,23 @@ class Ingestor(ABC):
             extension = kind.extension if kind else path.suffix
             raise ValueError(f"Unsupported file type: {extension}.") from e
 
+    @classmethod
+    def _download_from_url(cls, input_data: InputDocument) -> IngestedDocument:
+        tmp_path: Path = Path("/tmp") / str(uuid4()) / input_data.full_resource_url.split("/")[-1]
+        tmp_path.parent.mkdir(parents=True, exist_ok=True)
+        response = requests.get(input_data.full_resource_url, timeout=10)
+        response.raise_for_status()  # Raise an error if the download fails
+        with open(tmp_path, "wb") as f:
+            f.write(response.content)
+        file_type = cls._get_input_type(str(tmp_path.resolve()))
+        document = IngestedDocument(
+            data_pointer=tmp_path,
+            input_format=file_type,
+            loading_strategy=LOADING_STRATEGY_MAPPING[file_type],
+            **input_data.dict(),
+        )
+        return document
+
 
 class S3ObjectIngestor(Ingestor):
     """
@@ -257,51 +303,42 @@ class S3ObjectIngestor(Ingestor):
 
     This class is used for ingesting data from S3.
     """
+
     @classmethod
     def _ingest_data(cls, input_data: InputDocument) -> IngestedDocument:
         """Ingest the data from S3."""
-        tmp_path: Path = Path("/tmp") / str(uuid4()) / input_data.full_resource_url.split('/')[-1]
-        tmp_path.parent.mkdir(parents=True, exist_ok=True)
-        response = requests.get(input_data.full_resource_url, timeout=10)
-        response.raise_for_status() # Raise an error if the download fails
-        with open(tmp_path, "wb") as f:
-            f.write(response.content)
-        file_type = cls._get_file_type(tmp_path)
-        document = IngestedDocument(
-            data_pointer=tmp_path,
-            input_format=file_type,
-            loading_strategy=LOADING_STRATEGY_MAPPING[cls._get_file_type(tmp_path)],
-            **input_data.dict(),
-        )
-        return document
+        # sign if needed to dowload from private bucket
+        return cls._download_from_url(input_data)
 
-class URLIngestor(Ingestor):
+
+class WebPageIngestor(Ingestor):
     """
     Define the URL ingestor.
 
     This class is used for ingesting data from a URL.
     """
+
     @classmethod
     def _ingest_data(cls, input_data: InputDocument) -> IngestedDocument:
         """Ingest the data from a URL."""
-        remote_file_url = input_data.full_resource_url
-        # remove the last slash if no charactesr follow it
-        path = remote_file_url.path
-        if path[-1] == "/":
-            path = path[:-1]
-        final_part = path.split("/")[-1]
-        tmp_path = Path("/tmp") / str(uuid4()) / final_part
-        tmp_path.parent.mkdir(parents=True, exist_ok=True)
-        try:
-            urllib.request.urlretrieve(remote_file_url, tmp_path)
-        except Exception as e:
-            logger.error(f"Failed to download from {remote_file_url}: {e}")
-            raise RuntimeError(f"Failed to download from {remote_file_url}: {e}") from e
-        file_type = cls._get_file_type(tmp_path)
+        return cls._download_from_url(input_data)
+
+
+class RawUrlIngestor(Ingestor):
+    """
+    Define the raw URL ingestor.
+
+    This class is used for ingesting data from a raw URL.
+    """
+
+    @classmethod
+    def _ingest_data(cls, input_data: InputDocument) -> IngestedDocument:
+        """Ingest the data from a raw URL."""
+        url_type = cls._get_input_type(str(input_data.full_resource_url))
         document = IngestedDocument(
-            data_pointer=tmp_path,
-            input_format=file_type,
-            loading_strategy=LOADING_STRATEGY_MAPPING[file_type],
+            data_pointer=input_data.full_resource_url,
+            input_format=url_type,
+            loading_strategy=LOADING_STRATEGY_MAPPING[url_type],
             **input_data.dict(),
         )
         return document
