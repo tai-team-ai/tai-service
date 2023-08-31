@@ -257,7 +257,7 @@ class Ingestor(ABC):
         try:
             return get_url_type(input_pointer)
         except ValueError as e:
-            logger.error(e)
+            logger.info(f"Failed to get url type: {e}, retrying with file type.")
         try:
             path = Path(input_pointer)
             kind = filetype.guess(path)
