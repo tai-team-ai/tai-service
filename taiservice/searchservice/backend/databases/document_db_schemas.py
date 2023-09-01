@@ -2,28 +2,28 @@
 from typing import Optional
 from uuid import UUID
 from pydantic import Field, HttpUrl, validator
-from taiservice.api.taibackend.databases.document_db import ClassResourceProcessingStatus
 from ..shared_schemas import (
     ChunkMetadata,
     Metadata,
     BaseClassResourceDocument,
     StatefulClassResourceDocument,
+    ClassResourceProcessingStatus,
 )
 from ..tai_search.data_ingestor_schema import IngestedDocument
 
 
 class ClassResourceDocument(StatefulClassResourceDocument):
     """Define the document model of the class resource."""
-    child_resource_ids: Optional[list[UUID]] = Field(
-        default=None,
+    child_resource_ids: list[UUID] = Field(
+        default_factory=list,
         description=("The IDs of the child resource. This is useful when the provided "
             "resource is a webpage and the user wants to crawl the website for resources. "
             "In this case, the child resource ID of all child resources that are scraped "
             "from the webpage."
         ),
     )
-    parent_resource_ids: Optional[list[UUID]] = Field(
-        default=None,
+    parent_resource_ids: list[UUID] = Field(
+        default_factory=list,
         description=("The IDs of the parent resource. This field must be populated if the "
             "resource is a child of another resource. For example, if the resource is a "
             "webpage, then the parent resource ID is the ID of the webpage that contains "
@@ -46,15 +46,19 @@ class ClassResourceDocument(StatefulClassResourceDocument):
         return ids
 
     @staticmethod
-    def from_ingested_doc(ingested_doc: IngestedDocument) -> 'ClassResourceDocument':
+    def from_ingested_doc(
+        ingested_doc: IngestedDocument,
+        status: ClassResourceProcessingStatus = ClassResourceProcessingStatus.PENDING,
+    ) -> "ClassResourceDocument":
         """Convert the ingested document to a database document."""
         metadata = ingested_doc.metadata
         doc = ClassResourceDocument(
-            id=ingested_doc.id,
+            _id=ingested_doc.id,
             class_id=ingested_doc.class_id,
             full_resource_url=ingested_doc.full_resource_url,
             preview_image_url=ingested_doc.preview_image_url,
-            status=ClassResourceProcessingStatus.PENDING,
+            data_pointer=ingested_doc.data_pointer,
+            status=status,
             hashed_document_contents=ingested_doc.hashed_document_contents,
             metadata=Metadata(
                 title=metadata.title,
@@ -82,7 +86,7 @@ class ClassResourceChunkDocument(BaseClassResourceDocument):
     )
 
     @staticmethod
-    def _ensure_same_class_id(metadata_class_id: UUID, class_id: UUID) -> None:
+    def _ensure_same_class_id(metadata_class_id: UUID, class_id: Optional[UUID]) -> None:
         """Ensure the same class id."""
         assert metadata_class_id == class_id, \
             "The class id of the metadata must be the same as the class id " \

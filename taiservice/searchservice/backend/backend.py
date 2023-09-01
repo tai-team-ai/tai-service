@@ -1,6 +1,7 @@
 """Define the backend for handling requests to the TAI Search Service."""
 from datetime import date, datetime, timedelta
 import json
+import traceback
 from typing import Any, Callable, Optional, Union
 from uuid import UUID
 import psutil
@@ -209,17 +210,18 @@ class Backend:
             pass
         elif self._is_duplicate_class_resource(ingested_doc):
             raise DuplicateClassResourceError(f"Duplicate class resource: {ingested_doc.id} in class {ingested_doc.class_id}")
-        class_resource = ClassResourceDocument.from_ingested_doc(ingested_doc)
-        self._coerce_and_update_status(class_resource, ClassResourceProcessingStatus.PENDING)
+        db_class_resource = ClassResourceDocument.from_ingested_doc(ingested_doc)
+        self._coerce_and_update_status(db_class_resource, ClassResourceProcessingStatus.PENDING)
         def index_resource() -> None:
             try:
-                self._coerce_and_update_status(class_resource, ClassResourceProcessingStatus.PROCESSING)
-                self._tai_search.index_resource(ingested_doc, class_resource)
-                self._coerce_and_update_status(class_resource, ClassResourceProcessingStatus.COMPLETED)
-                logger.info(f"Completed indexing class resource: {class_resource.id}")
-            except Exception as e: # pylint: disable=broad-except
-                logger.critical(f"Failed to create class resources: {e}")
-                self._coerce_and_update_status(class_resource, ClassResourceProcessingStatus.FAILED)
+                self._coerce_and_update_status(db_class_resource, ClassResourceProcessingStatus.PROCESSING)
+                self._tai_search.index_resource(ingested_doc, db_class_resource)
+                self._coerce_and_update_status(db_class_resource, ClassResourceProcessingStatus.COMPLETED)
+                logger.info(f"Completed indexing class resource: {db_class_resource.id}")
+            except Exception: # pylint: disable=broad-except
+                logger.critical(f"Failed to create class resources")
+                logger.critical(traceback.format_exc())
+                self._coerce_and_update_status(db_class_resource, ClassResourceProcessingStatus.FAILED)
         return index_resource
 
     def get_class_resources(self, ids: list[UUID], from_class_ids: bool=False) -> list[ClassResource]:

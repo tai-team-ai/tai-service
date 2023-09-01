@@ -111,15 +111,6 @@ class InputDocument(BaseClassResourceDocument):
 class IngestedDocument(StatefulClassResourceDocument):
     """Define the ingested document."""
 
-    data_pointer: Union[HttpUrl, str, Path] = Field(
-        ...,
-        description=(
-            "This field should 'point' to the data. This will mean different things "
-            "depending on the input format and loading strategy. For example, if the input format "
-            "is PDF and the loading strategy is PyMuPDF, then this field will be a path object, as another "
-            "example, if the loading strategy is copy and paste, then this field will be a string."
-        ),
-    )
     input_format: InputFomat = Field(
         ...,
         description="The format of the input document.",
@@ -129,21 +120,6 @@ class IngestedDocument(StatefulClassResourceDocument):
         description="The loading strategy for the input document.",
     )
 
-    @root_validator(pre=True)
-    def generate_hashed_content_id(cls, values: dict) -> dict:
-        """Generate the hashed content id."""
-        data_pointer = values.get("data_pointer")
-        if isinstance(data_pointer, Path):
-            hashed_document_contents = sha1(data_pointer.read_bytes()).hexdigest()
-        elif isinstance(data_pointer, HttpUrl):
-            url = data_pointer.split("?")[0]
-            hashed_document_contents = sha1(url.encode()).hexdigest()
-        elif isinstance(data_pointer, str):
-            hashed_document_contents = sha1(data_pointer.encode()).hexdigest()
-        else:
-            raise ValueError("The data pointer must be a path, string, or url.")
-        values["hashed_document_contents"] = hashed_document_contents
-        return values
 
     @validator("loading_strategy")
     def verify_loading_strategy(cls, loading_strategy: LoadingStrategy, values: dict) -> LoadingStrategy:

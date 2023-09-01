@@ -32,10 +32,7 @@ from .data_ingestor_schema import (
     LOADING_STRATEGY_MAPPING,
     InputDocument,
     InputFomat,
-    InputDataIngestStrategy,
 )
-from .resource_utilities import ResourceUtility, PDF, HTML
-from ..databases.document_db_schemas import ClassResourceChunkDocument
 from ..shared_schemas import ChunkSize
 
 
@@ -94,138 +91,6 @@ class Ingestor(ABC):
     @abstractmethod
     def ingest_data(cls, input_data: InputDocument, bucket_name: str) -> IngestedDocument:
         """Ingest the data."""
-
-    @staticmethod
-    def _get_object_prefix(ingested_doc: IngestedDocument) -> str:
-        """Get the object prefix."""
-        class_id = f"class_id={ingested_doc.class_id}"
-        resource_id = f"resource_id={ingested_doc.id_as_str}"
-        return f"{class_id}/{resource_id}/"
-
-    @staticmethod
-    def _screenshot_resource(
-        data_pointer: Union[HttpUrl, Path],
-        input_format: InputFomat,
-        first_page_only: bool = True,
-    ) -> list[Path]:
-        screenshot_strategy_mapping: dict[InputFomat, ResourceUtility] = {
-            InputFomat.HTML: HTML,
-            InputFomat.PDF: PDF,
-        }
-        resource_utility = screenshot_strategy_mapping[input_format]
-        last_page_to_screenshot = 1 if first_page_only else None
-        return resource_utility.create_screenshots(data_pointer, last_page_to_include=last_page_to_screenshot)
-
-    @staticmethod
-    def _upload_to_cold_store(file_paths: list[Path], object_keys: list[str], bucket_name: str) -> Union[list[HttpUrl], HttpUrl]:
-        """Put the ingested document to s3."""
-        is_length_one = len(file_paths) == 1
-        try:
-            s3 = boto3.resource("s3")
-            bucket = s3.Bucket(bucket_name)
-            urls = []
-            for filepath, object_key in zip(file_paths, object_keys):
-                bucket.upload_file(str(filepath.resolve()), object_key)
-                urls.append(f"""https://{bucket_name}.s3.amazonaws.com/{urllib.parse.quote(object_key, safe="~()*!.'")}""")
-            return urls[0] if is_length_one else urls
-        except Exception as e:  # pylint: disable=broad-except
-            logger.critical(f"Failed to upload to s3: {e}")
-            raise RuntimeError(f"Failed to upload to s3: {e}") from e
-
-    @staticmethod
-    def run_screenshot_op(func: Callable, *args, **kwargs) -> Any:
-        """Run the screenshot operation."""
-        try:
-            return func(*args, **kwargs)
-        except Exception as e:  # pylint: disable=broad-except
-            logger.warning(f"Failed to create screenshots: {e}")
-            logger.warning(traceback.format_exc())
-            logger.warning("Skipping screenshot upload")
-            return []
-
-    @staticmethod
-    def run_split_resource_op(func: Callable, *args, **kwargs) -> list[Path]:
-        """Run the split resource operation."""
-        try:
-            return func(*args, **kwargs)
-        except Exception as e:
-            logger.critical(traceback.format_exc())
-            raise RuntimeError(f"Failed to split resource: {e}") from e
-
-    @classmethod
-    def upload_document_to_cold_store(
-        cls,
-        bucket_name: str,
-        ingested_doc: IngestedDocument,
-        chunks: list[ClassResourceChunkDocument],
-    ) -> None:
-        """Put the ingested document to s3."""
-        object_prefix = cls._get_object_prefix(ingested_doc)
-        screenshot_urls, split_resource_urls = [], []
-
-        def screenshot_upload_resource() -> Union[list[HttpUrl], HttpUrl]:
-            screenshot_paths = cls._screenshot_resource(
-                ingested_doc.data_pointer,
-                ingested_doc.input_format,
-                first_page_only=False,
-            )
-            screenshot_object_keys = [f"{object_prefix}{i + 1}/{path.name}" for i, path in enumerate(screenshot_paths)]
-            return cls._upload_to_cold_store(screenshot_paths, screenshot_object_keys, bucket_name)
-
-        def split_and_upload_pdf() -> Union[list[HttpUrl], HttpUrl]:
-            split_resource_paths = PDF.split_resource(input_path=ingested_doc.data_pointer)
-            split_objects_keys = [f"{object_prefix}{i +  1}/{path.name}" for i, path in enumerate(split_resource_paths)]
-            return cls._upload_to_cold_store(split_resource_paths, split_objects_keys, bucket_name)
-        # TODO need to screenshot youtube videos, and create snippet urls for youtube videos with timestamps
-        screenshot_urls = cls.run_screenshot_op(screenshot_upload_resource)
-        if isinstance(screenshot_urls, str) and ingested_doc.input_format != InputFomat.HTML:
-            screenshot_urls = [screenshot_urls]
-        if ingested_doc.input_format == InputFomat.PDF:
-            split_resource_urls = cls.run_split_resource_op(split_and_upload_pdf)
-            if isinstance(split_resource_urls, str):
-                split_resource_urls = [split_resource_urls]
-            for chunk in chunks:
-                chunk.raw_chunk_url = split_resource_urls[chunk.metadata.page_number] if split_resource_urls else None
-                chunk.preview_image_url = screenshot_urls[chunk.metadata.page_number] if screenshot_urls else None
-                chunk.metadata.title = f"{chunk.metadata.title} (Page {chunk.metadata.page_number + 1})"
-            return
-        for chunk in chunks:
-            chunk.raw_chunk_url = ingested_doc.full_resource_url
-            chunk.preview_image_url = screenshot_urls if screenshot_urls else None
-
-    @classmethod
-    def _upload_resource_to_cold_store_and_update_ingested_doc(
-        cls,
-        bucket_name: str,
-        input_doc: InputDocument,
-        ingested_doc: IngestedDocument,
-    ) -> None:
-        """Put the ingested document to s3."""
-        object_prefix = cls._get_object_prefix(ingested_doc)
-        is_webpage_html = (
-            ingested_doc.input_format == InputFomat.HTML
-            and input_doc.input_data_ingest_strategy == InputDataIngestStrategy.URL_DOWNLOAD
-        )
-
-        def screenshot_resource() -> None:
-            if is_webpage_html:
-                data_pointer = input_doc.full_resource_url
-            else:
-                data_pointer = ingested_doc.data_pointer
-            screenshot_path = Ingestor._screenshot_resource(data_pointer, ingested_doc.input_format)[0]
-            screenshot_object_key = f"{object_prefix}{screenshot_path.name}"
-            ingested_doc.preview_image_url = cls._upload_to_cold_store([screenshot_path], [screenshot_object_key], bucket_name)
-
-        def upload_raw_resource_to_cold_store() -> None:
-            if not is_webpage_html:
-                ingested_doc.full_resource_url = cls._upload_to_cold_store(
-                    [ingested_doc.data_pointer],
-                    [f"{object_prefix}{ingested_doc.data_pointer.name}"],
-                    bucket_name,
-                )
-
-        cls.run_screenshot_op(screenshot_resource)
-        cls.run_split_resource_op(upload_raw_resource_to_cold_store)
 
     @staticmethod
     def _get_input_format(input_pointer: str) -> InputFomat:
@@ -301,14 +166,8 @@ class S3ObjectIngestor(Ingestor):
     @classmethod
     def ingest_data(cls, input_data: InputDocument, bucket_name: str) -> IngestedDocument:
         """Ingest the data from S3."""
-        # sign if needed to dowload from private bucket
-        doc = cls._download_from_url(input_data)
-        cls._upload_resource_to_cold_store_and_update_ingested_doc(
-            bucket_name=bucket_name,
-            input_doc=input_data,
-            ingested_doc=doc,
-        )
-        return doc
+        # TODO: add s3 signature
+        return cls._download_from_url(input_data)
 
 
 class WebPageIngestor(Ingestor):
@@ -322,11 +181,6 @@ class WebPageIngestor(Ingestor):
     def ingest_data(cls, input_data: InputDocument, bucket_name: str) -> IngestedDocument:
         """Ingest the data from a URL."""
         doc = cls._download_from_url(input_data)
-        cls._upload_resource_to_cold_store_and_update_ingested_doc(
-            bucket_name=bucket_name,
-            input_doc=input_data,
-            ingested_doc=doc,
-        )
         return doc
 
 

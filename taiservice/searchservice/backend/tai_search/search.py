@@ -54,6 +54,7 @@ from ..databases.document_db_schemas import (
     ClassResourceChunkDocument,
     ClassResourceDocument,
 )
+from .resource_utilities import resource_utility_factory, resource_crawler_factory
 
 
 class OpenAIConfig(BaseOpenAIConfig):
@@ -179,17 +180,32 @@ class TAISearch:
         class_resource_document: ClassResourceDocument,
     ) -> None:
         """Index a document."""
+        logger.info(f"Crawling document: {ingested_document.id}")
         try:
-            self._s3_prefix = f"{ingested_document.class_id}/{ingested_document.id}/"
+            crawler = resource_crawler_factory(ingested_document)
+            ingested_documents = crawler.crawl(class_resource_document)
+        except Exception as e:  # pylint: disable=broad-except
+            logger.warning(e)
+            ingested_documents = [ingested_document]
+        logger.info(f"Finished crawling document: {ingested_document.id}. Found {len(ingested_documents)} documents.")
+
+        # TODO: We should not be iterating here, instead crawled docs will have been pushed to a queue that
+        # will be consumed by this service so this service is only processing one page/document at a time.
+        for ingested_document in ingested_documents:
+            utility = resource_utility_factory(self._cold_store_bucket_name, ingested_document)
+            logger.info(f"Creating thumbnail for document: {ingested_document.id}")
+            ingested_document = utility.create_thumbnail()
+            logger.info(f"Finished creating thumbnail for document: {ingested_document.id}")
+            logger.info(f"Uploading resource to cold store: {ingested_document.id}")
+            ingested_document = utility.upload_resource()
+            logger.info(f"Finished uploading resource to cold store: {ingested_document.id}")
+
             logger.info(f"Loading and splitting document: {ingested_document.id}")
             chunk_documents = self._load_and_split_document(ingested_document, ChunkSize.LARGE)
             chunk_documents.extend(self._load_and_split_document(ingested_document, ChunkSize.SMALL))
             logger.info(f"Finished loading and splitting document into {len(chunk_documents)} chunks: {ingested_document.id}")
-            class_resource_document.class_resource_chunk_ids = [chunk_doc.id for chunk_doc in chunk_documents]
-            if ingested_document.input_format == InputFomat.PDF or ingested_document.input_format == InputFomat.HTML:
-                logger.info(f"Uploading {len(chunk_documents)} document to cold store: {ingested_document.id}")
-                self._upload_docs_to_s3(chunk_documents, ingested_document)
-                logger.info(f"Finished uploading {len(chunk_documents)}  chunks to cold store: {ingested_document.id}")
+            class_resource_document.class_resource_chunk_ids.extend([chunk_doc.id for chunk_doc in chunk_documents])
+
             logger.info(f"Embedding {len(chunk_documents)} chunks: {ingested_document.id}")
             partial_func = partial(self.embed_documents, chunk_documents)
             vector_documents = execute_with_resource_check(partial_func)
@@ -200,9 +216,6 @@ class TAISearch:
             logger.info(f"Loading {len(vector_documents)} vectors to vector store: {ingested_document.id}")
             self._load_vectors_to_vector_store(vector_documents)
             logger.info(f"Finished loading {len(vector_documents)} vectors to vector store: {ingested_document.id}")
-        except Exception as e:
-            logger.error(traceback.format_exc())
-            raise RuntimeError("Failed to index resource.") from e
 
     def get_relevant_class_resources(
         self, query: str, class_id: UUID, for_tai_tutor: bool
@@ -264,7 +277,7 @@ class TAISearch:
             alpha = query_filter.alpha
             threshold = (
                 alpha * 0.60 + (1 - alpha) * 4.0
-            )  # this is a linear interpolation between 0.6 and 4.5, 4.5 is arbitrary as the is technically not an upper limit
+            )  # this is a linear interpolation between 0.6 and 4.0, 4.0 is arbitrary as the is technically not an upper limit
             return [doc for doc in similar_docs.documents if doc.score > threshold]
 
         with ThreadPoolExecutor(max_workers=len(pinecone_docs)) as executor:
@@ -360,6 +373,8 @@ class TAISearch:
 
     def _load_and_split_document(self, document: IngestedDocument, chunk_size: ChunkSize) -> list[ClassResourceChunkDocument]:
         """Split and load a document."""
+        # TODO: it's probably a good idea to add this to the resource utilities classes as the chunk urls
+        # may need to be dynamically updated, like in the case of YouTube where we need to add a timestamp
         split_docs: list[Document] = []
         try:
             Loader: BaseLoader = getattr(document_loaders, document.loading_strategy)
@@ -378,9 +393,6 @@ class TAISearch:
             logger.critical(traceback.format_exc())
             raise RuntimeError("Failed to load and split document.") from e
         chunk_documents = []
-        total_page_count = get_total_page_count(split_docs)
-        ingested_doc_metadata: Metadata = document.metadata
-        ingested_doc_metadata.total_page_count = total_page_count
         last_chapter = ""
         chapters = []
         for split_doc in split_docs:
@@ -394,12 +406,11 @@ class TAISearch:
                 chunk=split_doc.page_content,
                 metadata=ChunkMetadata(
                     class_id=document.class_id,
-                    page_number=get_page_number(split_doc),
                     chapters=chapters,
                     sections=self._extract_section_numbers(split_doc),
                     chunk_size=chunk_size,
                     vector_id=uuid4(),
-                    **ingested_doc_metadata.dict(),
+                    **document.metadata.dict(),
                 ),
                 **document.dict(exclude={"id", "metadata"}),
             )

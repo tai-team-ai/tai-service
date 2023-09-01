@@ -1,177 +1,305 @@
 """Define the module with code to screenshot class resources."""
+import copy
 from time import sleep
 import os
+import boto3
 import shutil
+import urllib.parse
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Optional, Union
-from pdf2image import convert_from_path
+from typing import Literal, Optional, Sequence, Union
+from uuid import uuid4
+from pdf2image.pdf2image import convert_from_path
 from PyPDF2 import PdfReader, PdfWriter
 from loguru import logger
+import requests
 from selenium import webdriver
 from pydantic import HttpUrl
 
+from taiservice.searchservice.backend.tai_search.data_ingestor_schema import IngestedDocument, InputFomat
+from .data_ingestor_schema import IngestedDocument, BaseClassResourceDocument
+from ..databases.document_db_schemas import ClassResourceDocument, ClassResourceProcessingStatus
 
-class ResourceUtility(ABC):
+
+def upload_file_to_s3(file_path: Union[str, Path], bucket_name: str, object_key: str) -> str:
+    file_path = Path(file_path)
+    s3 = boto3.resource("s3")
+    bucket = s3.Bucket(bucket_name)
+    bucket.upload_file(str(file_path.resolve()), object_key)
+    safe_object_key = urllib.parse.quote(object_key, safe="~()*!.'")
+    return f"https://{bucket_name}.s3.amazonaws.com/{safe_object_key}"
+
+
+def get_local_tmp_directory(doc: IngestedDocument, format: str) -> Path:
+    """Get the local path to the thumbnail."""
+    assert isinstance(doc.data_pointer, (Path, str)), f"Data pointer must be a path, not {type(doc.data_pointer)}"
+    doc.data_pointer = Path(doc.data_pointer)
+    path = Path("/tmp", str(doc.class_id), doc.hashed_document_contents, format)
+    path.mkdir(parents=True, exist_ok=True)
+    return path
+
+
+def get_s3_object_key(doc: IngestedDocument, local_filename: str) -> str:
+    """Get the s3 object key."""
+    return f"class_id={doc.class_id}/document_hash={doc.hashed_document_contents}/{local_filename}"
+
+
+class DocumentUtility(ABC):
     """Define the interface for screen-shotting class resources."""
-    @classmethod
+
+    def __init__(self, thumbnail_bucket_name: str, ingested_doc: IngestedDocument):
+        """Initialize the class."""
+        self._thumbnail_bucket_name = thumbnail_bucket_name
+        self._ingested_doc = ingested_doc
+
     @abstractmethod
-    def create_screenshots(
-        cls,
-        data_pointer: Union[Path, HttpUrl],
-        start_page: Optional[int] = None,
-        last_page_to_include: Optional[int] = None
-    ) -> Optional[list[Path]]:
-        """Create screenshots for all pages in the resource."""
+    def create_thumbnail(self) -> IngestedDocument:
+        """Create a thumbnail for the document and pass out a copy of the document with the thumbnail."""
 
-    @classmethod
     @abstractmethod
-    def split_resource(cls, input_path: Path, last_page_to_include: Optional[int] = None) -> Optional[list[Path]]:
-        """Split the resource into multiple resources."""
+    def upload_resource(self) -> IngestedDocument:
+        """Upload the resource to the cloud and pass out a copy of the document with the cloud url."""
 
-    @staticmethod
-    def _get_pdf_pages_from_pdf(path: Path, last_page_to_include: Optional[int] = None) -> Optional[list[Path]]:
-        """Get the pages of a PDF."""
-        pages = []
-        input_pdf = PdfReader(open(path, "rb"))
-        num_pages = len(input_pdf.pages)
-        last_page_to_include = min(last_page_to_include, num_pages) if last_page_to_include else num_pages
-        for i in range(last_page_to_include):
-            pdf_writer = PdfWriter()
-            pdf_writer.add_page(input_pdf.pages[i])
-            output_filename = f"{str(path.resolve())}_page_{i}.pdf"
-            with open(output_filename, "wb") as out:
-                pdf_writer.write(out)
-            pages.append(Path(output_filename))
-        if len(pages) > 0:
-            return pages
-        logger.warning(f"Could not get pages from PDF {path}")
 
-    @staticmethod
-    def _get_screenshot_from_pdf(
-        path: Path,
-        start_page: Optional[int] = None,
-        last_page_to_include: Optional[int] = None
-    ) -> Optional[list[Path]]:
-        """Get the screenshot from a PDF."""
-        output_folder = path.parent / f"{path.stem}_images"
-        try:
-            shutil.rmtree(output_folder)
-        except FileNotFoundError:
+class PDFDocumentUtility(DocumentUtility):
+    """Implement the PDF Document Utility."""
+
+    def create_thumbnail(self) -> IngestedDocument:
+        """Create a thumbnail for the document and pass out a copy of the document with the thumbnail."""
+        thumbnail_format = "png"
+        thumbnail_directory = get_local_tmp_directory(self._ingested_doc, thumbnail_format)
+        thumbnail_filename = f"{self._ingested_doc.metadata.title}-thumbnail.{thumbnail_format}"
+        thumbnail_path = thumbnail_directory / thumbnail_filename
+        if thumbnail_path.exists():
             pass
-        os.makedirs(output_folder, exist_ok=True)
-        convert_from_path(
-            path,
-            fmt="png",
-            output_folder=output_folder,
-            first_page=start_page,
-            last_page=last_page_to_include
-        )
-        paths = []
-        for i, file in enumerate(output_folder.iterdir()):
-            new_path = output_folder / f"{path.stem}_{i + 1}.png"
-            os.rename(file, new_path)
-            paths.append(new_path)
-        if len(paths) > 0:
-            return paths
-        logger.warning(f"Could not get screenshot from PDF {path}")
+        else:
+            convert_from_path(
+                self._ingested_doc.data_pointer,
+                fmt=thumbnail_format,
+                output_folder=thumbnail_directory,
+                output_file=thumbnail_path.stem,
+                first_page=0,
+                last_page=1,
+                dpi=84,  # roughly HD resolution
+            )
+            thumbnail_path = list(thumbnail_path.parent.glob(f"{thumbnail_path.stem}*"))[0]
+            new_path = thumbnail_path.parent / thumbnail_filename
+            thumbnail_path.rename(new_path)
+            thumbnail_path = new_path
+        output_doc = copy.deepcopy(self._ingested_doc)
+        s3_key = get_s3_object_key(output_doc, thumbnail_path.name)
+        output_doc.preview_image_url = upload_file_to_s3(thumbnail_path, self._thumbnail_bucket_name, s3_key)
+        return output_doc
 
-class PDF(ResourceUtility):
-    """Define the PDF screenshotter."""
-    @classmethod
-    def create_screenshots(
-        cls,
-        data_pointer: Union[Path, HttpUrl],
-        start_page: Optional[int] = None,
-        last_page_to_include: Optional[int] = None
-    ) -> Optional[list[Path]]:
-        """Create screenshots for all pages in the resource."""
-        assert isinstance(data_pointer, Path), f"Data pointer must be a path, not {type(data_pointer)}"
-        return cls._get_screenshot_from_pdf(data_pointer, start_page, last_page_to_include)
-
-    @classmethod
-    def split_resource(cls, input_path: Path, last_page_to_include: Optional[int] = None) -> Optional[list[Path]]:
-        """Split the resource into multiple resources."""
-        return cls._get_pdf_pages_from_pdf(input_path, last_page_to_include)
+    def upload_resource(self) -> IngestedDocument:
+        """Upload the resource to the cloud and pass out a copy of the document with the cloud url."""
+        s3_key = get_s3_object_key(self._ingested_doc, self._ingested_doc.data_pointer.name)
+        url = upload_file_to_s3(self._ingested_doc.data_pointer, self._thumbnail_bucket_name, s3_key)
+        output_doc = copy.deepcopy(self._ingested_doc)
+        output_doc.full_resource_url = url
+        return output_doc
 
 
-class GenericText(ResourceUtility):
-    @classmethod
-    def create_screenshots(
-        cls,
-        data_pointer: Union[Path, HttpUrl],
-        start_page: Optional[int] = None,
-        last_page_to_include: Optional[int] = None
-    ) -> Optional[list[Path]]:
-        """Create screenshots for all pages in the resource."""
-        raise NotImplementedError(f"Screen-shotting method {cls.__class__.__name__} not implemented.")
+class HTMLDocumentUtility(DocumentUtility):
+    """Implement the HTML Document Utility."""
+
+    def create_thumbnail(self) -> IngestedDocument:
+        """Create a thumbnail for the document and pass out a copy of the document with the thumbnail."""
+        thumbnail_format = "png"
+        thumbnail_directory = get_local_tmp_directory(self._ingested_doc, thumbnail_format)
+        thumbnail_path = thumbnail_directory / f"thumbnail.{thumbnail_format}"
+        doc = self._ingested_doc
+        if thumbnail_path.exists():
+            pass
+        else:
+            options = webdriver.ChromeOptions()
+            options.headless = True
+            options.add_argument("--no-sandbox")
+            options.add_argument("--disable-dev-shm-usage")
+            options.add_argument("--window-size=768,1024")
+            driver = webdriver.Chrome(options=options)
+            if isinstance(doc.data_pointer, Path):
+                doc.data_pointer = f"file://{doc.data_pointer.absolute()}"
+            driver.get(doc.data_pointer)
+            sleep(5)
+            driver.get_screenshot_as_file(thumbnail_path)
+            driver.close()
+        output_doc = copy.deepcopy(doc)
+        s3_key = get_s3_object_key(output_doc, thumbnail_path.name)
+        output_doc.preview_image_url = upload_file_to_s3(thumbnail_path, self._thumbnail_bucket_name, s3_key)
+        return output_doc
+
+    def upload_resource(self) -> IngestedDocument:
+        """Upload the resource to the cloud and pass out a copy of the document with the cloud url."""
+        if isinstance(self._ingested_doc.data_pointer, Path):
+            url = upload_file_to_s3(self._ingested_doc.data_pointer, self._thumbnail_bucket_name, self._ingested_doc.data_pointer.name)
+        elif isinstance(self._ingested_doc.data_pointer, HttpUrl):
+            url = str(self._ingested_doc.data_pointer)
+        else:
+            raise ValueError(f"Data pointer must be a path or url, not {type(self._ingested_doc.data_pointer)}")
+        output_doc = copy.deepcopy(self._ingested_doc)
+        output_doc.full_resource_url = url
+        return output_doc
 
 
-class Latex(ResourceUtility):
-    @classmethod
-    def create_screenshots(
-        cls,
-        data_pointer: Union[Path, HttpUrl],
-        start_page: Optional[int] = None,
-        last_page_to_include: Optional[int] = None
-    ) -> Optional[list[Path]]:
-        """Create screenshots for all pages in the resource."""
-        raise NotImplementedError(f"Screen-shotting method {cls.__class__.__name__} not implemented.")
+class YouTubeVideoDocumentUtility(DocumentUtility):
+    """Implement the YouTube Video Document Utility."""
+
+    def create_thumbnail(self) -> IngestedDocument:
+        video_id = self._ingested_doc.data_pointer
+        # urls ranked by quality ascending
+        urls = [
+            f"https://img.youtube.com/vi/{video_id}/mqdefault.jpg",
+            f"https://img.youtube.com/vi/{video_id}/hqdefault.jpg",
+            f"https://img.youtube.com/vi/{video_id}/sddefault.jpg",
+            f"https://img.youtube.com/vi/{video_id}/maxresdefault.jpg",
+        ]
+        doc = copy.deepcopy(self._ingested_doc)
+        doc.preview_image_url = urls[0]
+        for url in urls:
+            response = requests.get(url, timeout=4)
+            if response.status_code == 200:
+                doc.preview_image_url = url
+                break
+        return doc
+
+    def upload_resource(self) -> IngestedDocument:
+        """Upload the resource to the cloud and pass out a copy of the document with the cloud url."""
+        output_doc = copy.deepcopy(self._ingested_doc)
+        output_doc.full_resource_url = f"https://www.youtube.com/watch?v={output_doc.data_pointer}"
+        return output_doc
 
 
-class Markdown(ResourceUtility):
-    @classmethod
-    def create_screenshots(
-        cls,
-        data_pointer: Union[Path, HttpUrl],
-        start_page: Optional[int] = None,
-        last_page_to_include: Optional[int] = None
-    ) -> Optional[list[Path]]:
-        """Create screenshots for all pages in the resource."""
-        raise NotImplementedError(f"Screen-shotting method {cls.__class__.__name__} not implemented.")
+class GenericTextDocumentUtility(DocumentUtility):
+    """Implement the Generic Text Document Utility."""
+
+    def create_thumbnail(self) -> IngestedDocument:
+        """Create a thumbnail for the document and pass out a copy of the document with the thumbnail."""
+        raise NotImplementedError(f"Screen-shotting method {self.__class__.__name__} not implemented.")
+
+    def upload_resource(self) -> IngestedDocument:
+        """Upload the resource to the cloud and pass out a copy of the document with the cloud url."""
+        raise NotImplementedError(f"Uploading method {self.__class__.__name__} not implemented.")
 
 
-class HTML(ResourceUtility):
-    @classmethod
-    def create_screenshots(
-        cls,
-        data_pointer: Union[Path, HttpUrl],
-        start_page: Optional[int] = None,
-        last_page_to_include: Optional[int] = None
-    ) -> Optional[list[Path]]:
-        """Create screenshots for all pages in the resource."""
-        options = webdriver.ChromeOptions()
-        options.headless = True
-        options.add_argument("--no-sandbox")
-        options.add_argument("--disable-dev-shm-usage")
-        options.add_argument("--window-size=768,1024")
-        driver = webdriver.Chrome(options=options)
-        output_path = data_pointer.parent / f"{data_pointer.stem}.png"
-        if isinstance(data_pointer, Path):
-            data_pointer = f"file://{data_pointer.absolute()}"
-        driver.get(data_pointer)
-        sleep(5)
-        driver.get_screenshot_as_file(output_path)
-        driver.close()
-        return [output_path]
+class LatexDocumentUtility(DocumentUtility):
+    """Implement the Latex Document Utility."""
 
-    @classmethod
-    def split_resource(cls, input_path: Path, last_page_to_include: Optional[int] = None) -> Optional[list[Path]]:
+    def create_thumbnail(self) -> IngestedDocument:
+        """Create a thumbnail for the document and pass out a copy of the document with the thumbnail."""
+        raise NotImplementedError(f"Screen-shotting method {self.__class__.__name__} not implemented.")
+
+    def upload_resource(self) -> IngestedDocument:
+        """Upload the resource to the cloud and pass out a copy of the document with the cloud url."""
+        raise NotImplementedError(f"Uploading method {self.__class__.__name__} not implemented.")
+
+
+class MarkdownDocumentUtility(DocumentUtility):
+    """Implement the Markdown Document Utility."""
+
+    def create_thumbnail(self) -> IngestedDocument:
+        """Create a thumbnail for the document and pass out a copy of the document with the thumbnail."""
+        raise NotImplementedError(f"Screen-shotting method {self.__class__.__name__} not implemented.")
+
+    def upload_resource(self) -> IngestedDocument:
+        """Upload the resource to the cloud and pass out a copy of the document with the cloud url."""
+        raise NotImplementedError(f"Uploading method {self.__class__.__name__} not implemented.")
+
+
+class RawURLDocumentUtility(DocumentUtility):
+    """Implement the Raw URL Document Utility."""
+
+    def create_thumbnail(self) -> IngestedDocument:
+        """Create a thumbnail for the document and pass out a copy of the document with the thumbnail."""
+        raise NotImplementedError(f"Screen-shotting method {self.__class__.__name__} not implemented.")
+
+    def upload_resource(self) -> IngestedDocument:
+        """Upload the resource to the cloud and pass out a copy of the document with the cloud url."""
+        raise NotImplementedError(f"Uploading method {self.__class__.__name__} not implemented.")
+
+
+class ResourceCrawler(ABC):
+    """Define the interface for crawling class resources."""
+
+    def __init__(self, ingested_doc: IngestedDocument):
+        """Initialize the class."""
+        self._ingested_doc = ingested_doc
+        self._class_resource_doc: Optional[ClassResourceDocument] = None
+
+    @abstractmethod
+    def crawl(
+        self, class_resource_doc: ClassResourceDocument
+    ) -> Sequence[IngestedDocument]:  # TODO: change to BaseClassResourceDocument
         """
-        Split the resource into multiple resources.
+        Crawl the resource and return a list of discovered resources.
 
-        This is not implemented for HTML files, as they are not paginated.
+        Any class that implements this method must return a list of documents that are
+        created by crawling the resource. For a PDF, this could mean finding all pages,
+        following links, etc. For a website, this could mean following links, to other pages,
+        getting videos, etc.
+
+        IMPORTANT: After crawling, the class resource document originally passed into the
+        method must be updated with the child resource IDs that were discovered so that
+        there is a reference to the child resources.
         """
-        return [input_path]
 
 
-class RawURL(ResourceUtility):
-    @classmethod
-    def create_screenshots(
-        cls,
-        input_path: Path,
-        start_page: Optional[int] = None,
-        last_page_to_include: Optional[int] = None
-    ) -> Optional[list[Path]]:
-        """Create screenshots for all pages in the resource."""
-        raise NotImplementedError(f"Screen-shotting method {cls.__class__.__name__} not implemented.")
+class PDFResourceCrawler(ResourceCrawler):
+    """Implement the PDF resource crawler."""
+
+    def crawl(
+        self, class_resource_doc: ClassResourceDocument
+    ) -> Sequence[IngestedDocument]:  # TODO: change to BaseClassResourceDocument
+        """
+        Crawl the resource and return a list of discovered resources.
+
+        For right now for pdfs, crawling just means to split the pdf into multiple pdfs of 1 page each.
+        by page.
+        """
+        doc = self._ingested_doc
+        assert isinstance(doc.data_pointer, (str, Path)), f"Data pointer must be a path, not {type(doc.data_pointer)}"
+        doc.data_pointer = Path(doc.data_pointer)
+        input_pdf = PdfReader(open(doc.data_pointer, "rb"))
+        tmp_directory = get_local_tmp_directory(doc, "pdf")
+
+        output_docs: list[IngestedDocument] = []
+        for i, page in enumerate(input_pdf.pages):
+            pdf_writer = PdfWriter()
+            pdf_writer.add_page(page)
+            page_num = i + 1
+            output_filepath = tmp_directory / f"{doc.data_pointer.stem}_page_{page_num}.pdf"
+            with open(output_filepath, "wb") as out:
+                pdf_writer.write(out)
+            # TODO: we need to create a new Instance of a base class resource doc and then push to a queue
+            output_doc = copy.deepcopy(doc)
+            output_doc.id = uuid4()
+            output_doc.data_pointer = output_filepath
+            output_doc.metadata.page_number = page_num
+            output_doc.metadata.total_page_count = len(input_pdf.pages)
+            class_resource_doc.child_resource_ids.append(output_doc.id)
+            output_docs.append(output_doc)
+        return output_docs
+
+
+def resource_utility_factory(bucket_name: str, ingested_doc: IngestedDocument) -> DocumentUtility:
+    """Create the thumbnail generator."""
+    resource_utility_factory_mapping = {
+        InputFomat.PDF: PDFDocumentUtility,
+        InputFomat.HTML: HTMLDocumentUtility,
+        InputFomat.YOUTUBE_VIDEO: YouTubeVideoDocumentUtility,
+    }
+    utility = resource_utility_factory_mapping.get(ingested_doc.input_format)
+    if utility is None:
+        raise NotImplementedError(f"Could not find thumbnail generator for input format '{ingested_doc.input_format}'.")
+    return utility(bucket_name, ingested_doc)
+
+
+def resource_crawler_factory(ingested_doc: IngestedDocument) -> ResourceCrawler:
+    """Create the resource crawler."""
+    resource_crawler_factory_mapping = {
+        InputFomat.PDF: PDFResourceCrawler,
+    }
+    resource_crawler = resource_crawler_factory_mapping.get(ingested_doc.input_format)
+    if resource_crawler is None:
+        raise NotImplementedError(f"Could not find resource crawler for input format '{ingested_doc.input_format}'.")
+    return resource_crawler(ingested_doc)

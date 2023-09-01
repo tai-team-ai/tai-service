@@ -1,11 +1,12 @@
 """Define shared schemas for database models."""
 from datetime import datetime, timedelta
+from hashlib import sha1
 from uuid import UUID
 from uuid import uuid4
 from enum import Enum
-from typing import Any, Optional
+from typing import Any, Optional, Union
 from pathlib import Path
-from pydantic import BaseModel, Field, Extra, HttpUrl, constr
+from pydantic import BaseModel, Field, Extra, HttpUrl, root_validator
 
 
 HASH_FIELD_OBJECT = Field(
@@ -75,6 +76,7 @@ class BasePydanticModel(BaseModel):
 
         use_enum_values = True
         allow_population_by_field_name = True
+        validate_assignment = True
 
 
 class DateRange(BasePydanticModel):
@@ -116,8 +118,12 @@ class Metadata(BasePydanticModel):
         ...,
         description="The type of the class resource.",
     )
-    total_page_count: Optional[int] = Field(
-        default=None,
+    page_number: int = Field(
+        default=1,
+        description="The page number of the class resource.",
+    )
+    total_page_count: int = Field(
+        default=1,
         description="The page count of the class resource.",
     )
 
@@ -139,10 +145,6 @@ class ChunkMetadata(Metadata):
     class_id: UUID = Field(
         ...,
         description="The ID of the class that the resource belongs to.",
-    )
-    page_number: Optional[int] = Field(
-        default=None,
-        description="The page number of the class resource.",
     )
     vector_id: UUID = Field(
         default_factory=uuid4,
@@ -185,7 +187,7 @@ class BaseClassResourceDocument(BasePydanticModel):
         ...,
         description="The URL of the class resource.",
     )
-    preview_image_url: Optional[HttpUrl] = Field(
+    preview_image_url: HttpUrl = Field(
         ...,
         description="The URL of the image preview of the class resource.",
     )
@@ -219,19 +221,45 @@ class BaseClassResourceDocument(BasePydanticModel):
 
 class StatefulClassResourceDocument(BaseClassResourceDocument):
     """Define the stateful class resource document."""
-    hashed_document_contents: constr(min_length=40, max_length=40) = Field(
+    hashed_document_contents: str = Field(
         ...,
+        min_length=40,
+        max_length=40,
         description=("This field serves as a version/revision number for the document. "
             "It is used to determine if the document has changed since the last time "
             "it was processed. The value of this field is the SHA1 hash of the document "
             "contents."
         )
     )
+    data_pointer: Union[HttpUrl, str, Path] = Field(
+        ...,
+        description=(
+            "This field should 'point' to the data. This will mean different things "
+            "depending on the input format and loading strategy. For example, if the input format "
+            "is PDF and the loading strategy is PyMuPDF, then this field will be a path object, as another "
+            "example, if the loading strategy is copy and paste, then this field will be a string."
+        ),
+    )
     status: ClassResourceProcessingStatus = Field(
         default=ClassResourceProcessingStatus.PENDING,
         description="The status of the class resource.",
     )
 
+    @root_validator(pre=True)
+    def generate_hashed_content_id(cls, values: dict) -> dict:
+        """Generate the hashed content id."""
+        data_pointer = values.get("data_pointer")
+        if isinstance(data_pointer, Path):
+            hashed_document_contents = sha1(data_pointer.read_bytes()).hexdigest()
+        elif isinstance(data_pointer, HttpUrl):
+            url = data_pointer.split("?")[0]
+            hashed_document_contents = sha1(url.encode()).hexdigest()
+        elif isinstance(data_pointer, str):
+            hashed_document_contents = sha1(data_pointer.encode()).hexdigest()
+        else:
+            raise ValueError("The data pointer must be a path, string, or url.")
+        values["hashed_document_contents"] = hashed_document_contents
+        return values
 
 class BaseOpenAIConfig(BaseModel):
     """Define the base OpenAI config."""
