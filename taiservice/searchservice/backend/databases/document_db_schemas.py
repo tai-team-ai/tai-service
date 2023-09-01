@@ -76,8 +76,8 @@ class ClassResourceChunkDocument(BaseClassResourceDocument):
         ...,
         description="The text chunk of the class resource.",
     )
-    raw_chunk_url: Optional[HttpUrl] = Field(
-        default=None,
+    raw_chunk_url: HttpUrl = Field(
+        ...,
         description="The URL of the raw chunk.",
     )
     metadata: ChunkMetadata = Field(

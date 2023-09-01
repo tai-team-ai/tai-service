@@ -167,9 +167,10 @@ class DocumentDB:
     def upsert_document(self, document: BaseClassResourceDocument) -> None:
         """Upsert the chunks of the class resource."""
         collection = self._document_type_to_collection[document.__class__.__name__]
+        doc_dict = document.dict(serialize_dates=False, exclude={"id"})
         collection.update_one(
             {"_id": document.id_as_str},
-            {"$set": document.dict(serialize_dates=False, exclude={"id"})},
+            {"$set": doc_dict},
             upsert=True,
         )
 

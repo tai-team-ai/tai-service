@@ -191,6 +191,7 @@ class TAISearch:
 
         # TODO: We should not be iterating here, instead crawled docs will have been pushed to a queue that
         # will be consumed by this service so this service is only processing one page/document at a time.
+        original_class_resource_document = class_resource_document
         for ingested_document in ingested_documents:
             utility = resource_utility_factory(self._cold_store_bucket_name, ingested_document)
             logger.info(f"Creating thumbnail for document: {ingested_document.id}")
@@ -199,11 +200,13 @@ class TAISearch:
             logger.info(f"Uploading resource to cold store: {ingested_document.id}")
             ingested_document = utility.upload_resource()
             logger.info(f"Finished uploading resource to cold store: {ingested_document.id}")
+            class_resource_document = ClassResourceDocument.from_ingested_doc(ingested_document)
 
             logger.info(f"Loading and splitting document: {ingested_document.id}")
             chunk_documents = self._load_and_split_document(ingested_document, ChunkSize.LARGE)
             chunk_documents.extend(self._load_and_split_document(ingested_document, ChunkSize.SMALL))
             logger.info(f"Finished loading and splitting document into {len(chunk_documents)} chunks: {ingested_document.id}")
+            original_class_resource_document.class_resource_chunk_ids.extend([chunk_doc.id for chunk_doc in chunk_documents])
             class_resource_document.class_resource_chunk_ids.extend([chunk_doc.id for chunk_doc in chunk_documents])
 
             logger.info(f"Embedding {len(chunk_documents)} chunks: {ingested_document.id}")
@@ -243,6 +246,7 @@ class TAISearch:
             full_resource_url="https://www.google.com",  # this is a dummy link as it's not needed for the query
             id=uuid4(),
             preview_image_url="https://www.google.com",  # this is a dummy link as it's not needed for the query
+            raw_chunk_url="https://www.google.com",  # this is a dummy link as it's not needed for the query
             metadata=ChunkMetadata(
                 class_id=class_id,
                 title="User Query",
@@ -289,15 +293,6 @@ class TAISearch:
         chunk_docs = [doc for doc in chunk_docs if isinstance(doc, ClassResourceChunkDocument)]
         chunk_docs = self._sort_chunk_docs_by_pinecone_scores(relevant_documents, chunk_docs)
         return self._group_by_chunk_size(chunk_docs)
-
-    def _upload_docs_to_s3(self, chunk_documents: list[ClassResourceChunkDocument], ingested_document: IngestedDocument) -> None:
-        partial_func = partial(
-            Ingestor.upload_document_to_cold_store,
-            bucket_name=self._cold_store_bucket_name,
-            ingested_doc=ingested_document,
-            chunks=chunk_documents,
-        )
-        execute_with_resource_check(partial_func)
 
     def _group_by_chunk_size(
         self, chunk_documents: list[ClassResourceChunkDocument]
@@ -347,6 +342,7 @@ class TAISearch:
             logger.critical(traceback.format_exc())
             raise RuntimeError("Failed to load vectors to vector store.") from e
 
+    # TODO: Figure out why i have this mapping here
     def _load_class_resources_to_db(
         self,
         document: ClassResourceDocument,
@@ -404,6 +400,7 @@ class TAISearch:
             chunk_doc = ClassResourceChunkDocument(
                 id=uuid4(),
                 chunk=split_doc.page_content,
+                raw_chunk_url=document.full_resource_url,
                 metadata=ChunkMetadata(
                     class_id=document.class_id,
                     chapters=chapters,
