@@ -201,6 +201,7 @@ class TAISearch:
             ingested_document = utility.upload_resource()
             logger.info(f"Finished uploading resource to cold store: {ingested_document.id}")
             class_resource_document = ClassResourceDocument.from_ingested_doc(ingested_document)
+            class_resource_document.parent_resource_ids.append(original_class_resource_document.id)
 
             logger.info(f"Loading and splitting document: {ingested_document.id}")
             chunk_documents = self._load_and_split_document(ingested_document, ChunkSize.LARGE)

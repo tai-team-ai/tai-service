@@ -108,8 +108,16 @@ class DocumentDB:
         class_name = DocClass.__name__
         collection = self._document_type_to_collection[class_name]
         ids = [str(id) for id in ids]
-        field_name = "class_id" if from_class_ids else "_id"
-        documents = list(collection.find({field_name: {"$in": ids}}))
+        db_filter: dict[str, Any]
+        if from_class_ids:
+            db_filter = {"class_id": {"$in": ids}}
+        else:
+            db_filter = {"_id": {"$in": ids}}
+        if class_name == ClassResourceDocument.__name__:
+            # this check ensures we find the root doc for the class resource and not a child doc.
+            # Example: PDF vs pages in a PDF
+            db_filter.update({"parent_resource_ids": []})
+        documents = list(collection.find(db_filter))
         documents = [DocClass.parse_obj(document) for document in documents]
         if count_towards_metrics:
             try:
