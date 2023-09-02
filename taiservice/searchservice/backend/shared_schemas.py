@@ -187,8 +187,8 @@ class BaseClassResourceDocument(BasePydanticModel):
         ...,
         description="The URL of the class resource.",
     )
-    preview_image_url: HttpUrl = Field(
-        ...,
+    preview_image_url: Optional[HttpUrl] = Field(
+        default=None,
         description="The URL of the image preview of the class resource.",
     )
     metadata: Metadata = Field(

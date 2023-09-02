@@ -281,10 +281,9 @@ class TaiSearchServiceStack(Stack):
             BlockDevice(
                 device_name="/dev/xvda",
                 volume=BlockDeviceVolume.ebs(
-                    volume_type=EbsDeviceVolumeType.IO1,
+                    volume_type=EbsDeviceVolumeType.GP3,
                     delete_on_termination=True,
                     volume_size=200,
-                    iops=10000,  # must be 50x the volume size or less
                 ),
             ),
         ]
