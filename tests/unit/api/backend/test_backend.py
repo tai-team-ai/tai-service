@@ -70,7 +70,6 @@ def test_ClassResourceChunkDocument_to_ClassResourceSnippet():
     base_dict = get_valid_API_BaseClassResourceDocument_dict()
     base_dict["chunk"] = "dummy chunk"
     base_dict["metadata"]["class_id"] = base_dict["class_id"]
-    base_dict["raw_chunk_url"] = "https://example.com"
     class_resource_chunk_doc = ClassResourceChunkDocument(**base_dict)
     api_schema = Backend.to_api_resources([class_resource_chunk_doc])
     assert len(api_schema) == 1

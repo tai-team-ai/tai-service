@@ -15,7 +15,7 @@ from .document_db_schemas import (
 from ..shared_schemas import UsageMetric
 
 
-METRICS_FIELD_NAME = "usage_log"
+USAGE_LOG_FIELD_NAME = "usage_log"
 
 
 class DocumentDBConfig(BaseModel):
@@ -182,12 +182,12 @@ class DocumentDB:
         else:
             raise ValueError(f"Invalid document type: {DocClass}")
 
-    def upsert_metric(self, doc: BaseClassResourceDocument, metric: UsageMetric) -> None:
+    def upsert_metric(self, doc_id: UUID, metric: UsageMetric, DocClass: Union[Type[ClassResourceDocument], Type[ClassResourceChunkDocument]]) -> None:
         """Upsert the metrics of the class resource."""
-        collection = self._get_collection(doc.__class__)
+        collection = self._get_collection(DocClass)
         collection.find_one_and_update(
-            {"_id": doc.id_as_str},
-            {"$push": {METRICS_FIELD_NAME: metric.dict(serialize_dates=False)}},
+            {"_id": str(doc_id)},
+            {"$push": {USAGE_LOG_FIELD_NAME: metric.dict(serialize_dates=False)}},
         )
 
     def _execute_operation(

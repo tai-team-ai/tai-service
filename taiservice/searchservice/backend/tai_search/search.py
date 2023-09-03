@@ -180,27 +180,21 @@ class TAISearch:
     ) -> ClassResourceDocument:
         """Index a document."""
         logger.info(f"Crawling document: {ingested_document.id}")
-        parent_class_resource = self._save_document_to_cold_store(ingested_document)
-        try:
-            crawler = resource_crawler_factory(ingested_document)
-            ingested_documents = crawler.crawl(parent_class_resource)
-        except NotImplementedError as e:
-            logger.warning(e)
-            ingested_documents = [ingested_document]
-            parent_class_resource.child_resource_ids.append(ingested_document.id)
+        ingested_document, parent_class_resource = self._save_document_to_cold_store(ingested_document)
+        crawler = resource_crawler_factory(ingested_document)
+        ingested_documents = crawler.crawl(parent_class_resource)
         logger.info(f"Finished crawling document: {ingested_document.id}. Found {len(ingested_documents)} documents.")
 
         # TODO: We should not be iterating here, instead crawled docs will have been pushed to a queue that
         # will be consumed by this service so this service is only processing one page/document at a time.
         for ingested_document in ingested_documents:
-            class_resource_document = self._save_document_to_cold_store(ingested_document)
+            ingested_document, class_resource_document = self._save_document_to_cold_store(ingested_document)
             class_resource_document.parent_resource_ids.append(parent_class_resource.id)
 
             logger.info(f"Loading and splitting document: {ingested_document.id}")
             chunk_documents = self._load_and_split_document(ingested_document, ChunkSize.LARGE)
             chunk_documents.extend(self._load_and_split_document(ingested_document, ChunkSize.SMALL))
             logger.info(f"Finished loading and splitting document into {len(chunk_documents)} chunks: {ingested_document.id}")
-            parent_class_resource.class_resource_chunk_ids.extend([chunk_doc.id for chunk_doc in chunk_documents])
             class_resource_document.class_resource_chunk_ids.extend([chunk_doc.id for chunk_doc in chunk_documents])
 
             logger.info(f"Embedding {len(chunk_documents)} chunks: {ingested_document.id}")
@@ -217,7 +211,7 @@ class TAISearch:
 
     def get_relevant_class_resources(
         self, query: str, class_id: UUID, for_tai_tutor: bool
-    ) -> dict[ChunkSize, list[ClassResourceChunkDocument]]:
+    ) -> list[ClassResourceChunkDocument]:
         """
         Get the most relevant class resources.
 
@@ -241,7 +235,6 @@ class TAISearch:
             full_resource_url="https://www.google.com",  # this is a dummy link as it's not needed for the query
             id=uuid4(),
             preview_image_url="https://www.google.com",  # this is a dummy link as it's not needed for the query
-            raw_chunk_url="https://www.google.com",  # this is a dummy link as it's not needed for the query
             metadata=ChunkMetadata(
                 class_id=class_id,
                 title="User Query",
@@ -284,16 +277,19 @@ class TAISearch:
         relevant_documents = list(itertools.chain(*results))
         uuids = [doc.metadata.chunk_id for doc in relevant_documents]
         chunk_docs = self._document_db.get_class_resources(uuids, ClassResourceChunkDocument)
-        logger.info(f"Got similar docs: {chunk_docs}")
+        logger.info(f"Got similar docs: {[(doc.metadata.title, doc.full_resource_url) for doc in chunk_docs]}")
         chunk_docs = [doc for doc in chunk_docs if isinstance(doc, ClassResourceChunkDocument)]
         chunk_docs = self._sort_chunk_docs_by_pinecone_scores(relevant_documents, chunk_docs)
-        return self._group_by_chunk_size(chunk_docs)
+        return chunk_docs
 
-    def _save_document_to_cold_store(self, ingested_document: IngestedDocument) -> ClassResourceDocument:
+    def _save_document_to_cold_store(self, ingested_document: IngestedDocument) -> tuple[IngestedDocument, ClassResourceDocument]:
         utility = resource_utility_factory(self._cold_store_bucket_name, ingested_document)
         logger.info(f"Creating thumbnail for document: {ingested_document.id}")
-        utility.create_thumbnail()
-        logger.info(f"Finished creating thumbnail for document: {ingested_document.id}")
+        try:
+            utility.create_thumbnail()
+            logger.info(f"Finished creating thumbnail for document: {ingested_document.id}")
+        except Exception as e:
+            logger.warning(f"Failed to create thumbnail for document: {ingested_document.id}")
         logger.info(f"Uploading resource to cold store: {ingested_document.id}")
         # TODO: this could result in storage leaks in S3 if the upload suceeds but we don't 
         # save the document to the db. For now, because of how cheap S3 is, we'll just ignore
@@ -302,20 +298,7 @@ class TAISearch:
         logger.info(f"Finished uploading resource to cold store: {ingested_document.id}")
         class_resource_document = ClassResourceDocument.from_ingested_doc(utility.ingested_doc)
         self._document_db.upsert_document(class_resource_document)
-        return class_resource_document
-
-
-    def _group_by_chunk_size(
-        self, chunk_documents: list[ClassResourceChunkDocument]
-    ) -> dict[ChunkSize, list[ClassResourceChunkDocument]]:
-        """Group chunk documents by chunk size."""
-        chunk_size_mapping = {
-            ChunkSize.SMALL: [],
-            ChunkSize.LARGE: [],
-        }
-        for chunk_doc in chunk_documents:
-            chunk_size_mapping[chunk_doc.metadata.chunk_size].append(chunk_doc)
-        return chunk_size_mapping
+        return utility.ingested_doc, class_resource_document
 
     def _sort_chunk_docs_by_pinecone_scores(
         self,
@@ -411,7 +394,7 @@ class TAISearch:
             chunk_doc = ClassResourceChunkDocument(
                 id=uuid4(),
                 chunk=split_doc.page_content,
-                raw_chunk_url=document.full_resource_url,
+                resource_id=document.id,
                 metadata=ChunkMetadata(
                     class_id=document.class_id,
                     chapters=chapters,

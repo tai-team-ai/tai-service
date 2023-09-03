@@ -230,6 +230,12 @@ class ResourceCrawler(ABC):
         self._ingested_doc = copy.deepcopy(ingested_doc)
         self._class_resource_doc: Optional[ClassResourceDocument] = None
 
+    def _get_base_ingested_doc(self) -> IngestedDocument:
+        """Get the base ingested doc."""
+        output_doc = copy.deepcopy(self._ingested_doc)
+        output_doc.id = uuid4()
+        return output_doc
+
     @abstractmethod
     def crawl(
         self, class_resource_doc: ClassResourceDocument
@@ -246,6 +252,23 @@ class ResourceCrawler(ABC):
         method must be updated with the child resource IDs that were discovered so that
         there is a reference to the child resources.
         """
+
+
+class DefaultCrawler(ResourceCrawler):
+    """Implement the default crawler."""
+
+    def crawl(
+        self, class_resource_doc: ClassResourceDocument
+    ) -> Sequence[IngestedDocument]:  # TODO: change to BaseClassResourceDocument
+        """
+        Crawl the resource and return a list of discovered resources.
+
+        This generic default crawler will create one parent doc and one child (which in this
+        case will be the same as the parent doc)
+        """
+        output_doc = self._get_base_ingested_doc()
+        class_resource_doc.child_resource_ids.append(output_doc.id)
+        return [output_doc]
 
 
 class PDFResourceCrawler(ResourceCrawler):
@@ -267,16 +290,14 @@ class PDFResourceCrawler(ResourceCrawler):
         tmp_directory = get_local_tmp_directory(doc, "pdf")
 
         output_docs: list[IngestedDocument] = []
-        for i, page in enumerate(input_pdf.pages):
+        for page_num, page in enumerate(input_pdf.pages, 1):
             pdf_writer = PdfWriter()
             pdf_writer.add_page(page)
-            page_num = i + 1
             output_filepath = tmp_directory / f"{doc.data_pointer.stem}_page_{page_num}.pdf"
             with open(output_filepath, "wb") as out:
                 pdf_writer.write(out)
             # TODO: we need to create a new Instance of a base class resource doc and then push to a queue
-            output_doc = copy.deepcopy(doc)
-            output_doc.id = uuid4()
+            output_doc = self._get_base_ingested_doc()
             output_doc.data_pointer = output_filepath
             output_doc.metadata.page_number = page_num
             output_doc.metadata.total_page_count = len(input_pdf.pages)
@@ -303,7 +324,5 @@ def resource_crawler_factory(ingested_doc: IngestedDocument) -> ResourceCrawler:
     resource_crawler_factory_mapping = {
         InputFomat.PDF: PDFResourceCrawler,
     }
-    resource_crawler = resource_crawler_factory_mapping.get(ingested_doc.input_format)
-    if resource_crawler is None:
-        raise NotImplementedError(f"Could not find resource crawler for input format '{ingested_doc.input_format}'.")
+    resource_crawler = resource_crawler_factory_mapping.get(ingested_doc.input_format, DefaultCrawler)
     return resource_crawler(ingested_doc)

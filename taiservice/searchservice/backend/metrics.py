@@ -1,5 +1,5 @@
 """Define metrics utilities and classes for retrieving and aggregating metrics for the TAIService API."""
-from typing import Optional
+from typing import Optional, Union, Type
 from datetime import datetime
 from uuid import UUID
 from pydantic import Field, conint
@@ -7,7 +7,7 @@ from pydantic import Field, conint
 from ...api.taibackend.shared_schemas import BasePydanticModel, DateRange
 from .shared_schemas import UsageMetric
 from .databases.document_db_schemas import ClassResourceChunkDocument, ClassResourceDocument
-from .databases.document_db import DocumentDB
+from .databases.document_db import DocumentDB, USAGE_LOG_FIELD_NAME
 
 
 class MetricsConfig(BasePydanticModel):
@@ -36,19 +36,21 @@ class BaseFrequentlyAccessedObjects(BasePydanticModel):
 
 class BaseFrequentlyAccessedObject(BasePydanticModel):
     """Define a base schema for ranked common resources."""
-    rank: conint(ge=1) = Field(
+    rank: int = Field(
         ...,
+        ge=1,
         description="The rank of the object when ranked by appearances during the date range.",
     )
-    appearances_during_period: conint(ge=1) = Field(
+    appearances_during_period: int = Field(
         ...,
+        ge=1,
         description="The number of times the object appeared during the date range.",
     )
 
 
 class FrequentlyAccessedResource(BaseFrequentlyAccessedObject):
     """Define a schema for a common resource."""
-    resource: ClassResourceChunkDocument = Field(
+    resource: ClassResourceDocument = Field(
         ...,
         description="The resource that was most common during the date range.",
     )
@@ -68,14 +70,18 @@ class Metrics:
         """Initialize the metrics class."""
         self._doc_db = config.document_db_instance
 
-    def upsert_metrics_for_docs(self, docs: list[ClassResourceChunkDocument | ClassResourceDocument]) -> None:
+    def upsert_metrics_for_docs(self, ids: list[UUID],  DocClass: Union[Type[ClassResourceChunkDocument], Type[ClassResourceDocument]]) -> None:
         """Upsert the metrics of the class resource."""
-        for doc in docs:
+        for doc_id in ids:
             metric = UsageMetric(timestamp=datetime.utcnow())
-            self._doc_db.upsert_metric(doc, metric)
-            doc.usage_log.append(metric) # updates the document in memory
+            self._doc_db.upsert_metric(doc_id, metric, DocClass)
 
-    def get_most_frequently_accessed_resources(self, class_id: UUID, date_range: Optional[DateRange] = None) -> FrequentlyAccessedResources:
+    def get_most_frequently_accessed_resources(
+        self,
+        class_id: UUID,
+        date_range: Optional[DateRange] = None,
+        top_level_doc: bool = False,
+    ) -> FrequentlyAccessedResources:
         """Get the most frequently accessed resources."""
         if date_range is None:
             date_range = DateRange()
@@ -86,11 +92,19 @@ class Metrics:
                 }
             },
             {
-                '$unwind': '$usage_log'
+                '$match': {
+                    '$and': [
+                        { 'child_resource_ids' if top_level_doc else 'parent_resource_ids': { '$exists': True } },
+                        { 'child_resource_ids' if top_level_doc else 'parent_resource_ids': { '$ne': [] } },
+                    ]
+                },
+            },
+            {
+                '$unwind': f'${USAGE_LOG_FIELD_NAME}'
             },
             {
                 '$match': {
-                    'usage_log.timestamp': {'$gte': date_range.start_date, '$lte': date_range.end_date} ,
+                    f'{USAGE_LOG_FIELD_NAME}.timestamp': {'$gte': date_range.start_date, '$lte': date_range.end_date} ,
                 },
             },
             {
@@ -103,11 +117,11 @@ class Metrics:
                 '$sort': {'resource_count': -1}
             }
         ]
-        resources_usage = list(self._doc_db.run_aggregate_query(pipeline_usage, ClassResourceChunkDocument))
+        resources_usage = list(self._doc_db.run_aggregate_query(pipeline_usage, ClassResourceDocument))
         ids = [resource_usage['_id'] for resource_usage in resources_usage] 
         frequently_accessed_resources: list[FrequentlyAccessedResource] = []
         for rank, doc_id in enumerate(ids, 1):
-            document = self._doc_db.find_one(doc_id, ClassResourceChunkDocument)
+            document = self._doc_db.find_one(doc_id, ClassResourceDocument)
             frequently_accessed_resources.append(FrequentlyAccessedResource(
                 rank=rank,
                 appearances_during_period=resources_usage[rank - 1]['resource_count'],

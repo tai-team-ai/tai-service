@@ -46,7 +46,7 @@ from .shared_schemas import (
     Metadata as DBResourceMetadata,
     ClassResourceProcessingStatus,
     ChunkSize,
-) 
+)
 from .tai_search import search as tai_search
 
 
@@ -99,7 +99,7 @@ class Backend:
         """Log the system health."""
         cpu_load = psutil.cpu_percent(interval=1)
         svmem = psutil.virtual_memory()
-        mem_available_GB = svmem.available / 1024 ** 3
+        mem_available_GB = svmem.available / 1024**3
         memory_usage = svmem.percent
         logger.debug(f"Memory usage: {memory_usage}%, CPU usage: {cpu_load}%, Available memory: {mem_available_GB}GB")
 
@@ -127,7 +127,7 @@ class Backend:
                     description=metadata.description,
                     tags=metadata.tags,
                     resource_type=metadata.resource_type,
-                )
+                ),
             )
             input_documents.append(input_doc)
         return input_documents
@@ -159,7 +159,9 @@ class Backend:
             if isinstance(doc, ClassResourceDocument):
                 output_doc = ClassResource(status=doc.status, **base_doc)
             elif isinstance(doc, ClassResourceChunkDocument):
-                output_doc = APIClassResourceSnippet(resource_snippet=doc.chunk, raw_snippet_url=doc.raw_chunk_url, **base_doc)
+                output_doc = APIClassResourceSnippet(
+                    resource_snippet=doc.chunk, raw_snippet_url=doc.full_resource_url, **base_doc
+                )
             else:
                 raise RuntimeError(f"Unknown document type: {doc}")
             output_documents.append(output_doc)
@@ -190,11 +192,7 @@ class Backend:
                     class_id=doc.class_id,
                     **base_doc.metadata.dict(),
                 )
-                output_doc = ClassResourceChunkDocument(
-                    chunk=doc.resource_snippet,
-                    raw_chunk_url=doc.raw_snippet_url,
-                    **base_doc.dict()
-                )
+                output_doc = ClassResourceChunkDocument(chunk=doc.resource_snippet, **base_doc.dict())
             else:
                 raise RuntimeError(f"Unknown document type: {doc}")
             output_documents.append(output_doc)
@@ -206,26 +204,32 @@ class Backend:
             raise ServerOverloadedError("Server is overloaded, please try again later.")
         input_doc = self.to_backend_input_docs(class_resource)[0]
         ingested_doc = self._tai_search.ingest_document(input_doc)
-        if self._is_stuck_processing_or_failed(ingested_doc.id): # if it's stuck, we should continue as the operations are idempotent
+        if self._is_stuck_processing_or_failed(
+            ingested_doc.id
+        ):  # if it's stuck, we should continue as the operations are idempotent
             pass
         elif self._is_duplicate_class_resource(ingested_doc):
             raise DuplicateClassResourceError(f"Duplicate class resource: {ingested_doc.id} in class {ingested_doc.class_id}")
         self._coerce_and_update_status(ingested_doc, ClassResourceProcessingStatus.PENDING)
+
         def index_resource() -> None:
             try:
                 self._coerce_and_update_status(ingested_doc, ClassResourceProcessingStatus.PROCESSING)
                 db_class_resource = self._tai_search.index_resource(ingested_doc)
                 self._coerce_and_update_status(db_class_resource, ClassResourceProcessingStatus.COMPLETED)
                 logger.info(f"Completed indexing class resource: {db_class_resource.id}")
-            except Exception: # pylint: disable=broad-except
+            except Exception:  # pylint: disable=broad-except
                 self._coerce_and_update_status(ingested_doc, ClassResourceProcessingStatus.FAILED)
                 logger.critical(f"Failed to create class resources")
                 logger.critical(traceback.format_exc())
+
         return index_resource
 
-    def get_class_resources(self, ids: list[UUID], from_class_ids: bool=False) -> list[ClassResource]:
+    def get_class_resources(self, ids: list[UUID], from_class_ids: bool = False) -> list[ClassResource]:
         """Get the class resources."""
-        docs: list[ClassResourceDocument] = self._doc_db.get_class_resources(ids, ClassResourceDocument, from_class_ids=from_class_ids)
+        docs: list[ClassResourceDocument] = self._doc_db.get_class_resources(
+            ids, ClassResourceDocument, from_class_ids=from_class_ids
+        )
         for doc in docs:
             if self._is_stuck_processing_or_failed(doc.id):
                 self._coerce_and_update_status(doc, ClassResourceProcessingStatus.FAILED)
@@ -270,29 +274,73 @@ class Backend:
             )
         resources = APIFrequentlyAccessedResources(
             class_id=frequent_resources.class_id,
-            date_range=APIDateRange(start_date=frequent_resources.date_range.start_date, end_date=frequent_resources.date_range.end_date),
+            date_range=APIDateRange(
+                start_date=frequent_resources.date_range.start_date, end_date=frequent_resources.date_range.end_date
+            ),
             resources=[resource.dict() for resource in ranked_resources],
         )
         return resources
 
-    def search(self, search_query: ResourceSearchQuery, for_tai_tutor: bool) -> SearchEngineResponse:
+    def search(self, search_query: ResourceSearchQuery, for_tai_tutor: bool) -> tuple[SearchEngineResponse, Optional[Callable]]:
         """Search for class resources."""
-        docs = self._tai_search.get_relevant_class_resources(search_query.query, search_query.class_id, for_tai_tutor)
-        short_docs = docs.get(ChunkSize.SMALL, [])
-        long_docs = docs.get(ChunkSize.LARGE, [])
-        # TODO:  update the parent metric as well as one impression
-        self._metrics.upsert_metrics_for_docs(short_docs + long_docs)
+        chunk_docs = self._tai_search.get_relevant_class_resources(search_query.query, search_query.class_id, for_tai_tutor)
+        small_chunks = self._get_chunks(chunk_docs, ChunkSize.SMALL)
+        large_chunks = self._get_chunks(chunk_docs, ChunkSize.LARGE)
+        resource_ids = self._get_resource_ids_from_chunks(chunk_docs)
+        # When retrieving for TAI tutor, the class resources are never used, so we don't need to retrieve them to improve response time
+        resource_docs = [] if for_tai_tutor else self._doc_db.get_class_resources(resource_ids, ClassResourceDocument)
+        sorted_resources = self._sort_class_resources(resource_docs, chunk_docs)
         search_results = SearchEngineResponse(
-            short_snippets=self.to_api_resources(short_docs),
-            long_snippets=self.to_api_resources(long_docs),
+            short_snippets=self.to_api_resources(small_chunks),
+            long_snippets=self.to_api_resources(large_chunks),
+            class_resources=self.to_api_resources(sorted_resources),
             **search_query.dict(),
         )
-        return search_results
+
+        def update_metric():
+            logger.info(f"Updating metrics for {len(chunk_docs)} documents")
+            self._metrics.upsert_metrics_for_docs([doc.id for doc in chunk_docs], ClassResourceChunkDocument)
+            self._metrics.upsert_metrics_for_docs(resource_ids, ClassResourceDocument)
+            logger.info(f"Finished updating metrics for {len(chunk_docs)} documents")
+
+        return search_results, update_metric
+
+    def _get_resource_ids_from_chunks(
+        self, docs: Union[list[ClassResourceChunkDocument], ClassResourceChunkDocument], unique: bool = True
+    ) -> list[UUID]:
+        """Get the parent ids from the chunks."""
+        if isinstance(docs, ClassResourceChunkDocument):
+            docs = [docs]
+        resource_ids = [doc.resource_id for doc in docs]
+        return list(set(resource_ids)) if unique else resource_ids
+
+    def _get_chunks(
+        self,
+        chunk_documents: list[ClassResourceChunkDocument],
+        chunk_size: ChunkSize,
+    ) -> list[ClassResourceChunkDocument]:
+        """Group chunk documents by chunk size."""
+        chunk_documents = [chunk for chunk in chunk_documents if chunk.metadata.chunk_size == chunk_size]
+        return chunk_documents
+
+    def _sort_class_resources(
+        self,
+        class_resources: list[ClassResourceDocument],
+        chunk_documents: list[ClassResourceChunkDocument],
+    ) -> list[ClassResourceDocument]:
+        """Rank class resources based on the order of the ChunkDocuments."""
+        resource_dict = {resource.id: resource for resource in class_resources}
+        sorted_resources = []
+        for chunk_doc in chunk_documents:
+            resource = resource_dict.get(chunk_doc.resource_id)
+            if resource:
+                sorted_resources.append(resource)
+        return sorted_resources
 
     def _is_server_ready(self) -> bool:
         cpu_load = psutil.cpu_percent(interval=1)
         svmem = psutil.virtual_memory()
-        mem_available_MB = svmem.available / 1024 ** 2
+        mem_available_MB = svmem.available / 1024**2
         mem_percent = svmem.percent
         if cpu_load > 98 or mem_percent > 98 or mem_available_MB < 1000:
             return False
@@ -300,14 +348,12 @@ class Backend:
 
     def _get_secret_value(self, secret_name: str) -> Union[dict[str, Any], str]:
         session = boto3.session.Session()
-        client = session.client(service_name='secretsmanager')
+        client = session.client(service_name="secretsmanager")
         try:
-            get_secret_value_response = client.get_secret_value(
-                SecretId=secret_name
-            )
+            get_secret_value_response = client.get_secret_value(SecretId=secret_name)
         except ClientError as e:
             raise RuntimeError(f"Failed to get secret value: {e}") from e
-        secret = get_secret_value_response['SecretString']
+        secret = get_secret_value_response["SecretString"]
         try:
             return json.loads(secret)
         except json.JSONDecodeError:
@@ -348,7 +394,7 @@ class Backend:
     def _coerce_and_update_status(
         self,
         docs: Union[list[StatefulClassResourceDocument], StatefulClassResourceDocument],
-        status: ClassResourceProcessingStatus
+        status: ClassResourceProcessingStatus,
     ) -> None:
         """Coerce the status of the class resources to the given status and update the database."""
         if isinstance(docs, StatefulClassResourceDocument):
@@ -357,7 +403,9 @@ class Backend:
         self._coerce_status_to(stateful_resources, status)
         self._doc_db.upsert_documents(stateful_resources)
 
-    def _coerce_status_to(self, class_resources: list[StatefulClassResourceDocument], status: ClassResourceProcessingStatus) -> None:
+    def _coerce_status_to(
+        self, class_resources: list[StatefulClassResourceDocument], status: ClassResourceProcessingStatus
+    ) -> None:
         """Coerce the status of the class resources to the given status."""
         for class_resource in class_resources:
             class_resource.status = status

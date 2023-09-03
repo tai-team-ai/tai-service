@@ -1,7 +1,5 @@
 """Define CRUD endpoints for class resources."""
 from fastapi import APIRouter, Request, Response, status, BackgroundTasks
-from time import sleep
-import asyncio
 from loguru import logger
 from ...api.routers.class_resources_schema import ClassResource, ClassResources, ClassResourceIds
 from ..backend.backend import Backend, ServerOverloadedError

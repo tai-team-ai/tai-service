@@ -6,11 +6,12 @@ from pydantic import Field, conint
 # first imports are for local development, second imports are for deployment
 try:
     from .base_schema import BasePydanticModel, EXAMPLE_UUID
-    from .tai_schemas import ClassResourceSnippet, EXAMPLE_CLASS_RESOURCE_SNIPPET
+    from .tai_schemas import EXAMPLE_CLASS_RESOURCE_SNIPPET
+    from .class_resources_schema import ClassResource
 except ImportError:
     from routers.base_schema import BasePydanticModel, EXAMPLE_UUID
-    from routers.tai_schemas import ClassResourceSnippet, EXAMPLE_CLASS_RESOURCE_SNIPPET
-
+    from routers.tai_schemas import EXAMPLE_CLASS_RESOURCE_SNIPPET
+    from routers.class_resources_schema import ClassResource
 
 EXAMPLE_BASE_FREQUENTLY_ACCESSED_OBJECTS = {
     "classId": EXAMPLE_UUID,
@@ -76,12 +77,14 @@ class BaseFrequentlyAccessedObjects(BasePydanticModel):
 
 class BaseFrequentlyAccessedObject(BasePydanticModel):
     """Define a base schema for ranked common resources."""
-    rank: conint(ge=1) = Field(
+    rank: int = Field(
         ...,
+        ge=1,
         description="The rank of the object when ranked by appearances during the date range.",
     )
-    appearances_during_period: conint(ge=1) = Field(
+    appearances_during_period: int = Field(
         ...,
+        ge=1,
         description="The number of times the object appeared during the date range.",
     )
 
@@ -96,7 +99,7 @@ class CommonQuestion(BaseFrequentlyAccessedObject):
 
 class FrequentlyAccessedResource(BaseFrequentlyAccessedObject):
     """Define a schema for a common resource."""
-    resource: ClassResourceSnippet = Field(
+    resource: ClassResource = Field(
         ...,
         description="The resource that was most common during the date range.",
     )

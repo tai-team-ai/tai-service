@@ -7,8 +7,10 @@ from pydantic import BaseModel, Field
 
 try:
     from taiservice.api.routers.tai_schemas import ResourceSearchQuery, ClassResourceSnippet
+    from taiservice.api.routers.class_resources_schema import ClassResource
 except ImportError:
     from routers.tai_schemas import ResourceSearchQuery, ClassResourceSnippet
+    from routers.class_resources_schema import ClassResource
 
 
 class BasePydanticModel(BaseModel):
@@ -65,10 +67,15 @@ class SearchEngineResponse(ResourceSearchQuery):
     """Define the response from the search engine."""
 
     short_snippets: list[ClassResourceSnippet] = Field(
-        ...,
+        default_factory=list,
         description="The short snippets of the class resources.",
     )
     long_snippets: list[ClassResourceSnippet] = Field(
-        ...,
+        default_factory=list,
         description="The long snippets of the class resources.",
+    )
+    # TODO: Need to make a "ranked class resource model" that includes the score and rank
+    class_resources: list[ClassResource] = Field(
+        default_factory=list,
+        description="The class resources found while searching.",
     )
