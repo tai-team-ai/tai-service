@@ -81,6 +81,7 @@ class Metrics:
         class_id: UUID,
         date_range: Optional[DateRange] = None,
         top_level_doc: bool = False,
+        minimum_appearances: int = 10,
     ) -> FrequentlyAccessedResources:
         """Get the most frequently accessed resources."""
         if date_range is None:
@@ -112,6 +113,11 @@ class Metrics:
                     '_id': '$_id',
                     'resource_count': {'$sum': 1 },
                 }
+            },
+            {
+                '$match': {
+                    'resource_count': {'$gte': minimum_appearances},
+                },
             },
             {
                 '$sort': {'resource_count': -1}
