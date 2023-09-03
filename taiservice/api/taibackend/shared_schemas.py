@@ -5,6 +5,11 @@ from enum import Enum
 from typing import Any
 from pydantic import BaseModel, Field
 
+try:
+    from taiservice.api.routers.tai_schemas import ResourceSearchQuery, ClassResourceSnippet
+except ImportError:
+    from routers.tai_schemas import ResourceSearchQuery, ClassResourceSnippet
+
 
 class BasePydanticModel(BaseModel):
     """
@@ -56,9 +61,14 @@ class DateRange(BasePydanticModel):
     )
 
 
-class UsageMetric(BasePydanticModel):
-    """Define the usage log model for tracking usage of resources."""
-    timestamp: datetime = Field(
+class SearchEngineResponse(ResourceSearchQuery):
+    """Define the response from the search engine."""
+
+    short_snippets: list[ClassResourceSnippet] = Field(
         ...,
-        description="The date of the usage metric.",
+        description="The short snippets of the class resources.",
+    )
+    long_snippets: list[ClassResourceSnippet] = Field(
+        ...,
+        description="The long snippets of the class resources.",
     )

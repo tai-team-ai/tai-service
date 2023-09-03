@@ -9,7 +9,7 @@ from taiservice.searchservice.backend.databases.pinecone_db_schemas import (
     PineconeDocuments,
     ChunkMetadata,
 )
-from taiservice.searchservice.backend.shared_schemas import Metadata
+from taiservice.searchservice.backend.shared_schemas import Metadata, ChunkSize
 from .test_shared_schemas import EXAMPLE_METADATA, assert_schema1_inherits_from_schema2
 
 def test_chunk_metadata_schema():
@@ -30,6 +30,7 @@ EXAMPLE_CHUNK_METADATA = {
     "timestamp": "2021-01-01 00:00:00",
     "vector_id": "123e4567-e89b-12d3-a456-426614174000",
     "chunk_id": "123e4567-e89b-12d3-a456-426614174000",
+    "chunk_size": ChunkSize.SMALL,
 }
 EXAMPLE_CHUNK_METADATA.update(EXAMPLE_METADATA)
 EXAMPLE_PINECONE_DOCUMENT = {

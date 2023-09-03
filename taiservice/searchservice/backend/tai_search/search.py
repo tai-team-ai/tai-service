@@ -97,13 +97,13 @@ class ResourceLimits(BaseModel):
     """Define the custom parameters for resource usage."""
 
     memory_percent_threshold: float = Field(
-        default=80.0,
-        le=80.0,
+        default=90.0,
+        le=90.0,
         description="The threshold for memory usage percentage beyond which system is considered as resource constrained.",
     )
     cpu_percent_threshold: float = Field(
-        default=70.0,
-        le=80.0,
+        default=90.0,
+        le=90.0,
         description="The threshold for CPU usage percentage beyond which system is considered as resource constrained.",
     )
     additional_memory_gb: float = Field(
@@ -144,7 +144,7 @@ def execute_with_resource_check(func: Callable[..., Any], resource_limits: Resou
     Returns:
         The function's return value.
     """
-    time_to_sleep = 5
+    time_to_sleep = 1
     if isinstance(func, partial):
         func_name = func.func.__name__
     else:
@@ -176,38 +176,31 @@ class TAISearch:
 
     def index_resource(
         self,
-        ingested_document: IngestedDocument,
-        class_resource_document: ClassResourceDocument,
-    ) -> None:
+        ingested_document: IngestedDocument
+    ) -> ClassResourceDocument:
         """Index a document."""
         logger.info(f"Crawling document: {ingested_document.id}")
+        parent_class_resource = self._save_document_to_cold_store(ingested_document)
         try:
             crawler = resource_crawler_factory(ingested_document)
-            ingested_documents = crawler.crawl(class_resource_document)
-        except Exception as e:  # pylint: disable=broad-except
+            ingested_documents = crawler.crawl(parent_class_resource)
+        except NotImplementedError as e:
             logger.warning(e)
             ingested_documents = [ingested_document]
+            parent_class_resource.child_resource_ids.append(ingested_document.id)
         logger.info(f"Finished crawling document: {ingested_document.id}. Found {len(ingested_documents)} documents.")
 
         # TODO: We should not be iterating here, instead crawled docs will have been pushed to a queue that
         # will be consumed by this service so this service is only processing one page/document at a time.
-        original_class_resource_document = class_resource_document
         for ingested_document in ingested_documents:
-            utility = resource_utility_factory(self._cold_store_bucket_name, ingested_document)
-            logger.info(f"Creating thumbnail for document: {ingested_document.id}")
-            ingested_document = utility.create_thumbnail()
-            logger.info(f"Finished creating thumbnail for document: {ingested_document.id}")
-            logger.info(f"Uploading resource to cold store: {ingested_document.id}")
-            ingested_document = utility.upload_resource()
-            logger.info(f"Finished uploading resource to cold store: {ingested_document.id}")
-            class_resource_document = ClassResourceDocument.from_ingested_doc(ingested_document)
-            class_resource_document.parent_resource_ids.append(original_class_resource_document.id)
+            class_resource_document = self._save_document_to_cold_store(ingested_document)
+            class_resource_document.parent_resource_ids.append(parent_class_resource.id)
 
             logger.info(f"Loading and splitting document: {ingested_document.id}")
             chunk_documents = self._load_and_split_document(ingested_document, ChunkSize.LARGE)
             chunk_documents.extend(self._load_and_split_document(ingested_document, ChunkSize.SMALL))
             logger.info(f"Finished loading and splitting document into {len(chunk_documents)} chunks: {ingested_document.id}")
-            original_class_resource_document.class_resource_chunk_ids.extend([chunk_doc.id for chunk_doc in chunk_documents])
+            parent_class_resource.class_resource_chunk_ids.extend([chunk_doc.id for chunk_doc in chunk_documents])
             class_resource_document.class_resource_chunk_ids.extend([chunk_doc.id for chunk_doc in chunk_documents])
 
             logger.info(f"Embedding {len(chunk_documents)} chunks: {ingested_document.id}")
@@ -220,6 +213,7 @@ class TAISearch:
             logger.info(f"Loading {len(vector_documents)} vectors to vector store: {ingested_document.id}")
             self._load_vectors_to_vector_store(vector_documents)
             logger.info(f"Finished loading {len(vector_documents)} vectors to vector store: {ingested_document.id}")
+        return parent_class_resource
 
     def get_relevant_class_resources(
         self, query: str, class_id: UUID, for_tai_tutor: bool
@@ -289,11 +283,27 @@ class TAISearch:
             results = executor.map(compute_similar_documents, zip(pinecone_docs.documents, filters))
         relevant_documents = list(itertools.chain(*results))
         uuids = [doc.metadata.chunk_id for doc in relevant_documents]
-        chunk_docs = self._document_db.get_class_resources(uuids, ClassResourceChunkDocument, count_towards_metrics=True)
+        chunk_docs = self._document_db.get_class_resources(uuids, ClassResourceChunkDocument)
         logger.info(f"Got similar docs: {chunk_docs}")
         chunk_docs = [doc for doc in chunk_docs if isinstance(doc, ClassResourceChunkDocument)]
         chunk_docs = self._sort_chunk_docs_by_pinecone_scores(relevant_documents, chunk_docs)
         return self._group_by_chunk_size(chunk_docs)
+
+    def _save_document_to_cold_store(self, ingested_document: IngestedDocument) -> ClassResourceDocument:
+        utility = resource_utility_factory(self._cold_store_bucket_name, ingested_document)
+        logger.info(f"Creating thumbnail for document: {ingested_document.id}")
+        utility.create_thumbnail()
+        logger.info(f"Finished creating thumbnail for document: {ingested_document.id}")
+        logger.info(f"Uploading resource to cold store: {ingested_document.id}")
+        # TODO: this could result in storage leaks in S3 if the upload suceeds but we don't 
+        # save the document to the db. For now, because of how cheap S3 is, we'll just ignore
+        # this issue until we scale to 1000s of classrooms using the app.
+        utility.upload_resource()
+        logger.info(f"Finished uploading resource to cold store: {ingested_document.id}")
+        class_resource_document = ClassResourceDocument.from_ingested_doc(utility.ingested_doc)
+        self._document_db.upsert_document(class_resource_document)
+        return class_resource_document
+
 
     def _group_by_chunk_size(
         self, chunk_documents: list[ClassResourceChunkDocument]
@@ -454,7 +464,7 @@ class TAISearch:
         device = "cuda" if torch.cuda.is_available() else "cpu"
         logger.info(f"Using device '{device}' for vector encoding.")
 
-        def _embed_batch(
+        def embed_batch(
             batch: list[ClassResourceChunkDocument],
         ) -> list[PineconeDocument]:
             """Embed a batch of documents."""
@@ -467,10 +477,15 @@ class TAISearch:
             documents = [documents]
         batches = [documents[i : i + self._batch_size] for i in range(0, len(documents), self._batch_size)]
         vector_docs = []
+        # Start a separate thread for get_sparse_vectors operation
+        with ThreadPoolExecutor() as executor:
+            future = executor.submit(self.get_sparse_vectors, [doc.chunk for doc in documents])
         with ThreadPoolExecutor(max_workers=len(batches)) as executor:
-            results = executor.map(_embed_batch, batches)
+            results = executor.map(embed_batch, batches)
             vector_docs = [vector_doc for result in results for vector_doc in result]
-        sparse_vectors = self.get_sparse_vectors([doc.chunk for doc in documents])
+        # Close the thread and get results
+        sparse_vectors = future.result()
+
         for vector_doc, sparse_vector in zip(vector_docs, sparse_vectors):
             vector_doc.sparse_values = sparse_vector
         class_ids = {doc.metadata.class_id for doc in vector_docs}

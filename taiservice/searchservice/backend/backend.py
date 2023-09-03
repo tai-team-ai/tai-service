@@ -9,7 +9,7 @@ import boto3
 from botocore.exceptions import ClientError
 from loguru import logger
 
-
+from taiservice.api.taibackend.shared_schemas import SearchEngineResponse
 from taiservice.api.routers.class_resources_schema import (
     ClassResource,
     ClassResources,
@@ -24,7 +24,6 @@ from taiservice.api.routers.common_resources_schema import (
 from taiservice.api.routers.tai_schemas import (
     ClassResourceSnippet as APIClassResourceSnippet,
     ResourceSearchQuery,
-    SearchResults,
 )
 from .errors import ServerOverloadedError
 from ..runtime_settings import SearchServiceSettings
@@ -34,6 +33,7 @@ from .databases.document_db_schemas import (
     BaseClassResourceDocument,
     ClassResourceChunkDocument,
     ChunkMetadata as BEChunkMetadata,
+    StatefulClassResourceDocument,
 )
 from .databases.pinecone_db import PineconeDB, PineconeDBConfig
 from .metrics import (
@@ -210,23 +210,22 @@ class Backend:
             pass
         elif self._is_duplicate_class_resource(ingested_doc):
             raise DuplicateClassResourceError(f"Duplicate class resource: {ingested_doc.id} in class {ingested_doc.class_id}")
-        db_class_resource = ClassResourceDocument.from_ingested_doc(ingested_doc)
-        self._coerce_and_update_status(db_class_resource, ClassResourceProcessingStatus.PENDING)
+        self._coerce_and_update_status(ingested_doc, ClassResourceProcessingStatus.PENDING)
         def index_resource() -> None:
             try:
-                self._coerce_and_update_status(db_class_resource, ClassResourceProcessingStatus.PROCESSING)
-                self._tai_search.index_resource(ingested_doc, db_class_resource)
+                self._coerce_and_update_status(ingested_doc, ClassResourceProcessingStatus.PROCESSING)
+                db_class_resource = self._tai_search.index_resource(ingested_doc)
                 self._coerce_and_update_status(db_class_resource, ClassResourceProcessingStatus.COMPLETED)
                 logger.info(f"Completed indexing class resource: {db_class_resource.id}")
             except Exception: # pylint: disable=broad-except
+                self._coerce_and_update_status(ingested_doc, ClassResourceProcessingStatus.FAILED)
                 logger.critical(f"Failed to create class resources")
                 logger.critical(traceback.format_exc())
-                self._coerce_and_update_status(db_class_resource, ClassResourceProcessingStatus.FAILED)
         return index_resource
 
     def get_class_resources(self, ids: list[UUID], from_class_ids: bool=False) -> list[ClassResource]:
         """Get the class resources."""
-        docs = self._doc_db.get_class_resources(ids, ClassResourceDocument, from_class_ids=from_class_ids, count_towards_metrics=False)
+        docs: list[ClassResourceDocument] = self._doc_db.get_class_resources(ids, ClassResourceDocument, from_class_ids=from_class_ids)
         for doc in docs:
             if self._is_stuck_processing_or_failed(doc.id):
                 self._coerce_and_update_status(doc, ClassResourceProcessingStatus.FAILED)
@@ -235,7 +234,7 @@ class Backend:
     def delete_class_resources(self, ids: list[UUID]) -> None:
         """Delete the class resources."""
         try:
-            docs = self._doc_db.get_class_resources(ids, ClassResourceDocument, count_towards_metrics=False)
+            docs = self._doc_db.get_class_resources(ids, ClassResourceDocument)
             for doc in docs:
                 if isinstance(doc, ClassResourceDocument) or isinstance(doc, ClassResourceChunkDocument):
                     if isinstance(doc, ClassResourceDocument):
@@ -276,14 +275,16 @@ class Backend:
         )
         return resources
 
-    def search(self, search_query: ResourceSearchQuery, for_tai_tutor: bool) -> SearchResults:
+    def search(self, search_query: ResourceSearchQuery, for_tai_tutor: bool) -> SearchEngineResponse:
         """Search for class resources."""
         docs = self._tai_search.get_relevant_class_resources(search_query.query, search_query.class_id, for_tai_tutor)
-        small_docs = self.to_api_resources(docs.get(ChunkSize.SMALL, []))
-        large_docs = self.to_api_resources(docs.get(ChunkSize.LARGE, []))
-        search_results = SearchResults(
-            suggested_resources=large_docs[:1] + small_docs[:2],
-            other_resources=large_docs[1:4] + small_docs[2:6],
+        short_docs = docs.get(ChunkSize.SMALL, [])
+        long_docs = docs.get(ChunkSize.LARGE, [])
+        # TODO:  update the parent metric as well as one impression
+        self._metrics.upsert_metrics_for_docs(short_docs + long_docs)
+        search_results = SearchEngineResponse(
+            short_snippets=self.to_api_resources(short_docs),
+            long_snippets=self.to_api_resources(long_docs),
             **search_query.dict(),
         )
         return search_results
@@ -317,7 +318,6 @@ class Backend:
         class_resource_docs: list[ClassResourceDocument] = self._doc_db.get_class_resources(
             doc_id,
             ClassResourceDocument,
-            count_towards_metrics=False
         )
         existing_doc = class_resource_docs[0] if class_resource_docs else None
         if not existing_doc:
@@ -332,11 +332,10 @@ class Backend:
 
     def _is_duplicate_class_resource(self, new_doc: tai_search.IngestedDocument) -> bool:
         """Check if the document can be created."""
-        class_resource_docs = self._doc_db.get_class_resources(
+        class_resource_docs: list[ClassResourceDocument] = self._doc_db.get_class_resources(
             new_doc.class_id,
             ClassResourceDocument,
             from_class_ids=True,
-            count_towards_metrics=False
         )
         docs = {doc.id: doc for doc in class_resource_docs}
         doc_hashes = set([class_resource_doc.hashed_document_contents for class_resource_doc in class_resource_docs])
@@ -348,16 +347,17 @@ class Backend:
 
     def _coerce_and_update_status(
         self,
-        class_resources: Union[list[ClassResourceDocument], ClassResourceDocument],
+        docs: Union[list[StatefulClassResourceDocument], StatefulClassResourceDocument],
         status: ClassResourceProcessingStatus
     ) -> None:
         """Coerce the status of the class resources to the given status and update the database."""
-        if isinstance(class_resources, ClassResourceDocument):
-            class_resources = [class_resources]
-        self._coerce_status_to(class_resources, status)
-        self._doc_db.upsert_documents(class_resources)
+        if isinstance(docs, StatefulClassResourceDocument):
+            docs = [docs]
+        stateful_resources = [ClassResourceDocument(**doc.dict()) for doc in docs]
+        self._coerce_status_to(stateful_resources, status)
+        self._doc_db.upsert_documents(stateful_resources)
 
-    def _coerce_status_to(self, class_resources: list[ClassResourceDocument], status: ClassResourceProcessingStatus) -> None:
+    def _coerce_status_to(self, class_resources: list[StatefulClassResourceDocument], status: ClassResourceProcessingStatus) -> None:
         """Coerce the status of the class resources to the given status."""
         for class_resource in class_resources:
             class_resource.status = status
@@ -365,7 +365,7 @@ class Backend:
     def _chunks_from_class_resource(self, class_resources: ClassResourceDocument) -> list[ClassResourceChunkDocument]:
         """Get the chunks from the class resources."""
         chunk_ids = class_resources.class_resource_chunk_ids
-        return self._doc_db.get_class_resources(chunk_ids, ClassResourceChunkDocument, count_towards_metrics=False)
+        return self._doc_db.get_class_resources(chunk_ids, ClassResourceChunkDocument)
 
     def _delete_vectors_from_chunks(self, chunks: list[ClassResourceChunkDocument]) -> None:
         """Delete the vectors from the chunks."""

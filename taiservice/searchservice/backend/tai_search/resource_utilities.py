@@ -50,21 +50,36 @@ class DocumentUtility(ABC):
     def __init__(self, thumbnail_bucket_name: str, ingested_doc: IngestedDocument):
         """Initialize the class."""
         self._thumbnail_bucket_name = thumbnail_bucket_name
-        self._ingested_doc = ingested_doc
+        self._ingested_doc = copy.deepcopy(ingested_doc)
+
+    @property
+    def ingested_doc(self) -> IngestedDocument:
+        """Return the ingested document."""
+        return self._ingested_doc
 
     @abstractmethod
-    def create_thumbnail(self) -> IngestedDocument:
-        """Create a thumbnail for the document and pass out a copy of the document with the thumbnail."""
+    def create_thumbnail(self) -> None:
+        """
+        Create a thumbnail for the document.
+
+        IMPORTANT: After creating the thumbnail, the document must be updated with the
+        thumbnail url so that the thumbnail is accessible from the document.
+        """
 
     @abstractmethod
-    def upload_resource(self) -> IngestedDocument:
-        """Upload the resource to the cloud and pass out a copy of the document with the cloud url."""
+    def upload_resource(self) -> None:
+        """
+        Upload the resource to the cloud.
+
+        IMPORTANT: After uploading the resource, the document must be updated with the
+        resource url so that the resource is accessible from the document.
+        """
 
 
 class PDFDocumentUtility(DocumentUtility):
     """Implement the PDF Document Utility."""
 
-    def create_thumbnail(self) -> IngestedDocument:
+    def create_thumbnail(self) -> None:
         """Create a thumbnail for the document and pass out a copy of the document with the thumbnail."""
         thumbnail_format = "png"
         thumbnail_directory = get_local_tmp_directory(self._ingested_doc, thumbnail_format)
@@ -86,24 +101,20 @@ class PDFDocumentUtility(DocumentUtility):
             new_path = thumbnail_path.parent / thumbnail_filename
             thumbnail_path.rename(new_path)
             thumbnail_path = new_path
-        output_doc = copy.deepcopy(self._ingested_doc)
-        s3_key = get_s3_object_key(output_doc, thumbnail_path.name)
-        output_doc.preview_image_url = upload_file_to_s3(thumbnail_path, self._thumbnail_bucket_name, s3_key)
-        return output_doc
+        s3_key = get_s3_object_key(self._ingested_doc, thumbnail_path.name)
+        self._ingested_doc.preview_image_url = upload_file_to_s3(thumbnail_path, self._thumbnail_bucket_name, s3_key)
 
-    def upload_resource(self) -> IngestedDocument:
+    def upload_resource(self) -> None:
         """Upload the resource to the cloud and pass out a copy of the document with the cloud url."""
         s3_key = get_s3_object_key(self._ingested_doc, self._ingested_doc.data_pointer.name)
         url = upload_file_to_s3(self._ingested_doc.data_pointer, self._thumbnail_bucket_name, s3_key)
-        output_doc = copy.deepcopy(self._ingested_doc)
-        output_doc.full_resource_url = url
-        return output_doc
+        self._ingested_doc.full_resource_url = url
 
 
 class HTMLDocumentUtility(DocumentUtility):
     """Implement the HTML Document Utility."""
 
-    def create_thumbnail(self) -> IngestedDocument:
+    def create_thumbnail(self) -> None:
         """Create a thumbnail for the document and pass out a copy of the document with the thumbnail."""
         thumbnail_format = "png"
         thumbnail_directory = get_local_tmp_directory(self._ingested_doc, thumbnail_format)
@@ -124,12 +135,10 @@ class HTMLDocumentUtility(DocumentUtility):
             sleep(5)
             driver.get_screenshot_as_file(thumbnail_path)
             driver.close()
-        output_doc = copy.deepcopy(doc)
-        s3_key = get_s3_object_key(output_doc, thumbnail_path.name)
-        output_doc.preview_image_url = upload_file_to_s3(thumbnail_path, self._thumbnail_bucket_name, s3_key)
-        return output_doc
+        s3_key = get_s3_object_key(self._ingested_doc, thumbnail_path.name)
+        self._ingested_doc.preview_image_url = upload_file_to_s3(thumbnail_path, self._thumbnail_bucket_name, s3_key)
 
-    def upload_resource(self) -> IngestedDocument:
+    def upload_resource(self) -> None:
         """Upload the resource to the cloud and pass out a copy of the document with the cloud url."""
         if isinstance(self._ingested_doc.data_pointer, Path):
             url = upload_file_to_s3(self._ingested_doc.data_pointer, self._thumbnail_bucket_name, self._ingested_doc.data_pointer.name)
@@ -137,15 +146,13 @@ class HTMLDocumentUtility(DocumentUtility):
             url = str(self._ingested_doc.data_pointer)
         else:
             raise ValueError(f"Data pointer must be a path or url, not {type(self._ingested_doc.data_pointer)}")
-        output_doc = copy.deepcopy(self._ingested_doc)
-        output_doc.full_resource_url = url
-        return output_doc
+        self._ingested_doc.full_resource_url = url
 
 
 class YouTubeVideoDocumentUtility(DocumentUtility):
     """Implement the YouTube Video Document Utility."""
 
-    def create_thumbnail(self) -> IngestedDocument:
+    def create_thumbnail(self) -> None:
         video_id = self._ingested_doc.data_pointer
         # urls ranked by quality ascending
         urls = [
@@ -154,30 +161,27 @@ class YouTubeVideoDocumentUtility(DocumentUtility):
             f"https://img.youtube.com/vi/{video_id}/sddefault.jpg",
             f"https://img.youtube.com/vi/{video_id}/maxresdefault.jpg",
         ]
-        doc = copy.deepcopy(self._ingested_doc)
-        doc.preview_image_url = urls[0]
+        self._ingested_doc.preview_image_url = urls[0]
         for url in urls:
             response = requests.get(url, timeout=4)
             if response.status_code == 200:
-                doc.preview_image_url = url
+                self._ingested_doc.preview_image_url = url
                 break
-        return doc
 
-    def upload_resource(self) -> IngestedDocument:
+
+    def upload_resource(self) -> None:
         """Upload the resource to the cloud and pass out a copy of the document with the cloud url."""
-        output_doc = copy.deepcopy(self._ingested_doc)
-        output_doc.full_resource_url = f"https://www.youtube.com/watch?v={output_doc.data_pointer}"
-        return output_doc
+        self._ingested_doc.full_resource_url = f"https://www.youtube.com/watch?v={self._ingested_doc.data_pointer}"
 
 
 class GenericTextDocumentUtility(DocumentUtility):
     """Implement the Generic Text Document Utility."""
 
-    def create_thumbnail(self) -> IngestedDocument:
+    def create_thumbnail(self) -> None:
         """Create a thumbnail for the document and pass out a copy of the document with the thumbnail."""
         raise NotImplementedError(f"Screen-shotting method {self.__class__.__name__} not implemented.")
 
-    def upload_resource(self) -> IngestedDocument:
+    def upload_resource(self) -> None:
         """Upload the resource to the cloud and pass out a copy of the document with the cloud url."""
         raise NotImplementedError(f"Uploading method {self.__class__.__name__} not implemented.")
 
@@ -185,11 +189,11 @@ class GenericTextDocumentUtility(DocumentUtility):
 class LatexDocumentUtility(DocumentUtility):
     """Implement the Latex Document Utility."""
 
-    def create_thumbnail(self) -> IngestedDocument:
+    def create_thumbnail(self) -> None:
         """Create a thumbnail for the document and pass out a copy of the document with the thumbnail."""
         raise NotImplementedError(f"Screen-shotting method {self.__class__.__name__} not implemented.")
 
-    def upload_resource(self) -> IngestedDocument:
+    def upload_resource(self) -> None:
         """Upload the resource to the cloud and pass out a copy of the document with the cloud url."""
         raise NotImplementedError(f"Uploading method {self.__class__.__name__} not implemented.")
 
@@ -197,11 +201,11 @@ class LatexDocumentUtility(DocumentUtility):
 class MarkdownDocumentUtility(DocumentUtility):
     """Implement the Markdown Document Utility."""
 
-    def create_thumbnail(self) -> IngestedDocument:
+    def create_thumbnail(self) -> None:
         """Create a thumbnail for the document and pass out a copy of the document with the thumbnail."""
         raise NotImplementedError(f"Screen-shotting method {self.__class__.__name__} not implemented.")
 
-    def upload_resource(self) -> IngestedDocument:
+    def upload_resource(self) -> None:
         """Upload the resource to the cloud and pass out a copy of the document with the cloud url."""
         raise NotImplementedError(f"Uploading method {self.__class__.__name__} not implemented.")
 
@@ -209,11 +213,11 @@ class MarkdownDocumentUtility(DocumentUtility):
 class RawURLDocumentUtility(DocumentUtility):
     """Implement the Raw URL Document Utility."""
 
-    def create_thumbnail(self) -> IngestedDocument:
+    def create_thumbnail(self) -> None:
         """Create a thumbnail for the document and pass out a copy of the document with the thumbnail."""
         raise NotImplementedError(f"Screen-shotting method {self.__class__.__name__} not implemented.")
 
-    def upload_resource(self) -> IngestedDocument:
+    def upload_resource(self) -> None:
         """Upload the resource to the cloud and pass out a copy of the document with the cloud url."""
         raise NotImplementedError(f"Uploading method {self.__class__.__name__} not implemented.")
 
@@ -223,7 +227,7 @@ class ResourceCrawler(ABC):
 
     def __init__(self, ingested_doc: IngestedDocument):
         """Initialize the class."""
-        self._ingested_doc = ingested_doc
+        self._ingested_doc = copy.deepcopy(ingested_doc)
         self._class_resource_doc: Optional[ClassResourceDocument] = None
 
     @abstractmethod
@@ -282,14 +286,14 @@ class PDFResourceCrawler(ResourceCrawler):
 
 
 def resource_utility_factory(bucket_name: str, ingested_doc: IngestedDocument) -> DocumentUtility:
-    """Create the thumbnail generator."""
-    resource_utility_factory_mapping = {
+    """Create the resource utility."""
+    resource_utility_factory_mapping: dict[InputFomat, DocumentUtility] = {
         InputFomat.PDF: PDFDocumentUtility,
         InputFomat.HTML: HTMLDocumentUtility,
         InputFomat.YOUTUBE_VIDEO: YouTubeVideoDocumentUtility,
     }
     utility = resource_utility_factory_mapping.get(ingested_doc.input_format)
-    if utility is None:
+    if not utility:
         raise NotImplementedError(f"Could not find thumbnail generator for input format '{ingested_doc.input_format}'.")
     return utility(bucket_name, ingested_doc)
 

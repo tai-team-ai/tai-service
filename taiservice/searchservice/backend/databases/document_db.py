@@ -1,17 +1,21 @@
 """Define the pinecone database."""
-from datetime import datetime
 import traceback
-from typing import Any, Callable, Optional, Union
+from typing import Any, Callable, Optional, Union, Type
 from uuid import UUID
 from pydantic import BaseModel, Field, ValidationError
 from pymongo import MongoClient
+from pymongo.collection import Collection
 from loguru import logger
 from .document_db_schemas import (
     BaseClassResourceDocument,
     ClassResourceDocument,
     ClassResourceChunkDocument,
+    StatefulClassResourceDocument,
 )
 from ..shared_schemas import UsageMetric
+
+
+METRICS_FIELD_NAME = "usage_log"
 
 
 class DocumentDBConfig(BaseModel):
@@ -83,48 +87,39 @@ class DocumentDB:
         """Return the supported document models."""
         return self._doc_models
 
-    def find_one(self, doc_id: UUID, DocClass: BaseClassResourceDocument) -> Optional[BaseClassResourceDocument]:
+    def find_one(self, doc_id: UUID, DocClass: Type[BaseClassResourceDocument]) -> Optional[BaseClassResourceDocument]:
         """Return the full class resource."""
-        class_name = DocClass.__name__
-        collection = self._document_type_to_collection[class_name]
+        collection = self._get_collection(DocClass)
         document = collection.find_one({"_id": str(doc_id)})
         if document is None:
             return None
         try:
             return DocClass.parse_obj(document)
         except ValidationError as e:
-            logger.error(f"Failed to parse document: {document} for class: {class_name}")
+            logger.error(f"Failed to parse document: {document} for class: {DocClass.__name__}")
             logger.error(traceback.format_exc())
             raise e
 
     def get_class_resources(self,
         ids: Union[list[UUID], UUID],
-        DocClass: BaseClassResourceDocument,
+        DocClass: Type[ClassResourceDocument | ClassResourceChunkDocument],
         from_class_ids: bool=False,
-        count_towards_metrics: bool=True,
-    ) -> list[BaseClassResourceDocument]:
+    ) -> list[ClassResourceDocument | ClassResourceChunkDocument]:
         """Return the full class resources."""
         ids = [ids] if isinstance(ids, UUID) else ids
-        class_name = DocClass.__name__
-        collection = self._document_type_to_collection[class_name]
+        collection = self._get_collection(DocClass)
         ids = [str(id) for id in ids]
         db_filter: dict[str, Any]
         if from_class_ids:
             db_filter = {"class_id": {"$in": ids}}
         else:
             db_filter = {"_id": {"$in": ids}}
-        if class_name == ClassResourceDocument.__name__:
+        if DocClass == ClassResourceDocument:
             # this check ensures we find the root doc for the class resource and not a child doc.
             # Example: PDF vs pages in a PDF
-            db_filter.update({"parent_resource_ids": []})
+            db_filter.update({"$or": [{"parent_resource_ids": {"$exists": False}}, {"parent_resource_ids": []}]})
         documents = list(collection.find(db_filter))
         documents = [DocClass.parse_obj(document) for document in documents]
-        if count_towards_metrics:
-            try:
-                self._upsert_metrics_for_docs(documents, DocClass) # this let's us track usage DON'T REMOVE
-            except Exception as e: # pylint: disable=broad-except
-                logger.error(f"Failed to upsert metrics for documents: {e}")
-                logger.error(traceback.format_exc())
         return documents
 
     def upsert_class_resources(
@@ -147,15 +142,6 @@ class DocumentDB:
             self._execute_operation(upsert_document, document, failed_documents=failed_documents)
         return failed_documents
 
-    def upsert_many_class_resources(self, documents: list[BaseClassResourceDocument]) -> list[BaseClassResourceDocument]:
-        """Upsert the full class resources."""
-        failed_documents = []
-        def upsert_document(document: BaseClassResourceDocument) -> None:
-            self.upsert_document(document)
-        for document in documents:
-            self._execute_operation(upsert_document, document, failed_documents=failed_documents)
-        return failed_documents
-
     def delete_class_resources(self, documents: list[BaseClassResourceDocument]) -> list[BaseClassResourceDocument]:
         """Delete the full class resources."""
         failed_documents = []
@@ -174,7 +160,7 @@ class DocumentDB:
 
     def upsert_document(self, document: BaseClassResourceDocument) -> None:
         """Upsert the chunks of the class resource."""
-        collection = self._document_type_to_collection[document.__class__.__name__]
+        collection = self._get_collection(document.__class__)
         doc_dict = document.dict(serialize_dates=False, exclude={"id"})
         collection.update_one(
             {"_id": document.id_as_str},
@@ -182,22 +168,27 @@ class DocumentDB:
             upsert=True,
         )
 
-    def run_aggregate_query(self, query: list[dict[str, Any]], DocClass: BaseClassResourceDocument) -> Any:
+    def run_aggregate_query(self, query: list[dict[str, Any]], DocClass: Type[BaseClassResourceDocument]) -> Any:
         """Run an aggregate query and return the results."""
-        class_name = DocClass.__name__
-        collection = self._document_type_to_collection[class_name]
+        collection = self._get_collection(DocClass)
         return collection.aggregate(query)
 
-    def _upsert_metrics_for_docs(self, docs: list[BaseClassResourceDocument], DocClass: BaseClassResourceDocument) -> None:
+    def _get_collection(self, DocClass: Type[BaseClassResourceDocument]) -> Collection:
+        """Return the collection of the document."""
+        if issubclass(DocClass, StatefulClassResourceDocument):
+            return self._document_type_to_collection[ClassResourceDocument.__name__]
+        elif issubclass(DocClass, ClassResourceChunkDocument):
+            return self._document_type_to_collection[ClassResourceChunkDocument.__name__]
+        else:
+            raise ValueError(f"Invalid document type: {DocClass}")
+
+    def upsert_metric(self, doc: BaseClassResourceDocument, metric: UsageMetric) -> None:
         """Upsert the metrics of the class resource."""
-        for doc in docs:
-            collection = self._document_type_to_collection[DocClass.__name__]
-            metric = UsageMetric(timestamp=datetime.utcnow())
-            collection.find_one_and_update(
-                {"_id": doc.id_as_str},
-                {"$push": {"usage_log": metric.dict(serialize_dates=False)} }
-            )
-            doc.usage_log.append(metric) # updates the document in memory
+        collection = self._get_collection(doc.__class__)
+        collection.find_one_and_update(
+            {"_id": doc.id_as_str},
+            {"$push": {METRICS_FIELD_NAME: metric.dict(serialize_dates=False)}},
+        )
 
     def _execute_operation(
         self,
@@ -206,22 +197,22 @@ class DocumentDB:
         *args: Any,
         failed_documents: Optional[list[BaseClassResourceDocument]] = None,
         **kwargs: Any
-    ) -> bool:
+    ) -> None:
         """Execute the operation and return the document if it fails."""
         try:
             operation(document, *args, **kwargs)
         except Exception as e: # pylint: disable=broad-except
             logger.error(f"Failed to execute operation: {e} on document: {document}")
             traceback.format_exc()
-            failed_documents.append(document)
+            if failed_documents:
+                failed_documents.append(document)
 
     def _delete_documents(self, docs: list[BaseClassResourceDocument]) -> None:
         """Delete the chunks of the class resource."""
-        # sort by instance type
         for doc in docs:
             self._delete_document(doc)
 
     def _delete_document(self, doc: BaseClassResourceDocument) -> None:
         """Delete the chunks of the class resource."""
-        collection = self._document_type_to_collection[doc.__class__.__name__]
+        collection = self._get_collection(doc.__class__)
         collection.delete_one({"_id": doc.id_as_str})

@@ -10,6 +10,7 @@ from loguru import logger
 import boto3
 from botocore.exceptions import ClientError
 try:
+    from .shared_schemas import SearchEngineResponse
     from .databases.archiver import Archive
     from .metrics import (
         Metrics,
@@ -54,6 +55,7 @@ try:
         DocumentDB,
     )
 except (KeyError, ImportError):
+    from taibackend.shared_schemas import SearchEngineResponse
     from taibackend.databases.archiver import Archive
     from taibackend.metrics import (
         Metrics,
@@ -254,7 +256,8 @@ class Backend:
         )
         search_results = self._get_search_results(search_query, "tutor-search")
         tai_llm = TaiLLM(self._get_tai_llm_config(stream))
-        tai_llm.add_tai_tutor_chat_response(chat_session, search_results.suggested_resources)
+        docs_to_use = search_results.long_snippets[:1] + search_results.short_snippets[:2]
+        tai_llm.add_tai_tutor_chat_response(chat_session, docs_to_use)
         return self.to_api_chat_session(chat_session)
 
     # TODO: Add a test to verify the archive method is called
@@ -270,14 +273,20 @@ class Backend:
         )
         search_results = self._get_search_results(search_query, "search-engine")
         if search_results and result_type == 'summary':
+            docs_to_summarize = search_results.long_snippets[:1] + search_results.short_snippets[:2]
             tai_llm = TaiLLM(self._get_tai_llm_config())
             snippet = tai_llm.create_search_result_summary_snippet(
                 user_id=search_query.user_id,
                 search_query=search_query.query,
-                chunks=search_results.suggested_resources
+                chunks=docs_to_summarize,
             )
             return snippet
-        return search_results
+        api_search_results = SearchResults(
+            suggested_resources=search_results.short_snippets[:3],
+            other_resources=search_results.short_snippets[3:],
+            **search_results.dict(exclude={"short_snippets", "long_snippets"}),
+        )
+        return api_search_results
 
     def create_class_resources(self, class_resources: ClassResources) -> FailedResources:
         """Create a list of class resources."""
@@ -408,14 +417,14 @@ class Backend:
             )
         )
 
-    def _get_search_results(self, query: SearchQuery, endpoint_name: str) -> SearchResults:
+    def _get_search_results(self, query: SearchQuery, endpoint_name: str) -> SearchEngineResponse:
         url = f"{self._runtime_settings.search_service_api_url}/{endpoint_name}"
         response = requests.post(url, data=query.json(), timeout=15)
         logger.info(f"Search response status code: {response.status_code}")
         if response.status_code == 200:
             try:
                 data = response.json()
-                return SearchResults(**data)
+                return SearchEngineResponse(**data)
             except Exception as e: # pylint: disable=broad-except
                 raise RuntimeError(f"Failed to parse class resources. Exception: {e}")
         raise RuntimeError(f"Failed to retrieve class resources. Status code: {response.status_code}")

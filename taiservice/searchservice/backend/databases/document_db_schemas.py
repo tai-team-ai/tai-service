@@ -35,12 +35,12 @@ class ClassResourceDocument(StatefulClassResourceDocument):
         description="The IDs of the class resource chunks.",
     )
 
-    @validator("class_resource_chunk_ids")
+    @validator("child_resource_ids")
     def validate_class_resource_chunk_and_vector_ids(cls, ids: list[UUID], values: dict) -> list[UUID]:
         """Validate the class resource chunk ids."""
         completed_status = ClassResourceProcessingStatus.COMPLETED
         if values.get("status") == completed_status and not ids:
-            raise ValueError("The class resource chunk ids must NOT " \
+            raise ValueError("The class resource child ids must NOT " \
                 f"be empty if the status is {completed_status}. Values you provided: {values}"
             )
         return ids
@@ -57,7 +57,7 @@ class ClassResourceDocument(StatefulClassResourceDocument):
             class_id=ingested_doc.class_id,
             full_resource_url=ingested_doc.full_resource_url,
             preview_image_url=ingested_doc.preview_image_url,
-            data_pointer=ingested_doc.data_pointer,
+            data_pointer=ingested_doc.full_resource_url,
             status=status,
             hashed_document_contents=ingested_doc.hashed_document_contents,
             metadata=Metadata(

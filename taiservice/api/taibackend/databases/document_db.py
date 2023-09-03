@@ -43,14 +43,6 @@ class DateRange(BasePydanticModel):
     )
 
 
-class UsageMetric(BasePydanticModel):
-    """Define the usage log model for tracking usage of resources."""
-    timestamp: datetime = Field(
-        ...,
-        description="The date of the usage metric.",
-    )
-
-
 class Metadata(BasePydanticModel):
     """Define the metadata of the class resource."""
 

@@ -1,10 +1,12 @@
 """Define metrics utilities and classes for retrieving and aggregating metrics for the TAIService API."""
 from typing import Optional
+from datetime import datetime
 from uuid import UUID
 from pydantic import Field, conint
 
 from ...api.taibackend.shared_schemas import BasePydanticModel, DateRange
-from .databases.document_db_schemas import ClassResourceChunkDocument
+from .shared_schemas import UsageMetric
+from .databases.document_db_schemas import ClassResourceChunkDocument, ClassResourceDocument
 from .databases.document_db import DocumentDB
 
 
@@ -65,6 +67,13 @@ class Metrics:
     def __init__(self, config: MetricsConfig):
         """Initialize the metrics class."""
         self._doc_db = config.document_db_instance
+
+    def upsert_metrics_for_docs(self, docs: list[ClassResourceChunkDocument | ClassResourceDocument]) -> None:
+        """Upsert the metrics of the class resource."""
+        for doc in docs:
+            metric = UsageMetric(timestamp=datetime.utcnow())
+            self._doc_db.upsert_metric(doc, metric)
+            doc.usage_log.append(metric) # updates the document in memory
 
     def get_most_frequently_accessed_resources(self, class_id: UUID, date_range: Optional[DateRange] = None) -> FrequentlyAccessedResources:
         """Get the most frequently accessed resources."""
