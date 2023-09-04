@@ -386,6 +386,7 @@ class TAISearch:
                     last_chapter = chapters[-1]
                 elif not chapters and last_chapter:
                     chapters = [last_chapter]
+                merged_metadata = document.metadata.dict() | split_doc.metadata
                 chunk_doc = ClassResourceChunkDocument(
                     id=uuid4(),
                     chunk=split_doc.page_content,
@@ -396,8 +397,7 @@ class TAISearch:
                         sections=self._extract_section_numbers(split_doc),
                         chunk_size=chunk_size,
                         vector_id=uuid4(),
-                        **document.metadata.dict(),
-                        **split_doc.metadata,
+                        **merged_metadata,
                     ),
                     **document.dict(exclude={"id", "metadata"}),
                 )

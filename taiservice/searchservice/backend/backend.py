@@ -312,8 +312,9 @@ class Backend:
         for chunk_doc in chunk_docs:
             resource = resource_dict.get(chunk_doc.resource_id)
             if resource and resource.id not in resources_docs_already_replaced:
-                resources_docs_already_replaced.add(resource.id)
-                resource.full_resource_url = chunk_doc.raw_chunk_url
+                if chunk_doc.raw_chunk_url:
+                    resources_docs_already_replaced.add(resource.id)
+                    resource.full_resource_url = chunk_doc.raw_chunk_url
 
     def _get_resource_ids_from_chunks(
         self, docs: Union[list[ClassResourceChunkDocument], ClassResourceChunkDocument], unique: bool = True

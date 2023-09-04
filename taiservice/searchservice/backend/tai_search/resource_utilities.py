@@ -220,6 +220,14 @@ class YouTubeVideoDocumentUtility(DocumentUtility):
         """Upload the resource to the cloud and pass out a copy of the document with the cloud url."""
         self._ingested_doc.full_resource_url = f"https://www.youtube.com/watch?v={self._ingested_doc.data_pointer}"
 
+    def augment_chunks(self, chunk_docs: list[ClassResourceChunkDocument]) -> list[ClassResourceChunkDocument]:
+        """Augment the chunk documents."""
+        for chunk in chunk_docs:
+            chunk_dict = chunk.metadata.dict()
+            if "start" in chunk_dict:
+                chunk.raw_chunk_url = f"https://www.youtube.com/watch?v={self._ingested_doc.data_pointer}&t={chunk_dict['start']}s"
+        return chunk_docs
+
 
 class GenericTextDocumentUtility(DocumentUtility):
     """Implement the Generic Text Document Utility."""
