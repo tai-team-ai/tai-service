@@ -1,19 +1,16 @@
 """Define the data ingestor schemas."""
-from hashlib import sha1
 from enum import Enum
-from pathlib import Path
-import re
-from typing import Union
-from pydantic import Field, root_validator, validator, HttpUrl
+from typing import Optional, Type
+from pydantic import Field, validator
 from langchain.text_splitter import Language
-import requests
+from langchain.document_loaders.base import BaseLoader
 from ..shared_schemas import (
     BaseClassResourceDocument,
     StatefulClassResourceDocument,
 )
 
 
-class InputFomat(str, Enum):
+class InputFormat(str, Enum):
     """Define the supported input formats."""
 
     PDF = "pdf"
@@ -45,16 +42,6 @@ class LatexExtension(str, Enum):
     LATEX = ".latex"
 
 
-# These loading strategies must match the corresponding class name in langchain
-class LoadingStrategy(str, Enum):
-    """Define the loading strategies."""
-
-    PyMuPDFLoader = "PyMuPDFLoader"
-    UnstructuredMarkdownLoader = "UnstructuredMarkdownLoader"
-    BSHTMLLoader = "BSHTMLLoader"
-    YoutubeLoader = "YoutubeLoader"
-
-
 class SplitterStrategy(str, Enum):
     """Define the splitter strategies."""
 
@@ -72,23 +59,13 @@ class InputDataIngestStrategy(str, Enum):
     # WEB_CRAWL = "web_crawl"
 
 
-LOADING_STRATEGY_MAPPING = {
-    InputFomat.PDF: LoadingStrategy.PyMuPDFLoader,
-    InputFomat.GENERIC_TEXT: LoadingStrategy.UnstructuredMarkdownLoader,
-    InputFomat.LATEX: LoadingStrategy.UnstructuredMarkdownLoader,
-    InputFomat.MARKDOWN: LoadingStrategy.UnstructuredMarkdownLoader,
-    InputFomat.HTML: LoadingStrategy.BSHTMLLoader,
-    InputFomat.YOUTUBE_VIDEO: LoadingStrategy.YoutubeLoader,
-}
-
-
 SPLITTER_STRATEGY_MAPPING = {
-    InputFomat.PDF: SplitterStrategy.RecursiveCharacterTextSplitter,
-    InputFomat.GENERIC_TEXT: SplitterStrategy.RecursiveCharacterTextSplitter,
-    InputFomat.LATEX: Language.LATEX,
-    InputFomat.MARKDOWN: Language.MARKDOWN,
-    InputFomat.HTML: Language.HTML,
-    InputFomat.YOUTUBE_VIDEO: SplitterStrategy.RecursiveCharacterTextSplitter,
+    InputFormat.PDF: SplitterStrategy.RecursiveCharacterTextSplitter,
+    InputFormat.GENERIC_TEXT: SplitterStrategy.RecursiveCharacterTextSplitter,
+    InputFormat.LATEX: Language.LATEX,
+    InputFormat.MARKDOWN: Language.MARKDOWN,
+    InputFormat.HTML: Language.HTML,
+    InputFormat.YOUTUBE_VIDEO: SplitterStrategy.RecursiveCharacterTextSplitter,
 }
 TOTAL_PAGE_COUNT_STRINGS = [
     "total_pages",
@@ -111,21 +88,12 @@ class InputDocument(BaseClassResourceDocument):
 class IngestedDocument(StatefulClassResourceDocument):
     """Define the ingested document."""
 
-    input_format: InputFomat = Field(
+    input_format: InputFormat = Field(
         ...,
         description="The format of the input document.",
     )
-    loading_strategy: LoadingStrategy = Field(
-        ...,
-        description="The loading strategy for the input document.",
+
+    loader: Optional[BaseLoader] = Field(
+        default=None,
+        description="The loader for the input document.",
     )
-
-
-    @validator("loading_strategy")
-    def verify_loading_strategy(cls, loading_strategy: LoadingStrategy, values: dict) -> LoadingStrategy:
-        """Verify the loading strategy."""
-        if values.get("input_format") is not None:
-            assert (
-                loading_strategy == LOADING_STRATEGY_MAPPING[values.get("input_format")]
-            ), "The loading strategy must match the input format."
-        return loading_strategy

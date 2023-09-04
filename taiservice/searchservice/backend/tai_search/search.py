@@ -24,15 +24,16 @@ from pinecone_text.sparse import SpladeEncoder
 from .data_ingestors import (
     get_text_splitter,
     get_page_number,
-    get_total_page_count,
+
     S3ObjectIngestor,
     WebPageIngestor,
     Ingestor,
     RawUrlIngestor,
 )
+from .loaders import loading_strategy_factory
 from .data_ingestor_schema import (
     IngestedDocument,
-    InputFomat,
+    InputFormat,
     InputDocument,
     InputDataIngestStrategy,
 )
@@ -174,10 +175,7 @@ class TAISearch:
         self._s3_prefix = ""
         os.environ["PATH"] += f":{tai_search_config.chrome_driver_path}"
 
-    def index_resource(
-        self,
-        ingested_document: IngestedDocument
-    ) -> ClassResourceDocument:
+    def index_resource(self, ingested_document: IngestedDocument) -> ClassResourceDocument:
         """Index a document."""
         logger.info(f"Crawling document: {ingested_document.id}")
         ingested_document, parent_class_resource = self._save_document_to_cold_store(ingested_document)
@@ -192,8 +190,7 @@ class TAISearch:
             class_resource_document.parent_resource_ids.append(parent_class_resource.id)
 
             logger.info(f"Loading and splitting document: {ingested_document.id}")
-            chunk_documents = self._load_and_split_document(ingested_document, ChunkSize.LARGE)
-            chunk_documents.extend(self._load_and_split_document(ingested_document, ChunkSize.SMALL))
+            chunk_documents = self._load_and_split_document(ingested_document, [ChunkSize.SMALL, ChunkSize.LARGE])
             logger.info(f"Finished loading and splitting document into {len(chunk_documents)} chunks: {ingested_document.id}")
             class_resource_document.class_resource_chunk_ids.extend([chunk_doc.id for chunk_doc in chunk_documents])
 
@@ -209,9 +206,7 @@ class TAISearch:
             logger.info(f"Finished loading {len(vector_documents)} vectors to vector store: {ingested_document.id}")
         return parent_class_resource
 
-    def get_relevant_class_resources(
-        self, query: str, class_id: UUID, for_tai_tutor: bool
-    ) -> list[ClassResourceChunkDocument]:
+    def get_relevant_class_resources(self, query: str, class_id: UUID, for_tai_tutor: bool) -> list[ClassResourceChunkDocument]:
         """
         Get the most relevant class resources.
 
@@ -291,7 +286,7 @@ class TAISearch:
         except Exception as e:
             logger.warning(f"Failed to create thumbnail for document: {ingested_document.id}")
         logger.info(f"Uploading resource to cold store: {ingested_document.id}")
-        # TODO: this could result in storage leaks in S3 if the upload suceeds but we don't 
+        # TODO: this could result in storage leaks in S3 if the upload suceeds but we don't
         # save the document to the db. For now, because of how cheap S3 is, we'll just ignore
         # this issue until we scale to 1000s of classrooms using the app.
         utility.upload_resource()
@@ -361,51 +356,43 @@ class TAISearch:
             document.page_content = re.sub(pattern, character * max_chars_in_a_row, document.page_content)
         return document
 
-    def _load_and_split_document(self, document: IngestedDocument, chunk_size: ChunkSize) -> list[ClassResourceChunkDocument]:
+    def _load_and_split_document(self, document: IngestedDocument, chunk_sizes: list[ChunkSize]) -> list[ClassResourceChunkDocument]:
         """Split and load a document."""
         # TODO: it's probably a good idea to add this to the resource utilities classes as the chunk urls
         # may need to be dynamically updated, like in the case of YouTube where we need to add a timestamp
         split_docs: list[Document] = []
-        try:
-            Loader: BaseLoader = getattr(document_loaders, document.loading_strategy)
-            data_pointer = document.data_pointer
-            if isinstance(data_pointer, Path):
-                data_pointer = str(data_pointer.resolve())
-            loader: BaseLoader = Loader(data_pointer)
-            input_format = document.input_format
-            if isinstance(loader, document_loaders.BSHTMLLoader):
-                # the beautiful soup loader converts html to text so we need to change the input format
-                input_format = InputFomat.GENERIC_TEXT
-            splitter: TextSplitter = get_text_splitter(input_format, chunk_size)
-            # TODO: once we use mathpix, i think we can split pdfs better. Without mathpix, the pdfs don't get split well
-            split_docs = loader.load_and_split(splitter)
-        except Exception as e:  # pylint: disable=broad-except
-            logger.critical(traceback.format_exc())
-            raise RuntimeError("Failed to load and split document.") from e
+        document = loading_strategy_factory(document)
+        if isinstance(document.loader, document_loaders.BSHTMLLoader):
+            # the beautiful soup loader converts html to text so we need to change the input format
+            document.input_format = InputFormat.GENERIC_TEXT
+        loaded_docs = document.loader.load()
         chunk_documents = []
-        last_chapter = ""
-        chapters = []
-        for split_doc in split_docs:
-            chapters = self._extract_chapter_numbers(split_doc)
-            if chapters:
-                last_chapter = chapters[-1]
-            elif not chapters and last_chapter:
-                chapters = [last_chapter]
-            chunk_doc = ClassResourceChunkDocument(
-                id=uuid4(),
-                chunk=split_doc.page_content,
-                resource_id=document.id,
-                metadata=ChunkMetadata(
-                    class_id=document.class_id,
-                    chapters=chapters,
-                    sections=self._extract_section_numbers(split_doc),
-                    chunk_size=chunk_size,
-                    vector_id=uuid4(),
-                    **document.metadata.dict(),
-                ),
-                **document.dict(exclude={"id", "metadata"}),
-            )
-            chunk_documents.append(chunk_doc)
+        for chunk_size in chunk_sizes:
+            splitter: TextSplitter = get_text_splitter(document.input_format, chunk_size)
+            split_docs = splitter.split_documents(loaded_docs)
+            last_chapter = ""
+            chapters = []
+            for split_doc in split_docs:
+                chapters = self._extract_chapter_numbers(split_doc)
+                if chapters:
+                    last_chapter = chapters[-1]
+                elif not chapters and last_chapter:
+                    chapters = [last_chapter]
+                chunk_doc = ClassResourceChunkDocument(
+                    id=uuid4(),
+                    chunk=split_doc.page_content,
+                    resource_id=document.id,
+                    metadata=ChunkMetadata(
+                        class_id=document.class_id,
+                        chapters=chapters,
+                        sections=self._extract_section_numbers(split_doc),
+                        chunk_size=chunk_size,
+                        vector_id=uuid4(),
+                        **document.metadata.dict(),
+                    ),
+                    **document.dict(exclude={"id", "metadata"}),
+                )
+                chunk_documents.append(chunk_doc)
         return chunk_documents
 
     def _extract_chapter_numbers_from_query(self, query: str) -> list[str]:
@@ -434,7 +421,7 @@ class TAISearch:
 
     def _get_page_number(self, document: Document, ingested_document: IngestedDocument) -> Optional[int]:
         """Get page number for document."""
-        if ingested_document.input_format == InputFomat.PDF:
+        if ingested_document.input_format == InputFormat.PDF:
             return get_page_number(document)
 
     def embed_documents(

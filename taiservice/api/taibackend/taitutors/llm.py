@@ -4,6 +4,7 @@ from datetime import timedelta
 from typing import Any, Dict, Optional
 from uuid import UUID
 import tiktoken
+from openai.error import InvalidRequestError
 from pydantic import BaseModel, Field
 from langchain.chat_models import ChatOpenAI
 from langchain import PromptTemplate
@@ -12,7 +13,7 @@ from langchain.chains.openai_functions.base import create_openai_fn_chain
 from loguru import logger
 # first imports are for local development, second imports are for deployment
 try:
-    from .errors import UserTokenLimitError
+    from .errors import UserTokenLimitError, OverContextWindowError
     from .llm_functions import (
         get_relevant_class_resource_chunks,
         save_student_conversation_topics,
@@ -41,7 +42,7 @@ try:
     from ..databases.user_data import UserDB, DynamoDB
 except (KeyError, ImportError):
     from routers.tai_schemas import ClassResourceSnippet
-    from taibackend.taitutors.errors import UserTokenLimitError
+    from taibackend.taitutors.errors import UserTokenLimitError, OverContextWindowError
     from taibackend.taitutors.llm_functions import (
         get_relevant_class_resource_chunks,
         save_student_conversation_topics,
@@ -103,7 +104,7 @@ class ChatOpenAIConfig(BaseModel):
         description="The interval after which the token count of a user is reset.",
     )
     token_limit_per_interval: int = Field(
-        default=10,
+        default=50000,
         description="The maximum number of tokens per interval.",
     )
 
@@ -236,7 +237,7 @@ class TaiLLM:
 
     def _add_tai_tutor_chat_response(
         self,
-        chat_session: BaseLLMChatSession,
+        chat_session: TaiChatSession,
         relevant_chunks: Optional[list[ClassResourceSnippet]] = None,
         function_to_call: Optional[callable] = None,
         functions: Optional[list[callable]] = None,
@@ -298,7 +299,13 @@ class TaiLLM:
             raise ValueError(f"Invalid model name: {model_name}")
         if self._user_data.is_user_over_token_limit(chat_session.user_id):
             raise UserTokenLimitError(chat_session.user_id)
-        chat_message = ModelToUse(messages=chat_session.messages, **kwargs)
+        try:
+            chat_message = ModelToUse(messages=chat_session.messages, **kwargs)
+        except InvalidRequestError as e:
+            logger.error(e)
+            if e.code == "context_length_exceeded":
+                raise OverContextWindowError(chat_session.user_id) from e
+            raise e
         if chat_session.user_id:
             self._user_data.update_token_count(
                 user_id=chat_session.user_id,

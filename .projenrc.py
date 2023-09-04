@@ -13,9 +13,7 @@ from projen import (
 )
 
 
-def convert_dict_env_vars_to_env_vars(
-    env_vars: dict, output: Literal["docker", "list"] = "docker"
-) -> Union[str, list]:
+def convert_dict_env_vars_to_env_vars(env_vars: dict, output: Literal["docker", "list"] = "docker") -> Union[str, list]:
     """Convert a dictionary of environment variables to a string or list of strings."""
     if output == "docker":
         return " ".join([f'-e {key}="{value}"' for key, value in env_vars.items()])
@@ -72,7 +70,7 @@ project: Project = AwsCdkPythonApp(
         "tiktoken",
         "psutil",
         "gunicorn",
-        "uvicorn[standard]", # installs high performance ASGI server
+        "uvicorn[standard]",  # installs high performance ASGI server
         "markdown",
         "youtube-transcript-api",
     ],
@@ -88,25 +86,15 @@ SEARCH_SERVICE_API_URL = {
     "SEARCH_SERVICE_API_URL": "http://localhost:8080"
 }  # this gets set during deployment so this is for local dev
 PINECONE_DB_ENVIRONMENT = {"PINECONE_DB_ENVIRONMENT": "us-east-1-aws"}
-PINECONE_DB_API_KEY_SECRET_NAME = {
-    "PINECONE_DB_API_KEY_SECRET_NAME": "dev/tai_service/pinecone_db/api_key"
-}
-OPENAI_API_KEY_SECRET_NAME = {
-    "OPENAI_API_KEY_SECRET_NAME": "dev/tai_service/openai/api_key"
-}
-DOC_DB_READ_ONLY_USER_PASSWORD_SECRET_NAME = (
-    "dev/tai_service/document_DB/read_ONLY_user_password"
-)
-DOC_DB_READ_WRITE_USER_PASSWORD_SECRET_NAME = (
-    "dev/tai_service/document_DB/read_write_user_password"
-)
+PINECONE_DB_API_KEY_SECRET_NAME = {"PINECONE_DB_API_KEY_SECRET_NAME": "dev/tai_service/pinecone_db/api_key"}
+OPENAI_API_KEY_SECRET_NAME = {"OPENAI_API_KEY_SECRET_NAME": "dev/tai_service/openai/api_key"}
+DOC_DB_READ_ONLY_USER_PASSWORD_SECRET_NAME = "dev/tai_service/document_DB/read_ONLY_user_password"
+DOC_DB_READ_WRITE_USER_PASSWORD_SECRET_NAME = "dev/tai_service/document_DB/read_write_user_password"
 DOC_DB_FULLY_QUALIFIED_DOMAIN_NAME = {
     "DOC_DB_FULLY_QUALIFIED_DOMAIN_NAME": "tai-service-645860363137.us-east-1.docdb-elastic.amazonaws.com"
 }
 DOC_DB_DATABASE_NAME = {"DOC_DB_DATABASE_NAME": "class_resources"}
-DOC_DB_CLASS_RESOURCE_COLLECTION_NAME = {
-    "DOC_DB_CLASS_RESOURCE_COLLECTION_NAME": "class_resource"
-}
+DOC_DB_CLASS_RESOURCE_COLLECTION_NAME = {"DOC_DB_CLASS_RESOURCE_COLLECTION_NAME": "class_resource"}
 AWS_DEFAULT_REGION = {"AWS_DEFAULT_REGION": "us-east-1"}
 LOG_LEVEL = {"LOG_LEVEL": "DEBUG"}
 
@@ -148,6 +136,7 @@ SEARCH_SERVICE_RUNTIME_ENV_VARS = (
         "COLD_STORE_BUCKET_NAME": "tai-service-class-resource-cold-store-dev",
         "DOCUMENTS_TO_INDEX_QUEUE": "tai-service-documents-to-index-queue-dev",
         "NLTK_DATA": "/tmp/nltk_data",
+        "MATHPIX_API_SECRET": "{\"secret_name\": \"dev/tai_service/mathpix_api_secret\"}",
     }
     | PINECONE_DB_API_KEY_SECRET_NAME
     | PINECONE_DB_ENVIRONMENT

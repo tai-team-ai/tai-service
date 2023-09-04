@@ -1,5 +1,5 @@
 """Define data ingestors used by the tai_search."""
-from typing import Callable, Optional, Union, Any
+from typing import Optional, Type
 from abc import ABC, abstractmethod
 from uuid import uuid4
 from enum import Enum
@@ -12,8 +12,6 @@ from bs4 import BeautifulSoup
 import tiktoken
 from loguru import logger
 import requests
-import boto3
-from pydantic import HttpUrl
 from langchain.text_splitter import TextSplitter, RecursiveCharacterTextSplitter
 from langchain import text_splitter
 from langchain.schema import Document
@@ -29,9 +27,8 @@ from .data_ingestor_schema import (
     Language,
     TOTAL_PAGE_COUNT_STRINGS,
     PAGE_NUMBER_STRINGS,
-    LOADING_STRATEGY_MAPPING,
     InputDocument,
-    InputFomat,
+    InputFormat,
 )
 from ..shared_schemas import ChunkSize
 
@@ -54,7 +51,7 @@ OVERLAP_SIZE_TO_CHAR_COUNT_MAPPING = {
 }
 
 
-def get_text_splitter(input_format: InputFomat, chunk_size: ChunkSize) -> TextSplitter:
+def get_text_splitter(input_format: InputFormat, chunk_size: ChunkSize) -> TextSplitter:
     """Get the splitter strategy."""
     strategy_instructions = SPLITTER_STRATEGY_MAPPING.get(input_format)
     kwargs = {
@@ -93,29 +90,29 @@ class Ingestor(ABC):
         """Ingest the data."""
 
     @staticmethod
-    def _get_input_format(input_pointer: str) -> InputFomat:
+    def _get_input_format(input_pointer: str) -> InputFormat:
         """Get the file type."""
 
-        def check_file_type(path: Path, extension_enum: Enum) -> bool:
+        def check_file_type(path: Path, extension_enum: Type[Enum]) -> bool:
             """Check if the file type matches given extensions."""
             return path.suffix in [extension.value for extension in extension_enum]
 
-        def get_text_file_type(path: Path, file_contents: str) -> InputFomat:
+        def get_text_file_type(path: Path, file_contents: str) -> InputFormat:
             """Get the text file type."""
             if check_file_type(path, LatexExtension):
-                return InputFomat.LATEX
+                return InputFormat.LATEX
             elif check_file_type(path, MarkdownExtension):
-                return InputFomat.MARKDOWN
+                return InputFormat.MARKDOWN
             elif bool(BeautifulSoup(file_contents, "html.parser").find()):
-                return InputFomat.HTML
-            return InputFomat.GENERIC_TEXT
+                return InputFormat.HTML
+            return InputFormat.GENERIC_TEXT
 
-        def get_url_type(url: str) -> InputFomat:
+        def get_url_type(url: str) -> InputFormat:
             parsed_url = urllib.parse.urlparse(url)
             netloc = parsed_url.netloc
             path = parsed_url.path
             if netloc in YOUTUBE_NETLOCS and path.startswith("/watch"):
-                return InputFomat.YOUTUBE_VIDEO
+                return InputFormat.YOUTUBE_VIDEO
             else:
                 raise ValueError(f"Unsupported url type: {url}")
 
@@ -127,7 +124,7 @@ class Ingestor(ABC):
             path = Path(input_pointer)
             kind = filetype.guess(path)
             if kind:
-                return InputFomat(kind.extension)
+                return InputFormat(kind.extension)
             else:
                 with open(path, "r", encoding="utf-8") as f:
                     return get_text_file_type(path, f.read())
@@ -150,7 +147,6 @@ class Ingestor(ABC):
         document = IngestedDocument(
             data_pointer=tmp_path,
             input_format=file_type,
-            loading_strategy=LOADING_STRATEGY_MAPPING[file_type],
             **input_data.dict(),
         )
         return document
@@ -204,14 +200,13 @@ class RawUrlIngestor(Ingestor):
     def ingest_data(cls, input_data: InputDocument, bucket_name: str) -> IngestedDocument:
         """Ingest the data from a raw URL."""
         url_type = cls._get_input_format(str(input_data.full_resource_url))
-        if url_type == InputFomat.YOUTUBE_VIDEO:
+        if url_type == InputFormat.YOUTUBE_VIDEO:
             data_pointer = YoutubeLoader.extract_video_id(input_data.full_resource_url)
         else:
             data_pointer = input_data.full_resource_url
         document = IngestedDocument(
             data_pointer=data_pointer,
             input_format=url_type,
-            loading_strategy=LOADING_STRATEGY_MAPPING[url_type],
             **input_data.dict(),
         )
         return document

@@ -2,7 +2,7 @@
 from fastapi import APIRouter, Request, status, HTTPException
 from loguru import logger
 try:
-    from ..taibackend.taitutors.errors import UserTokenLimitError
+    from ..taibackend.taitutors.errors import UserTokenLimitError, OverContextWindowError
     from ..taibackend.backend import Backend
     from .tai_schemas import(
         SearchResults,
@@ -12,7 +12,7 @@ try:
     )
     from ..runtime_settings import BACKEND_ATTRIBUTE_NAME
 except ImportError:
-    from taibackend.taitutors.errors import UserTokenLimitError
+    from taibackend.taitutors.errors import UserTokenLimitError, OverContextWindowError
     from taibackend.backend import Backend
     from routers.tai_schemas import (
         SearchResults,
@@ -30,6 +30,8 @@ def handle_error(exc: Exception) -> dict:
     """Handle exceptions."""
     if isinstance(exc, UserTokenLimitError):
         raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail=exc.message)
+    elif isinstance(exc, OverContextWindowError):
+        raise HTTPException(status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, detail=exc.message)
     logger.error(exc)
     raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal Server Error")
 

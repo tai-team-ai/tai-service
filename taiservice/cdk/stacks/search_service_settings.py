@@ -15,7 +15,12 @@ from taiservice.cdk.constructs.customresources.pinecone_db.pinecone_db_custom_re
     PineconeIndexConfig,
     PineconeDBSettings,
 )
-from taiservice.searchservice.runtime_settings import SearchServiceSettings, LogLevel
+from taiservice.searchservice.runtime_settings import (
+    SearchServiceSettings,
+    LogLevel,
+    Secret,
+    Secrets,
+)
 from .deployment_settings import AWS_DEPLOYMENT_SETTINGS
 from ..constructs.construct_config import BaseDeploymentSettings
 
@@ -82,4 +87,5 @@ SEARCH_SERVICE_SETTINGS = DeploymentTaiApiSettings(
     cold_store_bucket_name="tai-service-class-resource-cold-store",
     documents_to_index_queue="tai-service-documents-to-index-queue",
     log_level=LogLevel.DEBUG if AWS_DEPLOYMENT_SETTINGS.deployment_type == DeploymentType.DEV else LogLevel.INFO,
+    mathpix_api_secret=Secret(secret_name="dev/tai_service/mathpix_api_secret"),
 )

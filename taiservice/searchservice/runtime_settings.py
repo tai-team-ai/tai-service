@@ -1,7 +1,11 @@
 """Define the runtime settings for the TAI Search Service."""
+import json
+from typing import Any, Union, Optional
 from enum import Enum
 from pathlib import Path
 from pydantic import Field, BaseSettings
+import boto3
+from botocore.exceptions import ClientError
 from .backend.databases.pinecone_db import Environment as PineconeEnvironment
 
 
@@ -27,6 +31,49 @@ class LogLevel(str, Enum):
     WARNING = "WARNING"
     ERROR = "ERROR"
     CRITICAL = "CRITICAL"
+
+
+class Secret(BaseSettings):
+    """Define the secret model."""
+    secret_name: str = Field(
+        ...,
+        description="The name of the secret.",
+    )
+
+    @property
+    def secret_value(self) -> Union[dict[str, Any], str]:
+        """Return the secret value."""
+        return self.get_secret_value(self.secret_name)
+
+    @staticmethod
+    def get_secret_value(secret_name: str) -> Union[dict[str, Any], str]:
+        """Get the secret value."""
+        session = boto3.session.Session()
+        client = session.client(service_name="secretsmanager")
+        try:
+            get_secret_value_response = client.get_secret_value(SecretId=secret_name)
+        except ClientError as e:
+            raise RuntimeError(f"Failed to get secret value: {e}") from e
+        secret = get_secret_value_response["SecretString"]
+        try:
+            return json.loads(secret)
+        except json.JSONDecodeError:
+            return secret
+
+
+class Secrets(BaseSettings):
+    """Define the secrets model."""
+    secrets: list[Secret] = Field(
+        ...,
+        description="The list of secrets.",
+    )
+
+    def get_kwargs(self) -> dict[str, Any]:
+        """Return the kwargs."""
+        kwargs = {}
+        for secret in self.secrets:
+            kwargs[secret.secret_name] = secret.secret_value
+        return kwargs
 
 
 class SearchServiceSettings(BaseSettings):
@@ -124,6 +171,10 @@ class SearchServiceSettings(BaseSettings):
         default=LogLevel.INFO,
         description="The log level for the service.",
     )
+    mathpix_api_secret: Optional[Secret] = Field(
+        default=None,
+        description="The secrets for the Mathpix API.",
+    )
 
     class Config:
         """Define the Pydantic config."""
@@ -134,11 +185,17 @@ class SearchServiceSettings(BaseSettings):
     @property
     def secret_names(self) -> list[str]:
         """Return the names of the secrets used by the service."""
-        return [
+        secrets = [
             self.openAI_api_key_secret_name,
             self.doc_db_credentials_secret_name,
             self.pinecone_db_api_key_secret_name,
+            self.mathpix_api_secret.secret_name if self.mathpix_api_secret else None,
         ]
+        output = []
+        for secret in secrets:
+            if secret:
+                output.append(secret)
+        return output
 
     def get_docker_file_contents(
         self,

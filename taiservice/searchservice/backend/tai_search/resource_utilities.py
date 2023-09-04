@@ -16,7 +16,7 @@ import requests
 from selenium import webdriver
 from pydantic import HttpUrl
 
-from taiservice.searchservice.backend.tai_search.data_ingestor_schema import IngestedDocument, InputFomat
+from taiservice.searchservice.backend.tai_search.data_ingestor_schema import IngestedDocument, InputFormat
 from .data_ingestor_schema import IngestedDocument, BaseClassResourceDocument
 from ..databases.document_db_schemas import ClassResourceDocument, ClassResourceProcessingStatus
 
@@ -141,7 +141,9 @@ class HTMLDocumentUtility(DocumentUtility):
     def upload_resource(self) -> None:
         """Upload the resource to the cloud and pass out a copy of the document with the cloud url."""
         if isinstance(self._ingested_doc.data_pointer, Path):
-            url = upload_file_to_s3(self._ingested_doc.data_pointer, self._thumbnail_bucket_name, self._ingested_doc.data_pointer.name)
+            url = upload_file_to_s3(
+                self._ingested_doc.data_pointer, self._thumbnail_bucket_name, self._ingested_doc.data_pointer.name
+            )
         elif isinstance(self._ingested_doc.data_pointer, HttpUrl):
             url = str(self._ingested_doc.data_pointer)
         else:
@@ -167,7 +169,6 @@ class YouTubeVideoDocumentUtility(DocumentUtility):
             if response.status_code == 200:
                 self._ingested_doc.preview_image_url = url
                 break
-
 
     def upload_resource(self) -> None:
         """Upload the resource to the cloud and pass out a copy of the document with the cloud url."""
@@ -308,10 +309,10 @@ class PDFResourceCrawler(ResourceCrawler):
 
 def resource_utility_factory(bucket_name: str, ingested_doc: IngestedDocument) -> DocumentUtility:
     """Create the resource utility."""
-    resource_utility_factory_mapping: dict[InputFomat, DocumentUtility] = {
-        InputFomat.PDF: PDFDocumentUtility,
-        InputFomat.HTML: HTMLDocumentUtility,
-        InputFomat.YOUTUBE_VIDEO: YouTubeVideoDocumentUtility,
+    resource_utility_factory_mapping: dict[InputFormat, DocumentUtility] = {
+        InputFormat.PDF: PDFDocumentUtility,
+        InputFormat.HTML: HTMLDocumentUtility,
+        InputFormat.YOUTUBE_VIDEO: YouTubeVideoDocumentUtility,
     }
     utility = resource_utility_factory_mapping.get(ingested_doc.input_format)
     if not utility:
@@ -322,7 +323,7 @@ def resource_utility_factory(bucket_name: str, ingested_doc: IngestedDocument) -
 def resource_crawler_factory(ingested_doc: IngestedDocument) -> ResourceCrawler:
     """Create the resource crawler."""
     resource_crawler_factory_mapping = {
-        InputFomat.PDF: PDFResourceCrawler,
+        InputFormat.PDF: PDFResourceCrawler,
     }
     resource_crawler = resource_crawler_factory_mapping.get(ingested_doc.input_format, DefaultCrawler)
     return resource_crawler(ingested_doc)

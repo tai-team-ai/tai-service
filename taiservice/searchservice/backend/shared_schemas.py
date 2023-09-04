@@ -77,6 +77,7 @@ class BasePydanticModel(BaseModel):
         use_enum_values = True
         allow_population_by_field_name = True
         validate_assignment = True
+        arbitrary_types_allowed = True
 
 
 class DateRange(BasePydanticModel):
