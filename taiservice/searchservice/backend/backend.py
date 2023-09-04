@@ -289,6 +289,7 @@ class Backend:
         resource_ids = self._get_resource_ids_from_chunks(chunk_docs)
         # When retrieving for TAI tutor, the class resources are never used, so we don't need to retrieve them to improve response time
         resource_docs = [] if for_tai_tutor else self._doc_db.get_class_resources(resource_ids, ClassResourceDocument)
+        self._replace_urls_with_chunk_urls(resource_docs, chunk_docs)
         sorted_resources = self._sort_class_resources(resource_docs, chunk_docs)
         search_results = SearchEngineResponse(
             short_snippets=self.to_api_resources(small_chunks),
@@ -304,6 +305,15 @@ class Backend:
             logger.info(f"Finished updating metrics for {len(chunk_docs)} documents")
 
         return search_results, update_metric
+
+    def _replace_urls_with_chunk_urls(self, resource_docs: list[ClassResourceDocument], chunk_docs: list[ClassResourceChunkDocument]) -> None:
+        resource_dict = {resource.id: resource for resource in resource_docs}
+        resources_docs_already_replaced = set()
+        for chunk_doc in chunk_docs:
+            resource = resource_dict.get(chunk_doc.resource_id)
+            if resource and resource.id not in resources_docs_already_replaced:
+                resources_docs_already_replaced.add(resource.id)
+                resource.full_resource_url = chunk_doc.raw_chunk_url
 
     def _get_resource_ids_from_chunks(
         self, docs: Union[list[ClassResourceChunkDocument], ClassResourceChunkDocument], unique: bool = True
@@ -331,9 +341,11 @@ class Backend:
         """Rank class resources based on the order of the ChunkDocuments."""
         resource_dict = {resource.id: resource for resource in class_resources}
         sorted_resources = []
+        already_sorted_resources = set()
         for chunk_doc in chunk_documents:
             resource = resource_dict.get(chunk_doc.resource_id)
-            if resource:
+            if resource and resource.id not in already_sorted_resources:
+                already_sorted_resources.add(resource.id)
                 sorted_resources.append(resource)
         return sorted_resources
 

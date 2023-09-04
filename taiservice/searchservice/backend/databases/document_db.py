@@ -103,7 +103,8 @@ class DocumentDB:
     def get_class_resources(self,
         ids: Union[list[UUID], UUID],
         DocClass: Type[ClassResourceDocument | ClassResourceChunkDocument],
-        from_class_ids: bool=False,
+        from_class_ids: bool = False,
+        get_root_doc: bool = True,
     ) -> list[ClassResourceDocument | ClassResourceChunkDocument]:
         """Return the full class resources."""
         ids = [ids] if isinstance(ids, UUID) else ids
@@ -112,12 +113,12 @@ class DocumentDB:
         db_filter: dict[str, Any]
         if from_class_ids:
             db_filter = {"class_id": {"$in": ids}}
+            if DocClass == ClassResourceDocument:
+                # this check ensures we find the root doc for the class resource and not a child doc.
+                # Example: PDF vs pages in a PDF
+                db_filter.update({"$or": [{"parent_resource_ids": {"$exists": False}}, {"parent_resource_ids": []}]})
         else:
             db_filter = {"_id": {"$in": ids}}
-        if DocClass == ClassResourceDocument:
-            # this check ensures we find the root doc for the class resource and not a child doc.
-            # Example: PDF vs pages in a PDF
-            db_filter.update({"$or": [{"parent_resource_ids": {"$exists": False}}, {"parent_resource_ids": []}]})
         documents = list(collection.find(db_filter))
         documents = [DocClass.parse_obj(document) for document in documents]
         return documents
