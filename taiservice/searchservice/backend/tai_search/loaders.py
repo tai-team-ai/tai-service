@@ -102,7 +102,7 @@ class YoutubeLoader(BaseLoader):
     def __init__(
         self,
         video_id: str,
-        add_video_info: bool = False,
+        add_video_info: bool = True,
         language: Union[str, Sequence[str]] = "en",
         translation: str = "en",
         continue_on_failure: bool = False,
