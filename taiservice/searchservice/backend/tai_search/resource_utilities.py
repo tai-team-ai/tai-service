@@ -1,5 +1,6 @@
 """Define the module with code to screenshot class resources."""
 import copy
+from uuid import uuid4, UUID
 from time import sleep
 import os
 import boto3
@@ -17,8 +18,8 @@ from selenium import webdriver
 from pydantic import HttpUrl
 
 from taiservice.searchservice.backend.tai_search.data_ingestor_schema import IngestedDocument, InputFormat
-from .data_ingestor_schema import IngestedDocument, BaseClassResourceDocument
-from ..databases.document_db_schemas import ClassResourceDocument, ClassResourceProcessingStatus
+from .data_ingestor_schema import IngestedDocument
+from ..databases.document_db_schemas import ClassResourceDocument, ClassResourceChunkDocument
 
 
 def upload_file_to_s3(file_path: Union[str, Path], bucket_name: str, object_key: str) -> str:
@@ -43,13 +44,17 @@ def get_s3_object_key(doc: IngestedDocument, local_filename: str) -> str:
     """Get the s3 object key."""
     return f"class_id={doc.class_id}/document_hash={doc.hashed_document_contents}/{local_filename}"
 
+def get_s3_key_for_chunk(self, chunk_id: UUID, doc: IngestedDocument) -> str:
+    """This function is supposed to get an s3_key for a chunk."""
+    return f"class_id={doc.class_id}/document_hash={doc.hashed_document_contents}/chunk_id={chunk_id}"
+
 
 class DocumentUtility(ABC):
     """Define the interface for screen-shotting class resources."""
 
-    def __init__(self, thumbnail_bucket_name: str, ingested_doc: IngestedDocument):
+    def __init__(self, bucket_name: str, ingested_doc: IngestedDocument):
         """Initialize the class."""
-        self._thumbnail_bucket_name = thumbnail_bucket_name
+        self._bucket_name = bucket_name
         self._ingested_doc = copy.deepcopy(ingested_doc)
 
     @property
@@ -73,6 +78,15 @@ class DocumentUtility(ABC):
 
         IMPORTANT: After uploading the resource, the document must be updated with the
         resource url so that the resource is accessible from the document.
+        """
+
+    @abstractmethod
+    def augment_chunks(self, chunk_docs: list[ClassResourceChunkDocument]) -> list[ClassResourceChunkDocument]:
+        """
+        Augment the chunk documents.
+
+        An example of this, could be creating a copy of the pdf page and highlighting it or
+        for a youtube video, adding a timestamp to the url.
         """
 
 
@@ -102,13 +116,36 @@ class PDFDocumentUtility(DocumentUtility):
             thumbnail_path.rename(new_path)
             thumbnail_path = new_path
         s3_key = get_s3_object_key(self._ingested_doc, thumbnail_path.name)
-        self._ingested_doc.preview_image_url = upload_file_to_s3(thumbnail_path, self._thumbnail_bucket_name, s3_key)
+        self._ingested_doc.preview_image_url = upload_file_to_s3(thumbnail_path, self._bucket_name, s3_key)
 
     def upload_resource(self) -> None:
         """Upload the resource to the cloud and pass out a copy of the document with the cloud url."""
         s3_key = get_s3_object_key(self._ingested_doc, self._ingested_doc.data_pointer.name)
-        url = upload_file_to_s3(self._ingested_doc.data_pointer, self._thumbnail_bucket_name, s3_key)
+        url = upload_file_to_s3(self._ingested_doc.data_pointer, self._bucket_name, s3_key)
         self._ingested_doc.full_resource_url = url
+
+    def highlight_section_in_pdf(self, pdf_path: str, begin: str, end: str) -> str:
+        """This function is supposed to make a copy of the pdf, highlight the given section, and return the path of the new pdf."""
+        raise NotImplementedError
+
+    def augment_chunks(self, chunk_docs: list[ClassResourceChunkDocument]) -> list[ClassResourceChunkDocument]:
+        for chunk in chunk_docs:
+            chunk_key = chunk.chunk[:15] + chunk.chunk[-15:]
+            for length in range(len(chunk_key), 0, -1):
+                try:
+                    begin = chunk_key[:length//2]
+                    end = chunk_key[length//2:]
+                    new_file_path = self.highlight_section_in_pdf(self._ingested_doc.data_pointer, begin, end)
+                    
+                    s3_key = get_s3_key_for_chunk(chunk.id)
+                    url = upload_file_to_s3(new_file_path, self._bucket_name, s3_key)
+                    
+                    chunk.url = url
+                    break
+                except ValueError:
+                    continue
+                    
+        return chunk_docs
 
 
 class HTMLDocumentUtility(DocumentUtility):
@@ -136,13 +173,13 @@ class HTMLDocumentUtility(DocumentUtility):
             driver.get_screenshot_as_file(thumbnail_path)
             driver.close()
         s3_key = get_s3_object_key(self._ingested_doc, thumbnail_path.name)
-        self._ingested_doc.preview_image_url = upload_file_to_s3(thumbnail_path, self._thumbnail_bucket_name, s3_key)
+        self._ingested_doc.preview_image_url = upload_file_to_s3(thumbnail_path, self._bucket_name, s3_key)
 
     def upload_resource(self) -> None:
         """Upload the resource to the cloud and pass out a copy of the document with the cloud url."""
         if isinstance(self._ingested_doc.data_pointer, Path):
             url = upload_file_to_s3(
-                self._ingested_doc.data_pointer, self._thumbnail_bucket_name, self._ingested_doc.data_pointer.name
+                self._ingested_doc.data_pointer, self._bucket_name, self._ingested_doc.data_pointer.name
             )
         elif isinstance(self._ingested_doc.data_pointer, HttpUrl):
             url = str(self._ingested_doc.data_pointer)
@@ -309,15 +346,15 @@ class PDFResourceCrawler(ResourceCrawler):
 
 def resource_utility_factory(bucket_name: str, ingested_doc: IngestedDocument) -> DocumentUtility:
     """Create the resource utility."""
-    resource_utility_factory_mapping: dict[InputFormat, DocumentUtility] = {
+    resource_utility_factory_mapping: dict[InputFormat, Any] = {
         InputFormat.PDF: PDFDocumentUtility,
         InputFormat.HTML: HTMLDocumentUtility,
         InputFormat.YOUTUBE_VIDEO: YouTubeVideoDocumentUtility,
     }
-    utility = resource_utility_factory_mapping.get(ingested_doc.input_format)
-    if not utility:
+    Utility = resource_utility_factory_mapping.get(ingested_doc.input_format)
+    if not Utility:
         raise NotImplementedError(f"Could not find thumbnail generator for input format '{ingested_doc.input_format}'.")
-    return utility(bucket_name, ingested_doc)
+    return Utility(bucket_name, ingested_doc)
 
 
 def resource_crawler_factory(ingested_doc: IngestedDocument) -> ResourceCrawler:
