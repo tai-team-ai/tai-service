@@ -84,6 +84,14 @@ class ClassResourceChunkDocument(BaseClassResourceDocument):
         ...,
         description="The metadata of the class resource chunk.",
     )
+    raw_chunk_url: Optional[HttpUrl] = Field(
+        default=None,
+        description="""
+            If the chunk hasn't been augmented this likely will point to the raw parent resource, if it has
+            been augmented, this may point to things such as a highlighted version of the pdf or be a link to 
+            a specific timestamp in a youtube video.
+        """,
+    )
 
     @staticmethod
     def _ensure_same_class_id(metadata_class_id: UUID, class_id: Optional[UUID]) -> None:

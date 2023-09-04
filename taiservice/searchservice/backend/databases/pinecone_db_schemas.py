@@ -3,16 +3,11 @@ from typing import Dict, Optional
 from uuid import UUID
 from pydantic import Field, root_validator, Extra
 # first imports are for local development, second imports are for deployment
-try:
-    from ..shared_schemas import (
-        ChunkMetadata,
-        BasePydanticModel,
-    )
-except (KeyError, ImportError):
-    from taiservice.api.taibackend.shared_schemas import (
-        ChunkMetadata,
-        BasePydanticModel,
-    )
+from ..shared_schemas import (
+    ChunkMetadata,
+    BasePydanticModel,
+)
+
 
 class SparseVector(BasePydanticModel):
     """Define the sparse vector model of the class resource."""

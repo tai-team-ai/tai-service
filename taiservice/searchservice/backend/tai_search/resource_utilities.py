@@ -2,21 +2,20 @@
 import copy
 from uuid import uuid4, UUID
 from time import sleep
-import os
-import boto3
 import shutil
-import urllib.parse
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Literal, Optional, Sequence, Union
-from uuid import uuid4
+from typing import Optional, Sequence, Union, Any
+import urllib.parse
+import boto3
+from keybert import KeyBERT
 from pdf2image.pdf2image import convert_from_path
 from PyPDF2 import PdfReader, PdfWriter
 from loguru import logger
 import requests
+import fitz
 from selenium import webdriver
 from pydantic import HttpUrl
-
 from taiservice.searchservice.backend.tai_search.data_ingestor_schema import IngestedDocument, InputFormat
 from .data_ingestor_schema import IngestedDocument
 from ..databases.document_db_schemas import ClassResourceDocument, ClassResourceChunkDocument
@@ -28,7 +27,8 @@ def upload_file_to_s3(file_path: Union[str, Path], bucket_name: str, object_key:
     bucket = s3.Bucket(bucket_name)
     bucket.upload_file(str(file_path.resolve()), object_key)
     safe_object_key = urllib.parse.quote(object_key, safe="~()*!.'")
-    return f"https://{bucket_name}.s3.amazonaws.com/{safe_object_key}"
+    url = f"https://{bucket_name}.s3.amazonaws.com/{safe_object_key}"
+    return url
 
 
 def get_local_tmp_directory(doc: IngestedDocument, format: str) -> Path:
@@ -44,9 +44,9 @@ def get_s3_object_key(doc: IngestedDocument, local_filename: str) -> str:
     """Get the s3 object key."""
     return f"class_id={doc.class_id}/document_hash={doc.hashed_document_contents}/{local_filename}"
 
-def get_s3_key_for_chunk(self, chunk_id: UUID, doc: IngestedDocument) -> str:
+def get_s3_key_for_chunk(chunk_id: UUID, doc: IngestedDocument, local_filename: str) -> str:
     """This function is supposed to get an s3_key for a chunk."""
-    return f"class_id={doc.class_id}/document_hash={doc.hashed_document_contents}/chunk_id={chunk_id}"
+    return f"class_id={doc.class_id}/document_hash={doc.hashed_document_contents}/chunk_id={chunk_id}/{local_filename}"
 
 
 class DocumentUtility(ABC):
@@ -124,27 +124,36 @@ class PDFDocumentUtility(DocumentUtility):
         url = upload_file_to_s3(self._ingested_doc.data_pointer, self._bucket_name, s3_key)
         self._ingested_doc.full_resource_url = url
 
-    def highlight_section_in_pdf(self, pdf_path: str, begin: str, end: str) -> str:
-        """This function is supposed to make a copy of the pdf, highlight the given section, and return the path of the new pdf."""
-        raise NotImplementedError
+    def highlight_section_in_pdf(self, pdf_path: Union[str, Path], chunk_keywords: list[str]) -> Path:
+        """Make a highlighted copy of a specific section in a pdf."""
+        path = Path(pdf_path)
+        pdf_file = fitz.open(str(path.resolve()))
+        pdf_page_count = pdf_file.page_count   #var to hold page count
+        keywords = set([keyword.lower() for keyword in chunk_keywords])
+        for page in range(pdf_page_count):
+            page_obj = pdf_file[page]
+            content_of_page = page_obj.get_text("words", sort=False)
+            for word in content_of_page:
+                if word[4].lower() in keywords:
+                    rect_comp = fitz.Rect(word[:4])
+                    page_obj.add_highlight_annot(rect_comp)
+        output_path = path.parent / f"highlighted_{path.name}"
+        pdf_file.save(str(output_path.resolve()), garbage=4, deflate=True, clean=True)
+        pdf_file.close()
+        return output_path
 
     def augment_chunks(self, chunk_docs: list[ClassResourceChunkDocument]) -> list[ClassResourceChunkDocument]:
+        assert isinstance(self._ingested_doc.data_pointer, Path), f"Data pointer must be a path, not {type(self._ingested_doc.data_pointer)}"
         for chunk in chunk_docs:
-            chunk_key = chunk.chunk[:15] + chunk.chunk[-15:]
-            for length in range(len(chunk_key), 0, -1):
-                try:
-                    begin = chunk_key[:length//2]
-                    end = chunk_key[length//2:]
-                    new_file_path = self.highlight_section_in_pdf(self._ingested_doc.data_pointer, begin, end)
-                    
-                    s3_key = get_s3_key_for_chunk(chunk.id)
-                    url = upload_file_to_s3(new_file_path, self._bucket_name, s3_key)
-                    
-                    chunk.url = url
-                    break
-                except ValueError:
-                    continue
-                    
+            # copy the pdf to a new file with the same as teh data poitner with a file name of chunk_id=chunk_id.pdf
+            new_file_path = self._ingested_doc.data_pointer.parent / f"chunk_id={chunk.id}.pdf"
+            # copy to new file path
+            shutil.copy(self._ingested_doc.data_pointer, new_file_path)
+            keyword_score_pairs: tuple[str, float] = KeyBERT().extract_keywords(chunk.chunk, top_n=20, keyphrase_ngram_range=(1, 1), stop_words="english")
+            keywords = [keyword for keyword, _ in keyword_score_pairs]
+            path = self.highlight_section_in_pdf(new_file_path, keywords)
+            s3_key = get_s3_key_for_chunk(chunk.id, self._ingested_doc, path.name)
+            chunk.raw_chunk_url = upload_file_to_s3(path, self._bucket_name, s3_key)
         return chunk_docs
 
 

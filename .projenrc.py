@@ -74,6 +74,7 @@ project: Project = AwsCdkPythonApp(
         "markdown",
         "youtube-transcript-api",
         "pytube",
+        "keybert",
     ],
     dev_deps=[
         "black",

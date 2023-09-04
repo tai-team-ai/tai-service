@@ -190,6 +190,7 @@ class TAISearch:
 
             logger.info(f"Loading and splitting document: {ingested_document.id}")
             chunk_documents = self._load_and_split_document(ingested_document, [ChunkSize.SMALL, ChunkSize.LARGE])
+            self._augment_chunks(ingested_document, chunk_documents)
             logger.info(f"Finished loading and splitting document into {len(chunk_documents)} chunks: {ingested_document.id}")
             class_resource_document.class_resource_chunk_ids.extend([chunk_doc.id for chunk_doc in chunk_documents])
 
@@ -275,6 +276,14 @@ class TAISearch:
         chunk_docs = [doc for doc in chunk_docs if isinstance(doc, ClassResourceChunkDocument)]
         chunk_docs = self._sort_chunk_docs_by_pinecone_scores(relevant_documents, chunk_docs)
         return chunk_docs
+
+    def _augment_chunks(self, ingested_document: IngestedDocument, chunks: list[ClassResourceChunkDocument]) -> None:
+        try:
+            utility = resource_utility_factory(self._cold_store_bucket_name, ingested_document)
+            utility.augment_chunks(chunks)
+        except Exception as e:
+            logger.warning(e)
+            logger.warning(f"Failed to augment chunks for document: {ingested_document.id}. Skipping...")
 
     def _save_document_to_cold_store(self, ingested_document: IngestedDocument) -> tuple[IngestedDocument, ClassResourceDocument]:
         utility = resource_utility_factory(self._cold_store_bucket_name, ingested_document)
@@ -388,6 +397,7 @@ class TAISearch:
                         chunk_size=chunk_size,
                         vector_id=uuid4(),
                         **document.metadata.dict(),
+                        **split_doc.metadata,
                     ),
                     **document.dict(exclude={"id", "metadata"}),
                 )
