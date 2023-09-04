@@ -136,6 +136,10 @@
       "type": "runtime"
     },
     {
+      "name": "pytube",
+      "type": "runtime"
+    },
+    {
       "name": "requests",
       "type": "runtime"
     },

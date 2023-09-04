@@ -73,6 +73,7 @@ project: Project = AwsCdkPythonApp(
         "uvicorn[standard]",  # installs high performance ASGI server
         "markdown",
         "youtube-transcript-api",
+        "pytube",
     ],
     dev_deps=[
         "black",

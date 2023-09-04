@@ -17,14 +17,10 @@ from loguru import logger
 from pydantic import BaseModel, Field
 from langchain.embeddings import OpenAIEmbeddings
 from langchain import document_loaders
-from langchain.document_loaders.base import BaseLoader
 from langchain.text_splitter import TextSplitter
 from langchain.schema import Document
 from pinecone_text.sparse import SpladeEncoder
 from .data_ingestors import (
-    get_text_splitter,
-    get_page_number,
-
     S3ObjectIngestor,
     WebPageIngestor,
     Ingestor,
@@ -41,7 +37,6 @@ from ..shared_schemas import (
     ChunkMetadata,
     BaseOpenAIConfig,
     ClassResourceType,
-    Metadata,
     ChunkSize,
 )
 from ..databases.pinecone_db import PineconeDBConfig, PineconeDB, PineconeQueryFilter
@@ -56,6 +51,10 @@ from ..databases.document_db_schemas import (
     ClassResourceDocument,
 )
 from .resource_utilities import resource_utility_factory, resource_crawler_factory
+from .splitters import (
+    document_splitter_factory,
+    get_page_number,
+)
 
 
 class OpenAIConfig(BaseOpenAIConfig):
@@ -356,20 +355,20 @@ class TAISearch:
             document.page_content = re.sub(pattern, character * max_chars_in_a_row, document.page_content)
         return document
 
-    def _load_and_split_document(self, document: IngestedDocument, chunk_sizes: list[ChunkSize]) -> list[ClassResourceChunkDocument]:
+    def _load_and_split_document(
+        self, document: IngestedDocument, chunk_sizes: list[ChunkSize]
+    ) -> list[ClassResourceChunkDocument]:
         """Split and load a document."""
         # TODO: it's probably a good idea to add this to the resource utilities classes as the chunk urls
         # may need to be dynamically updated, like in the case of YouTube where we need to add a timestamp
         split_docs: list[Document] = []
         document = loading_strategy_factory(document)
-        if isinstance(document.loader, document_loaders.BSHTMLLoader):
-            # the beautiful soup loader converts html to text so we need to change the input format
-            document.input_format = InputFormat.GENERIC_TEXT
         loaded_docs = document.loader.load()
+
         chunk_documents = []
         for chunk_size in chunk_sizes:
-            splitter: TextSplitter = get_text_splitter(document.input_format, chunk_size)
-            split_docs = splitter.split_documents(loaded_docs)
+            document = document_splitter_factory(document, chunk_size)
+            split_docs = document.splitter.split_documents(loaded_docs)
             last_chapter = ""
             chapters = []
             for split_doc in split_docs:

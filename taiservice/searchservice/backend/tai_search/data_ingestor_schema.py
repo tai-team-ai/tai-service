@@ -1,9 +1,9 @@
 """Define the data ingestor schemas."""
 from enum import Enum
-from typing import Optional, Type
-from pydantic import Field, validator
-from langchain.text_splitter import Language
+from typing import Optional
+from pydantic import Field
 from langchain.document_loaders.base import BaseLoader
+from langchain.text_splitter import TextSplitter
 from ..shared_schemas import (
     BaseClassResourceDocument,
     StatefulClassResourceDocument,
@@ -42,14 +42,6 @@ class LatexExtension(str, Enum):
     LATEX = ".latex"
 
 
-class SplitterStrategy(str, Enum):
-    """Define the splitter strategies."""
-
-    RecursiveCharacterTextSplitter = "RecursiveCharacterTextSplitter"
-    LatexTextSplitter = "LatexTextSplitter"
-    MarkdownTextSplitter = "MarkdownTextSplitter"
-
-
 class InputDataIngestStrategy(str, Enum):
     """Define the input types."""
 
@@ -58,22 +50,6 @@ class InputDataIngestStrategy(str, Enum):
     RAW_URL = "raw_url"
     # WEB_CRAWL = "web_crawl"
 
-
-SPLITTER_STRATEGY_MAPPING = {
-    InputFormat.PDF: SplitterStrategy.RecursiveCharacterTextSplitter,
-    InputFormat.GENERIC_TEXT: SplitterStrategy.RecursiveCharacterTextSplitter,
-    InputFormat.LATEX: Language.LATEX,
-    InputFormat.MARKDOWN: Language.MARKDOWN,
-    InputFormat.HTML: Language.HTML,
-    InputFormat.YOUTUBE_VIDEO: SplitterStrategy.RecursiveCharacterTextSplitter,
-}
-TOTAL_PAGE_COUNT_STRINGS = [
-    "total_pages",
-    "total_page_count",
-    "total_page_counts",
-    "page_count",
-]
-PAGE_NUMBER_STRINGS = ["page_number", "page_numbers", "page_num", "page_nums", "page"]
 
 
 class InputDocument(BaseClassResourceDocument):
@@ -92,8 +68,11 @@ class IngestedDocument(StatefulClassResourceDocument):
         ...,
         description="The format of the input document.",
     )
-
     loader: Optional[BaseLoader] = Field(
         default=None,
-        description="The loader for the input document.",
+        description="The loader for the ingested document.",
+    )
+    splitter: Optional[TextSplitter] = Field(
+        default=None,
+        description="The splitter for the ingested document.",
     )

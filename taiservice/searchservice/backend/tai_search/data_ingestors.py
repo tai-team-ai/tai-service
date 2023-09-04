@@ -12,8 +12,6 @@ from bs4 import BeautifulSoup
 import tiktoken
 from loguru import logger
 import requests
-from langchain.text_splitter import TextSplitter, RecursiveCharacterTextSplitter
-from langchain import text_splitter
 from langchain.schema import Document
 from langchain.document_loaders.youtube import (
     ALLOWED_NETLOCK as YOUTUBE_NETLOCS,
@@ -23,14 +21,9 @@ from .data_ingestor_schema import (
     IngestedDocument,
     LatexExtension,
     MarkdownExtension,
-    SPLITTER_STRATEGY_MAPPING,
-    Language,
-    TOTAL_PAGE_COUNT_STRINGS,
-    PAGE_NUMBER_STRINGS,
     InputDocument,
     InputFormat,
 )
-from ..shared_schemas import ChunkSize
 
 
 def number_tokens(text: str) -> int:
@@ -39,46 +32,6 @@ def number_tokens(text: str) -> int:
     encoding = tiktoken.get_encoding("cl100k_base")
     num_tokens = len(encoding.encode(text))
     return num_tokens
-
-
-CHUNK_SIZE_TO_CHAR_COUNT_MAPPING = {
-    ChunkSize.SMALL: 500,
-    ChunkSize.LARGE: 2000,
-}
-OVERLAP_SIZE_TO_CHAR_COUNT_MAPPING = {
-    ChunkSize.SMALL: 100,
-    ChunkSize.LARGE: 300,
-}
-
-
-def get_text_splitter(input_format: InputFormat, chunk_size: ChunkSize) -> TextSplitter:
-    """Get the splitter strategy."""
-    strategy_instructions = SPLITTER_STRATEGY_MAPPING.get(input_format)
-    kwargs = {
-        "chunk_size": CHUNK_SIZE_TO_CHAR_COUNT_MAPPING[chunk_size],
-        "chunk_overlap": OVERLAP_SIZE_TO_CHAR_COUNT_MAPPING[chunk_size],
-    }
-    if strategy_instructions is None:
-        raise ValueError("The input format is not supported.")
-    if strategy_instructions in Language:
-        return RecursiveCharacterTextSplitter.from_language(language=strategy_instructions, **kwargs)
-    splitter: TextSplitter = getattr(text_splitter, strategy_instructions)(**kwargs)
-    return splitter
-
-
-def get_total_page_count(docs: list[Document]) -> Optional[int]:
-    """Get the page count and total page count."""
-    for doc in docs:
-        for key in TOTAL_PAGE_COUNT_STRINGS:
-            if key in doc.metadata:
-                return doc.metadata[key]
-
-
-def get_page_number(doc: Document) -> Optional[int]:
-    """Get the page number."""
-    for key in PAGE_NUMBER_STRINGS:
-        if key in doc.metadata:
-            return doc.metadata[key]
 
 
 class Ingestor(ABC):

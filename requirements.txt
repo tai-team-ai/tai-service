@@ -28,6 +28,7 @@ pynamodb
 PyPDF2
 pytest
 pytest-cov
+pytube
 requests
 selenium
 tai-aws-account-bootstrap

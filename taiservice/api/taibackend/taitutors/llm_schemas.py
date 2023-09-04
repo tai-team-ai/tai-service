@@ -360,6 +360,7 @@ Respond in markdown format with inline LaTeX support using these delimiters:
     inline: $...$ or $$...$$
     display: $$...$$
     display + equation number: $$...$$ (1)\
+Additionally, please respond with html break tags (<br>) to specify line breaks.\
 """
 
 
