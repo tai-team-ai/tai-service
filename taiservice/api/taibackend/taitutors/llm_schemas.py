@@ -258,6 +258,39 @@ class BaseLLMChatSession(BasePydanticModel):
         if self.messages and isinstance(self.messages[0], SystemMessage):
             self.messages.pop(0)
 
+    def remove_unrendered_messages(self, num_unrendered_blocks_to_keep: int = 1) -> None:
+        """
+        Remove messages from the chat session that aren't rendered to the user,
+        except for the last 'num_unrendered_blocks_to_keep' sets of
+        non-rendered messages before a rendered message.
+
+        This method will remove all messages where the 'render_chat' property is False,
+        except for the last 'num_unrendered_blocks_to_keep' blocks of contiguous non-rendered messages.
+        This is useful for when the context of the most recent non-rendered messages is needed for comprehension.
+
+        Args:
+            num_unrendered_blocks_to_keep: The number of unrendered message blocks to retain in the chat history.
+                Each 'block' is a contiguous series of unrendered messages surrounded by rendered messages.
+        """
+        blocks_count = 0
+        started_new_block = False
+        new_messages = []
+
+        for i in reversed(range(len(self.messages))):
+            if not self.messages[i].render_chat:
+                if started_new_block is False:
+                    started_new_block = True
+                    blocks_count += 1
+
+                if blocks_count <= num_unrendered_blocks_to_keep:
+                    new_messages.insert(0, self.messages[i])
+            elif self.messages[i].render_chat:
+                started_new_block = False
+                new_messages.insert(0, self.messages[i])
+        
+        self.messages = new_messages
+
+
     def get_token_count(self, token_function: callable) -> int:
         """Return the tokens used since the last student message."""
         count = 0
