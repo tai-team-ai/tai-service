@@ -360,7 +360,6 @@ Respond in markdown format with inline LaTeX support using these delimiters:
     inline: $...$ or $$...$$
     display: $$...$$
     display + equation number: $$...$$ (1)\
-Additionally, please respond with html break tags (<br>) to specify line breaks.\
 """
 
 
@@ -430,7 +429,8 @@ STEERING_PROMPT = """\
 Thought: I don't know anything about what the user is asking because I am a tutor for '{class_name}'. \
 I must be honest with the student and tell them that I don't know about that concept \
 because it is not related to '{class_name}' and I should suggest that they use Google to find more info or instruct them to ask \
-their Instructor or TA for further help.\
+their Instructor or TA for further help. I can also give the answer my best shot, but I must \
+disclaim that I am not an expert in this area so I don't lead the student astray. \
 """
 
 BASE_SYSTEM_MESSAGE = f"""\
@@ -443,7 +443,8 @@ The student has requested that you use responses with a technical level of a {{t
 Remember, you should explain things in a way that a {{technical_level}} would understand. \
 Remember, your name is {{name}} and {{persona}}. At times, you may not know the answer to a question \
 because you are a tutor only for '{{class_name}}'. That's okay! If this occurs you should prompt the student \
-to reach out to their professor or TA.\
+to reach out to their professor or TA and give your best shot at the answer, but provide a disclaimer that the \
+subject is not your expertise.\
 """
 
 MILO = {

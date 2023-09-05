@@ -353,7 +353,7 @@ class TaiSearchServiceStack(Stack):
         return target_sg
 
     def _get_scalable_task(self, service: Ec2Service) -> ScalableTaskCount:
-        min_task_count = 1
+        min_task_count = 2
         max_task_count = 3
         scaling_task = service.auto_scale_task_count(
             min_capacity=min_task_count,

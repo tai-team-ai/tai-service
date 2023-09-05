@@ -10,11 +10,11 @@ from pydantic import Field, validator
 try:
     from .class_resources_schema import BaseClassResource
     from .base_schema import BasePydanticModel, EXAMPLE_UUID
-    from .class_resources_schema import BaseClassResource, ClassResourceType
+    from .class_resources_schema import BaseClassResource, ClassResourceType, ClassResource
 except (ImportError, KeyError):
     from routers.class_resources_schema import BaseClassResource
     from routers.base_schema import BasePydanticModel, EXAMPLE_UUID
-    from routers.class_resources_schema import BaseClassResource, ClassResourceType
+    from routers.class_resources_schema import BaseClassResource, ClassResourceType, ClassResource
 
 class TaiTutorName(str, Enum):
     """Define the supported TAI tutors."""
@@ -382,11 +382,11 @@ class ResourceSearchQuery(SearchQuery):
 
 class SearchResults(ResourceSearchQuery):
     """Define the response model for the search endpoint."""
-    suggested_resources: list[ClassResourceSnippet] = Field(
+    suggested_resources: list[ClassResource] = Field(
         ...,
         description="The suggested resources that should appear at the top of the search results.",
     )
-    other_resources: list[ClassResourceSnippet] = Field(
+    other_resources: list[ClassResource] = Field(
         ...,
         description="The other resources. These can be grouped by class resource type.",
     )

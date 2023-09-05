@@ -258,7 +258,7 @@ class Backend:
         search_results = self._get_search_results(search_query, "tutor-search")
         tai_llm = TaiLLM(self._get_tai_llm_config(stream))
         docs_to_use = search_results.long_snippets[:1] + search_results.short_snippets[:2]
-        # chat_session.remove_unrendered_messages(num_unrendered_blocks_to_keep=0)
+        chat_session.remove_unrendered_messages(num_unrendered_blocks_to_keep=1)
         tai_llm.add_tai_tutor_chat_response(chat_session, docs_to_use)
         return self.to_api_chat_session(chat_session)
 
@@ -284,8 +284,8 @@ class Backend:
             )
             return snippet
         api_search_results = SearchResults(
-            suggested_resources=search_results.short_snippets[:3],
-            other_resources=search_results.short_snippets[3:],
+            suggested_resources=search_results.class_resources[:2],
+            other_resources=search_results.class_resources[2:],
             **search_results.dict(exclude={"short_snippets", "long_snippets"}),
         )
         return api_search_results

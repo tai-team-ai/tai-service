@@ -190,6 +190,7 @@ class TAISearch:
 
             logger.info(f"Loading and splitting document: {ingested_document.id}")
             chunk_documents = self._load_and_split_document(ingested_document, [ChunkSize.SMALL, ChunkSize.LARGE])
+
             self._augment_chunks(ingested_document, chunk_documents)
             logger.info(f"Finished loading and splitting document into {len(chunk_documents)} chunks: {ingested_document.id}")
             class_resource_document.class_resource_chunk_ids.extend([chunk_doc.id for chunk_doc in chunk_documents])
@@ -260,11 +261,11 @@ class TAISearch:
 
         def compute_similar_documents(params: tuple[PineconeDocument, PineconeQueryFilter]) -> list[PineconeDocument]:
             doc, query_filter = params
-            similar_docs = self._pinecone_db.get_similar_documents(document=doc, doc_to_return=50, filter=query_filter)
+            similar_docs = self._pinecone_db.get_similar_documents(document=doc, doc_to_return=10, filter=query_filter)
             alpha = query_filter.alpha
             threshold = (
-                alpha * 0.60 + (1 - alpha) * 4.0
-            )  # this is a linear interpolation between 0.6 and 4.0, 4.0 is arbitrary as the is technically not an upper limit
+                alpha * 0.75 + (1 - alpha) * 6.5
+            )  # this is a linear interpolation between 0.6 and 5.0, 5.0 is arbitrary as the is technically not an upper limit
             return [doc for doc in similar_docs.documents if doc.score > threshold]
 
         with ThreadPoolExecutor(max_workers=len(pinecone_docs)) as executor:
@@ -272,7 +273,7 @@ class TAISearch:
         relevant_documents = list(itertools.chain(*results))
         uuids = [doc.metadata.chunk_id for doc in relevant_documents]
         chunk_docs = self._document_db.get_class_resources(uuids, ClassResourceChunkDocument)
-        logger.info(f"Got similar docs: {[(doc.metadata.title, doc.full_resource_url) for doc in chunk_docs]}")
+        logger.info(f"Got {len(chunk_docs)} similar docs: {[(doc.metadata.title, doc.full_resource_url) for doc in chunk_docs][:4]}...")
         chunk_docs = [doc for doc in chunk_docs if isinstance(doc, ClassResourceChunkDocument)]
         chunk_docs = self._sort_chunk_docs_by_pinecone_scores(relevant_documents, chunk_docs)
         return chunk_docs
