@@ -371,18 +371,18 @@ class TaiSearchServiceStack(Stack):
             scale_out_cooldown=Duration.seconds(300),  # we should be fast because of the warm pool
             disable_scale_in=False,
         )
-        scaling_task.scale_on_schedule(
-            id=self._namer("scale-up"),
-            schedule=Schedule.cron(hour="12", minute="0", week_day="*"),  # 6am MST
-            min_capacity=min_task_count,
-            max_capacity=max_task_count,
-        )
-        scaling_task.scale_on_schedule(
-            self._namer("scale-down"),
-            schedule=Schedule.cron(hour="8", minute="0", week_day="*"),  # 12am MST
-            min_capacity=0,
-            max_capacity=0,
-        )
+        # scaling_task.scale_on_schedule(
+        #     id=self._namer("scale-up"),
+        #     schedule=Schedule.cron(hour="12", minute="0", week_day="*"),  # 6am MST
+        #     min_capacity=min_task_count,
+        #     max_capacity=max_task_count,
+        # )
+        # scaling_task.scale_on_schedule(
+        #     self._namer("scale-down"),
+        #     schedule=Schedule.cron(hour="8", minute="0", week_day="*"),  # 12am MST
+        #     min_capacity=0,
+        #     max_capacity=0,
+        # )
         return scaling_task
 
     def _get_target_group(
