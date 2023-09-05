@@ -2,7 +2,7 @@
 from datetime import date, datetime, timedelta
 import json
 import traceback
-from typing import Any, Callable, Optional, Union
+from typing import Any, Callable, Optional, Type, Union
 from uuid import UUID
 import psutil
 import boto3
@@ -204,16 +204,13 @@ class Backend:
             raise ServerOverloadedError("Server is overloaded, please try again later.")
         input_doc = self.to_backend_input_docs(class_resource)[0]
         ingested_doc = self._tai_search.ingest_document(input_doc)
-        if self._is_stuck_processing_or_failed(
-            ingested_doc.id
-        ):  # if it's stuck, we should continue as the operations are idempotent
-            pass
-        elif self._is_duplicate_class_resource(ingested_doc):
+        if not self._able_to_create_resource(ingested_doc):
             raise DuplicateClassResourceError(f"Duplicate class resource: {ingested_doc.id} in class {ingested_doc.class_id}")
         self._coerce_and_update_status(ingested_doc, ClassResourceProcessingStatus.PENDING)
 
         def index_resource() -> None:
             try:
+                self._delete_before_update(ingested_doc)
                 self._coerce_and_update_status(ingested_doc, ClassResourceProcessingStatus.PROCESSING)
                 db_class_resource = self._tai_search.index_resource(ingested_doc)
                 self._coerce_and_update_status(db_class_resource, ClassResourceProcessingStatus.COMPLETED)
@@ -227,29 +224,32 @@ class Backend:
 
     def get_class_resources(self, ids: list[UUID], from_class_ids: bool = False) -> list[ClassResource]:
         """Get the class resources."""
-        docs: list[ClassResourceDocument] = self._doc_db.get_class_resources(
+        docs = self._doc_db.get_class_resources(
             ids, ClassResourceDocument, from_class_ids=from_class_ids
         )
         for doc in docs:
-            if self._is_stuck_processing_or_failed(doc.id):
+            if self._is_resource_stuck_processing(doc.id):
                 self._coerce_and_update_status(doc, ClassResourceProcessingStatus.FAILED)
         return self.to_api_resources(docs)
 
-    def delete_class_resources(self, ids: list[UUID]) -> None:
+    def _delete_before_update(self, new_doc: tai_search.IngestedDocument) -> None:
+        """Delete the class resources before updating."""
+        _, existing_doc = self._is_duplicate_class_resource(new_doc)
+        if existing_doc:
+            self.delete_class_resource(existing_doc)
+
+    def delete_class_resource(self, resource: ClassResourceDocument) -> None:
         """Delete the class resources."""
         try:
-            docs = self._doc_db.get_class_resources(ids, ClassResourceDocument)
-            for doc in docs:
-                if isinstance(doc, ClassResourceDocument) or isinstance(doc, ClassResourceChunkDocument):
-                    if isinstance(doc, ClassResourceDocument):
-                        self._coerce_and_update_status(doc, ClassResourceProcessingStatus.DELETING)
-                        chunk_docs = self._chunks_from_class_resource(doc)
-                    chunk_docs = [doc]
-                    self._delete_vectors_from_chunks(chunk_docs)
-            failed_docs = self._doc_db.delete_class_resources(docs)
-            for doc in failed_docs:
-                if isinstance(doc, ClassResourceDocument):
-                    self._coerce_and_update_status(doc, ClassResourceProcessingStatus.FAILED)
+            # because we have chosen a flat structure, we do not need to recursively delete the chunks
+            self._coerce_and_update_status(resource, ClassResourceProcessingStatus.DELETING)
+            child_docs = self._doc_db.get_class_resources(resource.child_resource_ids, ClassResourceDocument)
+            for child_doc in child_docs:
+                chunk_docs = self._chunks_from_class_resource(child_doc)
+                self._delete_vectors_from_chunks(chunk_docs, resource.class_id)
+                self._doc_db.delete_class_resources(chunk_docs)
+                self._doc_db.delete_class_resources(child_doc)
+            self._doc_db.delete_class_resources(resource)
         except Exception as e:
             logger.critical(f"Failed to delete class resources: {e}")
             raise RuntimeError(f"Failed to delete class resources: {e}") from e
@@ -372,37 +372,55 @@ class Backend:
         except json.JSONDecodeError:
             return secret
 
-    def _is_stuck_processing_or_failed(self, doc_id: UUID) -> bool:
+    def _able_to_create_resource(self, new_doc: tai_search.IngestedDocument, class_resource_docs: Optional[list[ClassResourceDocument]] = None) -> bool:
         """Check if the class resource is stuck uploading."""
-        class_resource_docs: list[ClassResourceDocument] = self._doc_db.get_class_resources(
-            doc_id,
+        if not class_resource_docs:
+            class_resource_docs: list[ClassResourceDocument] = self._doc_db.get_class_resources( # type: ignore
+                new_doc.class_id,
+                ClassResourceDocument,
+                from_class_ids=True,
+            )
+        statuses_allowed_to_proceed = [
+            ClassResourceProcessingStatus.FAILED,
+        ]
+        is_duplicate, duplicate_doc = self._is_duplicate_class_resource(new_doc, class_resource_docs)
+        if is_duplicate:
+            if duplicate_doc and duplicate_doc.status in statuses_allowed_to_proceed:
+                return True
+            return False
+        return True
+
+    def _is_resource_stuck_processing(self, resource_id: UUID) -> bool:
+        class_resource_docs = self._doc_db.get_class_resources(
+            resource_id,
             ClassResourceDocument,
+            from_class_ids=True,
         )
         existing_doc = class_resource_docs[0] if class_resource_docs else None
         if not existing_doc:
             return False
-        success = existing_doc.status == ClassResourceProcessingStatus.COMPLETED
-        if not success:
+
+        assert isinstance(existing_doc, ClassResourceDocument)
+        if existing_doc.status != ClassResourceProcessingStatus.COMPLETED:
             elapsed_time = (datetime.utcnow() - existing_doc.modified_timestamp).total_seconds()
-            failed = existing_doc.status == ClassResourceProcessingStatus.FAILED
-            if elapsed_time > self._runtime_settings.class_resource_processing_timeout or failed:
+            if elapsed_time > self._runtime_settings.class_resource_processing_timeout:
                 return True
         return False
 
-    def _is_duplicate_class_resource(self, new_doc: tai_search.IngestedDocument) -> bool:
-        """Check if the document can be created."""
-        class_resource_docs: list[ClassResourceDocument] = self._doc_db.get_class_resources(
-            new_doc.class_id,
-            ClassResourceDocument,
-            from_class_ids=True,
-        )
-        docs = {doc.id: doc for doc in class_resource_docs}
-        doc_hashes = set([class_resource_doc.hashed_document_contents for class_resource_doc in class_resource_docs])
-        # find the doc and check the status, if failed, then we can overwrite
-        existing_doc = docs.get(new_doc.id, None)
-        if existing_doc and existing_doc.status == ClassResourceProcessingStatus.FAILED:
-            return False
-        return new_doc.hashed_document_contents in doc_hashes
+    def _is_duplicate_class_resource(self, new_doc: tai_search.IngestedDocument, class_resource_docs: Optional[list[ClassResourceDocument]] = None) -> tuple[bool, Optional[ClassResourceDocument]]:
+        if not class_resource_docs:
+            class_resource_docs: list[ClassResourceDocument] = self._doc_db.get_class_resources( # type: ignore
+                new_doc.class_id,
+                ClassResourceDocument,
+                from_class_ids=True,
+            )
+        doc_hashes = {class_resource_doc.hashed_document_contents: class_resource_doc for class_resource_doc in class_resource_docs}
+        doc_titles = {class_resource_doc.metadata.title: class_resource_doc for class_resource_doc in class_resource_docs}
+        doc_ids = {class_resource_doc.id: class_resource_doc for class_resource_doc in class_resource_docs}
+        existing_doc = doc_hashes.get(new_doc.hashed_document_contents) or doc_titles.get(new_doc.metadata.title) or doc_ids.get(new_doc.id)
+        if existing_doc:
+            return True, existing_doc
+        return False, None
 
     def _coerce_and_update_status(
         self,
@@ -414,7 +432,8 @@ class Backend:
             docs = [docs]
         stateful_resources = [ClassResourceDocument(**doc.dict()) for doc in docs]
         self._coerce_status_to(stateful_resources, status)
-        self._doc_db.upsert_documents(stateful_resources)
+        self._doc_db.update_statuses(stateful_resources)
+        
 
     def _coerce_status_to(
         self, class_resources: list[StatefulClassResourceDocument], status: ClassResourceProcessingStatus
@@ -428,10 +447,10 @@ class Backend:
         chunk_ids = class_resources.class_resource_chunk_ids
         return self._doc_db.get_class_resources(chunk_ids, ClassResourceChunkDocument)
 
-    def _delete_vectors_from_chunks(self, chunks: list[ClassResourceChunkDocument]) -> None:
+    def _delete_vectors_from_chunks(self, chunks: list[ClassResourceChunkDocument], class_id: UUID) -> None:
         """Delete the vectors from the chunks."""
         vector_ids = [chunk.metadata.vector_id for chunk in chunks]
-        self._pinecone_db.delete_vectors(vector_ids)
+        self._pinecone_db.delete_vectors(vector_ids, class_id)
 
     def _get_BE_date_range(self, start_date: Optional[date], end_date: Optional[date]) -> BEDateRange:
         if start_date is None:

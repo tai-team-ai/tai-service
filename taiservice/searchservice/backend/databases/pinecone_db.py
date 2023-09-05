@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from multiprocessing.pool import ApplyResult
 from enum import Enum
 import os
-from typing import List
+from typing import List, Union
 from uuid import UUID
 from loguru import logger
 from pydantic import BaseModel, Field
@@ -148,9 +148,10 @@ class PineconeDB:
         docs.documents.sort(key=lambda doc: doc.score, reverse=True)
         return docs
 
-    def delete_vectors(self, documents: PineconeDocuments) -> None:
+    def delete_vectors(self, ids: list[UUID], class_id: UUID) -> None:
         """Delete vectors from pinecone db."""
-        self._execute_async_pinecone_operation("delete", documents)
+        ids = [str(id) for id in ids]
+        self.index.delete(ids, namespace=str(class_id))
 
     def delete_all_vectors(self, class_id: UUID) -> None:
         """Delete all vectors from pinecone db."""

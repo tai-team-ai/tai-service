@@ -180,6 +180,8 @@ class TAISearch:
         ingested_document, parent_class_resource = self._save_document_to_cold_store(ingested_document)
         crawler = resource_crawler_factory(ingested_document)
         ingested_documents = crawler.crawl(parent_class_resource)
+        # after crawling, the parent_class_resource will have pointers to all the child class resources
+        self._document_db.upsert_class_resources([parent_class_resource])
         logger.info(f"Finished crawling document: {ingested_document.id}. Found {len(ingested_documents)} documents.")
 
         # TODO: We should not be iterating here, instead crawled docs will have been pushed to a queue that
@@ -340,7 +342,6 @@ class TAISearch:
             logger.critical(traceback.format_exc())
             raise RuntimeError("Failed to load vectors to vector store.") from e
 
-    # TODO: Figure out why i have this mapping here
     def _load_class_resources_to_db(
         self,
         document: ClassResourceDocument,
@@ -349,12 +350,10 @@ class TAISearch:
         """Load the document to the db."""
         chunk_mapping = {chunk_doc.id: chunk_doc for chunk_doc in chunk_documents}
         try:
-            failed_docs = self._document_db.upsert_class_resources(documents=[document], chunk_mapping=chunk_mapping)
+            self._document_db.upsert_class_resources(documents=[document], chunk_mapping=chunk_mapping)
         except Exception as e:
             logger.critical(traceback.format_exc())
             raise RuntimeError("Failed to load document to db.") from e
-        if failed_docs:
-            raise RuntimeError(f"{len(failed_docs)} documents failed to load to db: {failed_docs}")
 
     def collapse_spaces_in_document(self, document: Document) -> Document:
         """Collapse spaces in document."""

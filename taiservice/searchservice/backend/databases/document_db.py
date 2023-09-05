@@ -104,7 +104,6 @@ class DocumentDB:
         ids: Union[list[UUID], UUID],
         DocClass: Type[ClassResourceDocument | ClassResourceChunkDocument],
         from_class_ids: bool = False,
-        get_root_doc: bool = True,
     ) -> list[ClassResourceDocument | ClassResourceChunkDocument]:
         """Return the full class resources."""
         ids = [ids] if isinstance(ids, UUID) else ids
@@ -125,34 +124,39 @@ class DocumentDB:
 
     def upsert_class_resources(
         self,
-        documents: list[BaseClassResourceDocument],
+        documents: list[ClassResourceDocument],
         chunk_mapping: Optional[dict[UUID, ClassResourceChunkDocument]] = None, # pylint: disable=unused-argument
-    ) -> list[BaseClassResourceDocument]:
+    ) -> None:
         """Upsert the full class resources."""
-        failed_documents = []
-        def upsert_document(document: BaseClassResourceDocument) -> None:
-            self.upsert_document(document)
-            if isinstance(document, ClassResourceDocument):
+        self.upsert_documents(documents)
+        if chunk_mapping:
+            for document in documents:
                 try:
                     chunks = [chunk_mapping[id] for id in document.class_resource_chunk_ids]
                 except KeyError as e:
                     logger.error(f"Failed to find chunk: {e} for document: {document}")
                     raise e
                 self.upsert_documents(chunks)
-        for document in documents:
-            self._execute_operation(upsert_document, document, failed_documents=failed_documents)
-        return failed_documents
 
-    def delete_class_resources(self, documents: list[BaseClassResourceDocument]) -> list[BaseClassResourceDocument]:
-        """Delete the full class resources."""
-        failed_documents = []
-        def delete_document(document: BaseClassResourceDocument) -> None:
-            if isinstance(document, ClassResourceDocument):
-                self._delete_documents(document.class_resource_chunk_ids)
-            self._delete_document(document)
+    def update_statuses(self, documents: list[ClassResourceDocument]) -> None:
+        """Update the statuses of the class resources."""
+        collection = self._get_collection(ClassResourceDocument)
         for document in documents:
-            self._execute_operation(delete_document, document, failed_documents=failed_documents)
-        return failed_documents
+            doc = collection.find_one_and_update(
+                {"_id": str(document.id)},
+                {"$set": {"status": document.status}},
+            )
+            if not doc:
+                self.upsert_document(document)
+
+    def delete_class_resources(self, documents: Union[list[BaseClassResourceDocument], BaseClassResourceDocument]) -> None:
+        """Delete the full class resources."""
+        if isinstance(documents, BaseClassResourceDocument):
+            documents = [documents]
+        for document in documents:
+            if isinstance(document, ClassResourceDocument):
+                self._delete_documents(document.class_resource_chunk_ids, ClassResourceChunkDocument)
+            self._delete_document(document.id, document.__class__)
 
     def upsert_documents(self, documents: list[BaseClassResourceDocument]) -> None:
         """Upsert the chunks of the class resource."""
@@ -191,29 +195,12 @@ class DocumentDB:
             {"$push": {USAGE_LOG_FIELD_NAME: metric.dict(serialize_dates=False)}},
         )
 
-    def _execute_operation(
-        self,
-        operation: Callable,
-        document: BaseClassResourceDocument,
-        *args: Any,
-        failed_documents: Optional[list[BaseClassResourceDocument]] = None,
-        **kwargs: Any
-    ) -> None:
-        """Execute the operation and return the document if it fails."""
-        try:
-            operation(document, *args, **kwargs)
-        except Exception as e: # pylint: disable=broad-except
-            logger.error(f"Failed to execute operation: {e} on document: {document}")
-            traceback.format_exc()
-            if failed_documents:
-                failed_documents.append(document)
-
-    def _delete_documents(self, docs: list[BaseClassResourceDocument]) -> None:
+    def _delete_documents(self, ids: list[UUID], DocClass: Type[BaseClassResourceDocument]) -> None:
         """Delete the chunks of the class resource."""
-        for doc in docs:
-            self._delete_document(doc)
+        collection = self._get_collection(DocClass)
+        collection.delete_many({"_id": {"$in": [str(id) for id in ids]}})
 
-    def _delete_document(self, doc: BaseClassResourceDocument) -> None:
+    def _delete_document(self, doc_id: UUID, DocClass: Type[BaseClassResourceDocument]) -> None:
         """Delete the chunks of the class resource."""
-        collection = self._get_collection(doc.__class__)
-        collection.delete_one({"_id": doc.id_as_str})
+        collection = self._get_collection(DocClass)
+        collection.delete_one({"_id": str(doc_id)})
