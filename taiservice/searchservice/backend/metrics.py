@@ -72,6 +72,7 @@ class Metrics:
 
     def upsert_metrics_for_docs(self, ids: list[UUID],  DocClass: Union[Type[ClassResourceChunkDocument], Type[ClassResourceDocument]]) -> None:
         """Upsert the metrics of the class resource."""
+        ids = set(ids)
         for doc_id in ids:
             metric = UsageMetric(timestamp=datetime.utcnow())
             self._doc_db.upsert_metric(doc_id, metric, DocClass)

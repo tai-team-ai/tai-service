@@ -300,10 +300,13 @@ class Backend:
         )
 
         def update_metric():
-            logger.info(f"Updating metrics for {len(chunk_docs)} documents")
-            self._metrics.upsert_metrics_for_docs([doc.id for doc in chunk_docs], ClassResourceChunkDocument)
+            chunk_docs_truncated = chunk_docs[:3]
+            logger.debug(f"Updating metrics for {len(chunk_docs_truncated)} chunk documents")
+            self._metrics.upsert_metrics_for_docs([doc.id for doc in chunk_docs_truncated], ClassResourceChunkDocument)
+            logger.debug(f"Finished updating metrics for {len(chunk_docs_truncated)} chunk documents")
+            logger.debug(f"Updating metrics for {len(resource_ids)} resource documents")
             self._metrics.upsert_metrics_for_docs(resource_ids, ClassResourceDocument)
-            logger.info(f"Finished updating metrics for {len(chunk_docs)} documents")
+            logger.debug(f"Finished updating metrics for {len(resource_ids)} resource documents")
 
         return search_results, update_metric
 

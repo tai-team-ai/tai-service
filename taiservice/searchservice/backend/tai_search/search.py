@@ -259,20 +259,20 @@ class TAISearch:
                 filter_by_chapters=True,
                 filter_by_sections=True,
                 filter_by_resource_type=False,
-                alpha=0.5 if for_tai_tutor else 0.7,
+                alpha=0.7 if for_tai_tutor else 0.6,
             ),
             PineconeQueryFilter(
                 filter_by_resource_type=False,
-                alpha=0.5 if for_tai_tutor else 0.7,
+                alpha=0.7 if for_tai_tutor else 0.6,
             ),
         ]
 
         def compute_similar_documents(params: tuple[PineconeDocument, PineconeQueryFilter]) -> list[PineconeDocument]:
             doc, query_filter = params
-            similar_docs = self._pinecone_db.get_similar_documents(document=doc, doc_to_return=10, filter=query_filter)
+            similar_docs = self._pinecone_db.get_similar_documents(document=doc, doc_to_return=6, filter=query_filter)
             alpha = query_filter.alpha
             threshold = (
-                alpha * 0.75 + (1 - alpha) * 6.5
+                alpha * 0.70 + (1 - alpha) * 5.5
             )  # this is a linear interpolation between 0.6 and 5.0, 5.0 is arbitrary as the is technically not an upper limit
             return [doc for doc in similar_docs.documents if doc.score > threshold]
 
