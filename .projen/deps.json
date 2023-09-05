@@ -68,6 +68,10 @@
       "type": "runtime"
     },
     {
+      "name": "keybert",
+      "type": "runtime"
+    },
+    {
       "name": "langchain==0.0.229",
       "type": "runtime"
     },

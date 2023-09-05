@@ -147,7 +147,8 @@ def document_splitter_factory(ingested_document: IngestedDocument, chunk_size: C
         if not Splitter:
             raise NotImplementedError(f"Splitting strategy for {ingested_document.input_format} not implemented.")
         elif Splitter == YouTubeTranscriptSplitter:
-            kwargs["chunk_overlap"] = kwargs["chunk_overlap"] + 100
+            kwargs["chunk_overlap"] = int(kwargs["chunk_overlap"] * 1.5)
+            kwargs["chunk_size"] = int(kwargs["chunk_size"] * 1.5)
         splitter = Splitter(**kwargs)
     copy_of_ingested_document = ingested_document.copy()
     copy_of_ingested_document.splitter = splitter

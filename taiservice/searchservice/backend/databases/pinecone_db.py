@@ -151,7 +151,8 @@ class PineconeDB:
     def delete_vectors(self, ids: list[UUID], class_id: UUID) -> None:
         """Delete vectors from pinecone db."""
         ids = [str(id) for id in ids]
-        self.index.delete(ids, namespace=str(class_id))
+        if ids:
+            self.index.delete(ids, namespace=str(class_id))
 
     def delete_all_vectors(self, class_id: UUID) -> None:
         """Delete all vectors from pinecone db."""

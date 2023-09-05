@@ -116,6 +116,7 @@ class DocumentDB:
                 # this check ensures we find the root doc for the class resource and not a child doc.
                 # Example: PDF vs pages in a PDF
                 db_filter.update({"$or": [{"parent_resource_ids": {"$exists": False}}, {"parent_resource_ids": []}]})
+                db_filter.update({"$and": [{"child_resource_ids": {"$exists": True}}, {"child_resource_ids": {"$ne": []}}]})
         else:
             db_filter = {"_id": {"$in": ids}}
         documents = list(collection.find(db_filter))

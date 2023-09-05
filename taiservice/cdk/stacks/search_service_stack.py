@@ -379,7 +379,7 @@ class TaiSearchServiceStack(Stack):
         )
         scaling_task.scale_on_schedule(
             self._namer("scale-down"),
-            schedule=Schedule.cron(hour="6", minute="0", week_day="*"),  # 12am MST
+            schedule=Schedule.cron(hour="8", minute="0", week_day="*"),  # 12am MST
             min_capacity=0,
             max_capacity=0,
         )

@@ -11,6 +11,7 @@ fastapi<=0.98.0
 filetype
 gunicorn
 ipykernel
+keybert
 langchain==0.0.229
 loguru
 markdown

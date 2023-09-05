@@ -252,6 +252,7 @@ class Backend:
             self._doc_db.delete_class_resources(resource)
         except Exception as e:
             logger.critical(f"Failed to delete class resources: {e}")
+            self._coerce_and_update_status(resource, ClassResourceProcessingStatus.FAILED)
             raise RuntimeError(f"Failed to delete class resources: {e}") from e
 
     def get_frequently_accessed_class_resources(

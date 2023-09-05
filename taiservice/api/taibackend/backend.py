@@ -285,7 +285,7 @@ class Backend:
             return snippet
         api_search_results = SearchResults(
             suggested_resources=search_results.class_resources[:2],
-            other_resources=search_results.class_resources[2:],
+            other_resources=search_results.class_resources[2:5],
             **search_results.dict(exclude={"short_snippets", "long_snippets"}),
         )
         return api_search_results
@@ -313,30 +313,33 @@ class Backend:
             'ids': ids,
             'from_class_ids': from_class_ids
         }
-        response = requests.get(url, params=params, timeout=4)
-        if response.status_code != 200:
-            logger.info(f"Failed to retrieve class resources from {url}. Status code: {response.status_code}")
-        else:
-            try:
-                data = response.json()
-                api_resources = [ClassResource(**item) for item in data['classResources']]
-                return api_resources
-            except Exception as e: # pylint: disable=broad-except
-                logger.info(f"Failed to parse class resources from {url}. Exception: {e}")
-        # we fall back to the document db if the search service fails
-        resources = self._doc_db.get_class_resources(ids=ids, from_class_ids=from_class_ids)
-        api_resources = []
-        for resource in resources:
-            api_res = ClassResource(
-                id=resource.id,
-                class_id=resource.class_id,
-                full_resource_url=resource.full_resource_url,
-                preview_image_url=resource.preview_image_url,
-                status=resource.status,
-                metadata=resource.metadata,
-            )
-            api_resources.append(api_res)
-        return api_resources
+        try:
+            response = requests.get(url, params=params, timeout=4)
+            if response.status_code != 200:
+                logger.info(f"Failed to retrieve class resources from {url}. Status code: {response.status_code}")
+            else:
+                try:
+                    data = response.json()
+                    api_resources = [ClassResource(**item) for item in data['classResources']]
+                    return api_resources
+                except Exception as e: # pylint: disable=broad-except
+                    logger.info(f"Failed to parse class resources from {url}. Exception: {e}")
+        except Exception as e: # pylint: disable=broad-except
+            logger.warning(f"Failed to retrieve class resources from {url}. Exception: {e}")
+            # we fall back to the document db if the search service fails
+            resources = self._doc_db.get_class_resources(ids=ids, from_class_ids=from_class_ids)
+            api_resources = []
+            for resource in resources:
+                api_res = ClassResource(
+                    id=resource.id,
+                    class_id=resource.class_id,
+                    full_resource_url=resource.full_resource_url,
+                    preview_image_url=resource.preview_image_url,
+                    status=resource.status,
+                    metadata=resource.metadata,
+                )
+                api_resources.append(api_res)
+            return api_resources
 
     def get_frequently_accessed_class_resources(
         self,

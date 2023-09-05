@@ -16,8 +16,6 @@ import psutil
 from loguru import logger
 from pydantic import BaseModel, Field
 from langchain.embeddings import OpenAIEmbeddings
-from langchain import document_loaders
-from langchain.text_splitter import TextSplitter
 from langchain.schema import Document
 from pinecone_text.sparse import SpladeEncoder
 from .data_ingestors import (
@@ -38,6 +36,8 @@ from ..shared_schemas import (
     BaseOpenAIConfig,
     ClassResourceType,
     ChunkSize,
+    StatefulClassResourceDocument,
+    Metadata,
 )
 from ..databases.pinecone_db import PineconeDBConfig, PineconeDB, PineconeQueryFilter
 from ..databases.pinecone_db_schemas import (
@@ -186,27 +186,33 @@ class TAISearch:
 
         # TODO: We should not be iterating here, instead crawled docs will have been pushed to a queue that
         # will be consumed by this service so this service is only processing one page/document at a time.
-        for ingested_document in ingested_documents:
+        for doc_num, ingested_document in enumerate(ingested_documents, 1):
+            logger.info(f"Indexing document '{ingested_document.id}' in class '{ingested_document.class_id}' ({doc_num}/{len(ingested_documents)})")
             ingested_document, class_resource_document = self._save_document_to_cold_store(ingested_document)
             class_resource_document.parent_resource_ids.append(parent_class_resource.id)
-
-            logger.info(f"Loading and splitting document: {ingested_document.id}")
+            logger.debug(f"Loading and splitting document: {ingested_document.id}")
             chunk_documents = self._load_and_split_document(ingested_document, [ChunkSize.SMALL, ChunkSize.LARGE])
-
+            self._update_metadata(class_resource_document, chunk_documents[0])
+            self._update_metadata(parent_class_resource, chunk_documents[0])
+            self._document_db.upsert_class_resources([parent_class_resource])
+            if not chunk_documents:
+                logger.warning(f"No chunks found for document: {ingested_document.id}")
+                continue
             self._augment_chunks(ingested_document, chunk_documents)
-            logger.info(f"Finished loading and splitting document into {len(chunk_documents)} chunks: {ingested_document.id}")
+            logger.debug(f"Finished loading and splitting document into {len(chunk_documents)} chunks: {ingested_document.id}")
             class_resource_document.class_resource_chunk_ids.extend([chunk_doc.id for chunk_doc in chunk_documents])
 
-            logger.info(f"Embedding {len(chunk_documents)} chunks: {ingested_document.id}")
+            logger.debug(f"Embedding {len(chunk_documents)} chunks: {ingested_document.id}")
             partial_func = partial(self.embed_documents, chunk_documents)
             vector_documents = execute_with_resource_check(partial_func)
-            logger.info(f"Finished embedding {len(chunk_documents)}  chunks: {ingested_document.id}")
-            logger.info(f"Loading {len(chunk_documents)}  chunks to db: {ingested_document.id}")
+            logger.debug(f"Finished embedding {len(chunk_documents)}  chunks: {ingested_document.id}")
+            logger.debug(f"Loading {len(chunk_documents)}  chunks to db: {ingested_document.id}")
             self._load_class_resources_to_db(class_resource_document, chunk_documents)
-            logger.info(f"Finished loading {len(chunk_documents)}  chunks to db: {ingested_document.id}")
-            logger.info(f"Loading {len(vector_documents)} vectors to vector store: {ingested_document.id}")
+            logger.debug(f"Finished loading {len(chunk_documents)}  chunks to db: {ingested_document.id}")
+            logger.debug(f"Loading {len(vector_documents)} vectors to vector store: {ingested_document.id}")
             self._load_vectors_to_vector_store(vector_documents)
-            logger.info(f"Finished loading {len(vector_documents)} vectors to vector store: {ingested_document.id}")
+            logger.debug(f"Finished loading {len(vector_documents)} vectors to vector store: {ingested_document.id}")
+            logger.info(f"Finished indexing document '{ingested_document.id}' in class '{ingested_document.class_id}' ({doc_num}/{len(ingested_documents)})")
         return parent_class_resource
 
     def get_relevant_class_resources(self, query: str, class_id: UUID, for_tai_tutor: bool) -> list[ClassResourceChunkDocument]:
@@ -374,7 +380,7 @@ class TAISearch:
         document = loading_strategy_factory(document)
         loaded_docs = document.loader.load()
 
-        chunk_documents = []
+        chunk_documents: list[ClassResourceChunkDocument] = []
         for chunk_size in chunk_sizes:
             document = document_splitter_factory(document, chunk_size)
             split_docs = document.splitter.split_documents(loaded_docs)
@@ -403,6 +409,11 @@ class TAISearch:
                 )
                 chunk_documents.append(chunk_doc)
         return chunk_documents
+
+    def _update_metadata(self, resource_doc: StatefulClassResourceDocument, document: ClassResourceChunkDocument) -> None:
+        """Update the metadata."""
+        metadata = resource_doc.metadata.dict() | document.metadata.dict()
+        resource_doc.metadata = Metadata(**metadata)
 
     def _extract_chapter_numbers_from_query(self, query: str) -> list[str]:
         chapter_pattern = r"(chapters?\s*((\d+\s?[,and\s&]*)+))"  # matches chapter 1, chapter 2, 3, 4, chapter 5 & 6, etc. to extract the numbers from a query
@@ -459,7 +470,7 @@ class TAISearch:
         # Start a separate thread for get_sparse_vectors operation
         with ThreadPoolExecutor() as executor:
             future = executor.submit(self.get_sparse_vectors, [doc.chunk for doc in documents])
-        with ThreadPoolExecutor(max_workers=len(batches)) as executor:
+        with ThreadPoolExecutor(max_workers=max(len(batches), 1)) as executor:
             results = executor.map(embed_batch, batches)
             vector_docs = [vector_doc for result in results for vector_doc in result]
         # Close the thread and get results

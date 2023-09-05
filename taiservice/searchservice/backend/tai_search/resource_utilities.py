@@ -204,8 +204,6 @@ class YouTubeVideoDocumentUtility(DocumentUtility):
         video_id = self._ingested_doc.data_pointer
         # urls ranked by quality ascending
         urls = [
-            f"https://img.youtube.com/vi/{video_id}/mqdefault.jpg",
-            f"https://img.youtube.com/vi/{video_id}/hqdefault.jpg",
             f"https://img.youtube.com/vi/{video_id}/sddefault.jpg",
             f"https://img.youtube.com/vi/{video_id}/maxresdefault.jpg",
         ]

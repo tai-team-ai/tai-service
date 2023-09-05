@@ -164,12 +164,20 @@ class DocumentDB:
 
     def get_class_resources(self,
         ids: Union[list[UUID], UUID],
-        from_class_ids: bool=False,
+        from_class_ids: bool = False,
     ) -> list[ClassResourceDocument]:
         """Return the full class resources."""
         ids = [ids] if isinstance(ids, UUID) else ids
         ids = [str(id) for id in ids]
-        field_name = "class_id" if from_class_ids else "_id"
-        documents = list(self._class_resource_collection.find({field_name: {"$in": ids}}))
+        db_filter: dict[str, Any]
+        if from_class_ids:
+            # this check ensures we find the root doc for the class resource and not a child doc.
+            # Example: PDF vs pages in a PDF
+            db_filter = {"class_id": {"$in": ids}}
+            db_filter.update({"$or": [{"parent_resource_ids": {"$exists": False}}, {"parent_resource_ids": []}]})
+            db_filter.update({"$and": [{"child_resource_ids": {"$exists": True}}, {"child_resource_ids": {"$ne": []}}]})
+        else:
+            db_filter = {"_id": {"$in": ids}}
+        documents = list(self._class_resource_collection.find(db_filter))
         documents = [ClassResourceDocument.parse_obj(document) for document in documents]
         return documents
