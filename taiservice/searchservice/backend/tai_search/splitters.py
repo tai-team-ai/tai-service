@@ -51,6 +51,7 @@ class YouTubeTranscriptSplitter(RecursiveCharacterTextSplitter):
         aggregate_start = metadatas[0]["start"]
         overlap_buffer = ""
         overlap_duration = 0
+        timestamp_overlap = 15
 
         for i, text in enumerate(texts):
             if self._length_function(text) > self._chunk_size:
@@ -72,7 +73,7 @@ class YouTubeTranscriptSplitter(RecursiveCharacterTextSplitter):
                 aggregate_content += " " + text
                 aggregate_duration += metadata["duration"]
             else:
-                metadata.update({"start": aggregate_start, "duration": aggregate_duration})
+                metadata.update({"start": aggregate_start - timestamp_overlap, "duration": aggregate_duration})
                 page_content = aggregate_content if self._keep_separator else aggregate_content.strip()
                 documents.append(Document(page_content=page_content, metadata=metadata))
                 aggregate_content = text
@@ -147,8 +148,8 @@ def document_splitter_factory(ingested_document: IngestedDocument, chunk_size: C
         if not Splitter:
             raise NotImplementedError(f"Splitting strategy for {ingested_document.input_format} not implemented.")
         elif Splitter == YouTubeTranscriptSplitter:
-            kwargs["chunk_overlap"] = int(kwargs["chunk_overlap"] * 1.5)
-            kwargs["chunk_size"] = int(kwargs["chunk_size"] * 1.5)
+            kwargs["chunk_overlap"] = int(kwargs["chunk_overlap"] * 1.2)
+            kwargs["chunk_size"] = int(kwargs["chunk_size"] * 1.2)
         splitter = Splitter(**kwargs)
     copy_of_ingested_document = ingested_document.copy()
     copy_of_ingested_document.splitter = splitter

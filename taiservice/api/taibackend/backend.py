@@ -314,7 +314,7 @@ class Backend:
             'from_class_ids': from_class_ids
         }
         try:
-            response = requests.get(url, params=params, timeout=4)
+            response = requests.get(url, params=params, timeout=7)
             if response.status_code != 200:
                 logger.info(f"Failed to retrieve class resources from {url}. Status code: {response.status_code}")
             else:

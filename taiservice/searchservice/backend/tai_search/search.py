@@ -49,6 +49,7 @@ from ..databases.document_db import DocumentDBConfig, DocumentDB
 from ..databases.document_db_schemas import (
     ClassResourceChunkDocument,
     ClassResourceDocument,
+    ClassResourceProcessingStatus,
 )
 from .resource_utilities import resource_utility_factory, resource_crawler_factory
 from .splitters import (
@@ -149,9 +150,15 @@ def execute_with_resource_check(func: Callable[..., Any], resource_limits: Resou
         func_name = func.func.__name__
     else:
         func_name = func.__name__
+    attempts = 0
+    max_checks_before_proceeding = 15
     while resources_constrained(resource_limits=resource_limits):
         logger.warning(f"System resources constrained. Retrying operation {func_name} after {time_to_sleep} seconds.")
         sleep(time_to_sleep)
+        if attempts >= max_checks_before_proceeding:
+            logger.warning(f"System resources still constrained after {max_checks_before_proceeding} attempts. Proceeding with operation {func_name}.")
+            break
+        attempts += 1
     return func()
 
 
@@ -176,28 +183,34 @@ class TAISearch:
 
     def index_resource(self, ingested_document: IngestedDocument) -> ClassResourceDocument:
         """Index a document."""
-        logger.info(f"Crawling document: {ingested_document.id}")
+        logger.debug(f"Crawling document: {ingested_document.id}")
         ingested_document, parent_class_resource = self._save_document_to_cold_store(ingested_document)
         crawler = resource_crawler_factory(ingested_document)
         ingested_documents = crawler.crawl(parent_class_resource)
         # after crawling, the parent_class_resource will have pointers to all the child class resources
         self._document_db.upsert_class_resources([parent_class_resource])
-        logger.info(f"Finished crawling document: {ingested_document.id}. Found {len(ingested_documents)} documents.")
+        logger.debug(f"Finished crawling document: {ingested_document.id}. Found {len(ingested_documents)} documents.")
 
         # TODO: We should not be iterating here, instead crawled docs will have been pushed to a queue that
         # will be consumed by this service so this service is only processing one page/document at a time.
+        class_resource_docs = []
         for doc_num, ingested_document in enumerate(ingested_documents, 1):
             logger.info(f"Indexing document '{ingested_document.id}' in class '{ingested_document.class_id}' ({doc_num}/{len(ingested_documents)})")
             ingested_document, class_resource_document = self._save_document_to_cold_store(ingested_document)
+            class_resource_docs.append(class_resource_document)
             class_resource_document.parent_resource_ids.append(parent_class_resource.id)
+            class_resource_document.parent_resource_url = parent_class_resource.full_resource_url
             logger.debug(f"Loading and splitting document: {ingested_document.id}")
             chunk_documents = self._load_and_split_document(ingested_document, [ChunkSize.SMALL, ChunkSize.LARGE])
-            self._update_metadata(class_resource_document, chunk_documents[0])
-            self._update_metadata(parent_class_resource, chunk_documents[0])
-            self._document_db.upsert_class_resources([parent_class_resource])
-            if not chunk_documents:
+
+            if chunk_documents:
+                self._update_metadata(class_resource_document, chunk_documents[0])
+                self._update_metadata(parent_class_resource, chunk_documents[0])
+                self._document_db.upsert_class_resources([parent_class_resource])
+            else:
                 logger.warning(f"No chunks found for document: {ingested_document.id}")
                 continue
+
             self._augment_chunks(ingested_document, chunk_documents)
             logger.debug(f"Finished loading and splitting document into {len(chunk_documents)} chunks: {ingested_document.id}")
             class_resource_document.class_resource_chunk_ids.extend([chunk_doc.id for chunk_doc in chunk_documents])
@@ -213,6 +226,9 @@ class TAISearch:
             self._load_vectors_to_vector_store(vector_documents)
             logger.debug(f"Finished loading {len(vector_documents)} vectors to vector store: {ingested_document.id}")
             logger.info(f"Finished indexing document '{ingested_document.id}' in class '{ingested_document.class_id}' ({doc_num}/{len(ingested_documents)})")
+
+        self._update_linked_list_pointers_for_resources(class_resource_docs)
+        self._document_db.upsert_class_resources(class_resource_docs)
         return parent_class_resource
 
     def get_relevant_class_resources(self, query: str, class_id: UUID, for_tai_tutor: bool) -> list[ClassResourceChunkDocument]:
@@ -308,9 +324,25 @@ class TAISearch:
         # this issue until we scale to 1000s of classrooms using the app.
         utility.upload_resource()
         logger.info(f"Finished uploading resource to cold store: {ingested_document.id}")
-        class_resource_document = ClassResourceDocument.from_ingested_doc(utility.ingested_doc)
+        class_resource_document = ClassResourceDocument.from_ingested_doc(
+            utility.ingested_doc,
+            status=ClassResourceProcessingStatus.PROCESSING,
+        )
         self._document_db.upsert_document(class_resource_document)
         return utility.ingested_doc, class_resource_document
+
+    def _update_linked_list_pointers_for_resources(self, class_resource_documents: list[ClassResourceDocument]) -> None:
+        """Update the linked list pointers for resources."""
+        previous_document_id = None
+        previous_document_url = None
+        for i, class_resource_document in enumerate(class_resource_documents):
+            if i < len(class_resource_documents) - 1:
+                class_resource_document.next_document_id = class_resource_documents[i + 1].id
+                class_resource_document.next_document_url = class_resource_documents[i + 1].full_resource_url
+            class_resource_document.previous_document_id = previous_document_id
+            class_resource_document.previous_document_url = previous_document_url
+            previous_document_id = class_resource_document.id
+            previous_document_url = class_resource_document.full_resource_url
 
     def _sort_chunk_docs_by_pinecone_scores(
         self,

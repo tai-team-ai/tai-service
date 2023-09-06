@@ -211,7 +211,7 @@ class TaiSearchServiceStack(Stack):
         cluster, capacity_provider_mapping = self._get_cluster()
         capacity_provider_strategies: list[CapacityProviderStrategy] = []
         for name, service_type in capacity_provider_mapping.items():
-            weight = 1 if service_type == ECSServiceType.GPU else 0
+            weight = 1 if service_type == ECSServiceType.NO_GPU else 0
             logger.info(f"Adding capacity provider strategy with weight {weight} for capacity provider '{name}'")
             capacity_provider_strategies.append(
                 CapacityProviderStrategy(
@@ -245,7 +245,7 @@ class TaiSearchServiceStack(Stack):
                 self._search_service_settings.get_docker_file_contents(
                     target_port,
                     FULLY_QUALIFIED_HANDLER_NAME,
-                    worker_count=10,
+                    worker_count=16,
                 )
             )
 
@@ -298,7 +298,7 @@ class TaiSearchServiceStack(Stack):
             ami = EcsOptimizedImage.amazon_linux2(hardware_type=AmiHardwareType.GPU)
         else:
             instance_type = ec2.InstanceType.of(
-                instance_class=ec2.InstanceClass.C6A,
+                instance_class=ec2.InstanceClass.R6A,
                 instance_size=ec2.InstanceSize.XLARGE2,
             )
             ami = EcsOptimizedImage.amazon_linux2(hardware_type=AmiHardwareType.STANDARD)
@@ -309,7 +309,7 @@ class TaiSearchServiceStack(Stack):
             vpc=self.vpc,
             instance_type=instance_type,
             machine_image=ami,
-            max_capacity=3,
+            max_capacity=8,
             min_capacity=0,
             # spot_price="0.35",
             block_devices=block_devices,
@@ -330,7 +330,7 @@ class TaiSearchServiceStack(Stack):
             image=ContainerImage.from_asset(directory=CWD, file=DOCKER_FILE_NAME),
             environment=self._search_service_settings.dict(for_environment=True, export_aws_vars=True),
             logging=LogDriver.aws_logs(stream_prefix=self._namer("log")),
-            gpu_count=1,
+            gpu_count=0,
             memory_reservation_mib=15000,
             stop_timeout=Duration.seconds(600),
         )
@@ -353,8 +353,8 @@ class TaiSearchServiceStack(Stack):
         return target_sg
 
     def _get_scalable_task(self, service: Ec2Service) -> ScalableTaskCount:
-        min_task_count = 2
-        max_task_count = 3
+        min_task_count = 5
+        max_task_count = 8
         scaling_task = service.auto_scale_task_count(
             min_capacity=min_task_count,
             max_capacity=max_task_count,
@@ -367,22 +367,22 @@ class TaiSearchServiceStack(Stack):
         )
         scaling_task.scale_on_memory_utilization(
             id=self._namer("task-memory-scaling"),
-            target_utilization_percent=75,
+            target_utilization_percent=50,
             scale_out_cooldown=Duration.seconds(300),  # we should be fast because of the warm pool
             disable_scale_in=False,
         )
-        # scaling_task.scale_on_schedule(
-        #     id=self._namer("scale-up"),
-        #     schedule=Schedule.cron(hour="12", minute="0", week_day="*"),  # 6am MST
-        #     min_capacity=min_task_count,
-        #     max_capacity=max_task_count,
-        # )
-        # scaling_task.scale_on_schedule(
-        #     self._namer("scale-down"),
-        #     schedule=Schedule.cron(hour="8", minute="0", week_day="*"),  # 12am MST
-        #     min_capacity=0,
-        #     max_capacity=0,
-        # )
+        scaling_task.scale_on_schedule(
+            id=self._namer("scale-up"),
+            schedule=Schedule.cron(hour="13", minute="0", week_day="*"),  # 7am MST
+            min_capacity=min_task_count,
+            max_capacity=max_task_count,
+        )
+        scaling_task.scale_on_schedule(
+            self._namer("scale-down"),
+            schedule=Schedule.cron(hour="4", minute="0", week_day="*"),  # 10pm MST
+            min_capacity=2,
+            max_capacity=max_task_count,
+        )
         return scaling_task
 
     def _get_target_group(
@@ -402,9 +402,9 @@ class TaiSearchServiceStack(Stack):
             deregistration_delay=Duration.seconds(600),
             health_check=elbv2.HealthCheck(
                 healthy_threshold_count=2,
-                interval=Duration.seconds(120),
-                timeout=Duration.seconds(60),
-                unhealthy_threshold_count=5,
+                interval=Duration.seconds(30),
+                timeout=Duration.seconds(5),
+                unhealthy_threshold_count=3,
             ),
         )
         return target_group

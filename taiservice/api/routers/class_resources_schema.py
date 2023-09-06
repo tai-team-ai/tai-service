@@ -39,6 +39,7 @@ class ClassResourceType(str, Enum):
     STUDY_GUIDE = "study guide"
     LECTURE = "lecture"
     ARTICLE = "article"
+    CLASS_INFORMATION = "class information"
 
 
 class Metadata(BasePydanticModel):
@@ -118,6 +119,22 @@ class ClassResource(BaseClassResource):
         schema_extra = {
             "example": EXAMPLE_CLASS_RESOURCE,
         }
+
+
+class ClassResourceResponse(BasePydanticModel):
+    """Define the model for responding from a post request."""
+    client_id: Optional[UUID] = Field(
+        default=None,
+        description="The ID of the client that uploaded the resource.",
+    )
+    class_resource_id: Optional[UUID] = Field(
+        ...,
+        description="The ID of the class resource.",
+    )
+    status: ClassResourceProcessingStatus = Field(
+        ...,
+        description=f"The status of the class resource. Valid values are: {', '.join([status.value for status in ClassResourceProcessingStatus])}",
+    )
 
 
 class ClassResources(BasePydanticModel):

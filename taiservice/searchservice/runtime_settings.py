@@ -162,8 +162,8 @@ class SearchServiceSettings(BaseSettings):
         description="The path to the chrome driver.",
     )
     class_resource_processing_timeout: int = Field(
-        default=1000,
-        ge=480,
+        default=900,
+        ge=300,
         le=1000,
         description="The timeout for class resource processing.",
     )

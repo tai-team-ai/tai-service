@@ -2,6 +2,7 @@
 from datetime import date, datetime, timedelta
 import json
 import traceback
+from uuid import uuid4
 from typing import Any, Callable, Optional, Type, Union
 from uuid import UUID
 import psutil
@@ -34,6 +35,7 @@ from .databases.document_db_schemas import (
     ClassResourceChunkDocument,
     ChunkMetadata as BEChunkMetadata,
     StatefulClassResourceDocument,
+    IngestedDocument,
 )
 from .databases.pinecone_db import PineconeDB, PineconeDBConfig
 from .metrics import (
@@ -198,19 +200,20 @@ class Backend:
             output_documents.append(output_doc)
         return output_documents
 
-    def create_class_resource(self, class_resource: ClassResource) -> Callable[[], None]:
+    def create_class_resource(self, class_resource: ClassResource) -> tuple[Callable[[], None], ClassResource]:
         """Create the class resources."""
         if not self._is_server_ready():
             raise ServerOverloadedError("Server is overloaded, please try again later.")
         input_doc = self.to_backend_input_docs(class_resource)[0]
         ingested_doc = self._tai_search.ingest_document(input_doc)
+        ingested_doc.id = uuid4()
         if not self._able_to_create_resource(ingested_doc):
             raise DuplicateClassResourceError(f"Duplicate class resource: {ingested_doc.id} in class {ingested_doc.class_id}")
         self._coerce_and_update_status(ingested_doc, ClassResourceProcessingStatus.PENDING)
 
         def index_resource() -> None:
             try:
-                self._delete_before_update(ingested_doc)
+                self._delete_if_exists(ingested_doc)
                 self._coerce_and_update_status(ingested_doc, ClassResourceProcessingStatus.PROCESSING)
                 db_class_resource = self._tai_search.index_resource(ingested_doc)
                 self._coerce_and_update_status(db_class_resource, ClassResourceProcessingStatus.COMPLETED)
@@ -220,7 +223,8 @@ class Backend:
                 logger.critical(f"Failed to create class resources")
                 logger.critical(traceback.format_exc())
 
-        return index_resource
+        api_resource = self.to_api_resources(ClassResourceDocument(**ingested_doc.dict()))
+        return index_resource, api_resource
 
     def get_class_resources(self, ids: list[UUID], from_class_ids: bool = False) -> list[ClassResource]:
         """Get the class resources."""
@@ -232,7 +236,7 @@ class Backend:
                 self._coerce_and_update_status(doc, ClassResourceProcessingStatus.FAILED)
         return self.to_api_resources(docs)
 
-    def _delete_before_update(self, new_doc: tai_search.IngestedDocument) -> None:
+    def _delete_if_exists(self, new_doc: tai_search.IngestedDocument) -> None:
         """Delete the class resources before updating."""
         _, existing_doc = self._is_duplicate_class_resource(new_doc)
         if existing_doc:
@@ -292,6 +296,7 @@ class Backend:
         resource_docs = [] if for_tai_tutor else self._doc_db.get_class_resources(resource_ids, ClassResourceDocument)
         self._replace_urls_with_chunk_urls(resource_docs, chunk_docs)
         sorted_resources = self._sort_class_resources(resource_docs, chunk_docs)
+
         search_results = SearchEngineResponse(
             short_snippets=self.to_api_resources(small_chunks),
             long_snippets=self.to_api_resources(large_chunks),
@@ -318,7 +323,7 @@ class Backend:
             if resource and resource.id not in resources_docs_already_replaced:
                 if chunk_doc.raw_chunk_url:
                     resources_docs_already_replaced.add(resource.id)
-                    resource.full_resource_url = chunk_doc.raw_chunk_url
+                    resource.raw_chunk_url = chunk_doc.raw_chunk_url
 
     def _get_resource_ids_from_chunks(
         self, docs: Union[list[ClassResourceChunkDocument], ClassResourceChunkDocument], unique: bool = True
@@ -420,8 +425,7 @@ class Backend:
             )
         doc_hashes = {class_resource_doc.hashed_document_contents: class_resource_doc for class_resource_doc in class_resource_docs}
         doc_titles = {class_resource_doc.metadata.title: class_resource_doc for class_resource_doc in class_resource_docs}
-        doc_ids = {class_resource_doc.id: class_resource_doc for class_resource_doc in class_resource_docs}
-        existing_doc = doc_hashes.get(new_doc.hashed_document_contents) or doc_titles.get(new_doc.metadata.title) or doc_ids.get(new_doc.id)
+        existing_doc = doc_hashes.get(new_doc.hashed_document_contents) or doc_titles.get(new_doc.metadata.title)
         if existing_doc:
             return True, existing_doc
         return False, None

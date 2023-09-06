@@ -30,9 +30,33 @@ class ClassResourceDocument(StatefulClassResourceDocument):
             "the parent resource."
         ),
     )
+    parent_resource_url: Optional[HttpUrl] = Field(
+        default=None,
+        description="The URL of the parent resource. This should be the root resource.",
+    )
     class_resource_chunk_ids: list[UUID] = Field(
         default_factory=list,
         description="The IDs of the class resource chunks.",
+    )
+    next_document_id: Optional[UUID] = Field(
+        default=None,
+        description="The ID of the next document. Useful if the resource is a pdf.",
+    )
+    previous_document_url: Optional[HttpUrl] = Field(
+        default=None,
+        description="The URL of the previous document. Useful if the resource is a pdf.",
+    )
+    previous_document_id: Optional[UUID] = Field(
+        default=None,
+        description="The ID of the previous document. Useful if the resource is a pdf.",
+    )
+    next_document_url: Optional[HttpUrl] = Field(
+        default=None,
+        description="The URL of the next document. Useful if the resource is a pdf.",
+    )
+    raw_chunk_url: Optional[HttpUrl] = Field(
+        default=None,
+        description="The URL of the raw chunk. Useful if the resource is a pdf.",
     )
 
     @validator("child_resource_ids")
@@ -48,7 +72,7 @@ class ClassResourceDocument(StatefulClassResourceDocument):
     @staticmethod
     def from_ingested_doc(
         ingested_doc: IngestedDocument,
-        status: ClassResourceProcessingStatus = ClassResourceProcessingStatus.PENDING,
+        status: ClassResourceProcessingStatus = ClassResourceProcessingStatus.PROCESSING,
     ) -> "ClassResourceDocument":
         """Convert the ingested document to a database document."""
         metadata = ingested_doc.metadata

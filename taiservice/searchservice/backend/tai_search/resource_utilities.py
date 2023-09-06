@@ -196,6 +196,10 @@ class HTMLDocumentUtility(DocumentUtility):
             raise ValueError(f"Data pointer must be a path or url, not {type(self._ingested_doc.data_pointer)}")
         self._ingested_doc.full_resource_url = url
 
+    def augment_chunks(self, chunk_docs: list[ClassResourceChunkDocument]) -> list[ClassResourceChunkDocument]:
+        """Augment the chunk documents."""
+        return chunk_docs
+
 
 class YouTubeVideoDocumentUtility(DocumentUtility):
     """Implement the YouTube Video Document Utility."""
