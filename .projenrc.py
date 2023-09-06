@@ -22,13 +22,14 @@ def convert_dict_env_vars_to_env_vars(env_vars: dict, output: Literal["docker", 
     else:
         raise ValueError(f"Invalid output type: {output}")
 
+PACKAGE_NAME = "taiservice"
 
 VENV_DIR = ".venv"
 project: Project = AwsCdkPythonApp(
     author_email="jacobpetterle+aiforu@gmail.com",
     author_name="Jacob Petterle",
     cdk_version="2.85.0",
-    module_name="taiservice",
+    module_name=PACKAGE_NAME,
     name="tai-service",
     version="0.1.0",
     venv_options=VenvOptions(envdir=VENV_DIR),
@@ -92,9 +93,7 @@ PINECONE_DB_API_KEY_SECRET_NAME = {"PINECONE_DB_API_KEY_SECRET_NAME": "dev/tai_s
 OPENAI_API_KEY_SECRET_NAME = {"OPENAI_API_KEY_SECRET_NAME": "dev/tai_service/openai/api_key"}
 DOC_DB_READ_ONLY_USER_PASSWORD_SECRET_NAME = "dev/tai_service/document_DB/read_ONLY_user_password"
 DOC_DB_READ_WRITE_USER_PASSWORD_SECRET_NAME = "dev/tai_service/document_DB/read_write_user_password"
-DOC_DB_FULLY_QUALIFIED_DOMAIN_NAME = {
-    "DOC_DB_FULLY_QUALIFIED_DOMAIN_NAME": "tai-service-645860363137.us-east-1.docdb-elastic.amazonaws.com"
-}
+DOC_DB_FULLY_QUALIFIED_DOMAIN_NAME = {"DOC_DB_FULLY_QUALIFIED_DOMAIN_NAME": "localhost:17019"}
 DOC_DB_DATABASE_NAME = {"DOC_DB_DATABASE_NAME": "class_resources"}
 DOC_DB_CLASS_RESOURCE_COLLECTION_NAME = {"DOC_DB_CLASS_RESOURCE_COLLECTION_NAME": "class_resource"}
 AWS_DEFAULT_REGION = {"AWS_DEFAULT_REGION": "us-east-1"}
@@ -138,7 +137,7 @@ SEARCH_SERVICE_RUNTIME_ENV_VARS = (
         "COLD_STORE_BUCKET_NAME": "tai-service-class-resource-cold-store-dev",
         "DOCUMENTS_TO_INDEX_QUEUE": "tai-service-documents-to-index-queue-dev",
         "NLTK_DATA": "/tmp/nltk_data",
-        "MATHPIX_API_SECRET": "{\"secret_name\": \"dev/tai_service/mathpix_api_secret\"}",
+        "MATHPIX_API_SECRET": '{"secret_name": "dev/tai_service/mathpix_api_secret"}',
     }
     | PINECONE_DB_API_KEY_SECRET_NAME
     | PINECONE_DB_ENVIRONMENT
@@ -183,6 +182,8 @@ vscode_launch_config.add_configuration(
         "--factory",
         "--port",
         "8000",
+        "--reload-dir",
+        f"{PACKAGE_NAME}/api",
     ],
     env=API_RUNTIME_ENV_VARS,
 )
@@ -197,6 +198,8 @@ vscode_launch_config.add_configuration(
         "--factory",
         "--port",
         "8080",
+        "--reload-dir",
+        f"{PACKAGE_NAME}/searchservice",
     ],
     env=SEARCH_SERVICE_RUNTIME_ENV_VARS,
 )
@@ -283,6 +286,18 @@ make_file.add_rule(
     recipe=[
         *BASE_DOCKER_RUN_RECIPE,
         f"sudo docker run --network host {convert_dict_env_vars_to_env_vars(SEARCH_SERVICE_RUNTIME_ENV_VARS)} test-container",
+    ],
+)
+make_file.add_rule(
+    targets=["mongodb-start"],
+    recipe=[
+        "kill $(lsof -t -i:27017); docker run --rm --name mongodb -p 17017:27017 -v /home/ec2-user/tai-service/docker/mongodb:/data/db -e MONGO_INITDB_ROOT_USERNAME=user -e MONGO_INITDB_ROOT_PASSWORD=password mongo",
+    ],
+)
+make_file.add_rule(
+    targets=["mongodb-stop"],
+    recipe=[
+        "docker stop mongodb",
     ],
 )
 

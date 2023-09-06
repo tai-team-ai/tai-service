@@ -232,7 +232,7 @@ class TaiSearchServiceStack(Stack):
             task_definition=task_definition,
             security_groups=[security_group, sg_for_connecting_to_db],
             circuit_breaker=DeploymentCircuitBreaker(rollback=True),
-            placement_strategies=[PlacementStrategy.spread_across_instances()],
+            placement_strategies=[PlacementStrategy.packed_by_memory()],
             capacity_provider_strategies=capacity_provider_strategies,
             health_check_grace_period=Duration.seconds(450),
         )
@@ -272,6 +272,8 @@ class TaiSearchServiceStack(Stack):
                     name,
                     auto_scaling_group=asg,
                     capacity_provider_name=name,
+                    enable_managed_scaling=True,
+                    enable_managed_termination_protection=True,
                 )
             )
         return cluster, capacity_provider_mapping
@@ -309,12 +311,13 @@ class TaiSearchServiceStack(Stack):
             vpc=self.vpc,
             instance_type=instance_type,
             machine_image=ami,
-            max_capacity=8,
+            max_capacity=2,
             min_capacity=0,
             # spot_price="0.35",
             block_devices=block_devices,
             max_instance_lifetime=Duration.days(10),
             user_data=user_data,
+            new_instances_protected_from_scale_in=True,
         )
         WarmPool(
             self,
@@ -365,22 +368,24 @@ class TaiSearchServiceStack(Stack):
             scale_out_cooldown=Duration.seconds(300),  # we should be fast because of the warm pool
             disable_scale_in=False,
         )
-        scaling_task.scale_on_memory_utilization(
-            id=self._namer("task-memory-scaling"),
-            target_utilization_percent=50,
-            scale_out_cooldown=Duration.seconds(300),  # we should be fast because of the warm pool
-            disable_scale_in=False,
-        )
+        # for some reason, scaling on multiple metrics prohibits scaling in,
+        # scaling out does not appear to be affected
+        # scaling_task.scale_on_memory_utilization(
+        #     id=self._namer("task-memory-scaling"),
+        #     target_utilization_percent=50,
+        #     scale_out_cooldown=Duration.seconds(300),  # we should be fast because of the warm pool
+        #     disable_scale_in=False,
+        # )
         scaling_task.scale_on_schedule(
             id=self._namer("scale-up"),
-            schedule=Schedule.cron(hour="13", minute="0", week_day="*"),  # 7am MST
+            schedule=Schedule.cron(hour="14", minute="0", week_day="*"),  # 8am MST
             min_capacity=min_task_count,
             max_capacity=max_task_count,
         )
         scaling_task.scale_on_schedule(
             self._namer("scale-down"),
-            schedule=Schedule.cron(hour="4", minute="0", week_day="*"),  # 10pm MST
-            min_capacity=2,
+            schedule=Schedule.cron(hour="5", minute="0", week_day="*"),  # 11pm MST
+            min_capacity=1,
             max_capacity=max_task_count,
         )
         return scaling_task

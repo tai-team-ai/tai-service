@@ -159,10 +159,14 @@ class Backend:
                 ),
             ).dict()
             if isinstance(doc, ClassResourceDocument):
-                output_doc = ClassResource(status=doc.status, **base_doc)
+                output_doc = ClassResource(
+                    status=doc.status,
+                    raw_snippet_url=doc.raw_chunk_url,
+                    **base_doc,
+                )
             elif isinstance(doc, ClassResourceChunkDocument):
                 output_doc = APIClassResourceSnippet(
-                    resource_snippet=doc.chunk, raw_snippet_url=doc.full_resource_url, **base_doc
+                    resource_snippet=doc.chunk, raw_snippet_url=doc.raw_chunk_url, **base_doc
                 )
             else:
                 raise RuntimeError(f"Unknown document type: {doc}")

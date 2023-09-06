@@ -10,7 +10,9 @@
         "--reload",
         "--factory",
         "--port",
-        "8000"
+        "8000",
+        "--reload-dir",
+        "taiservice/api"
       ],
       "env": {
         "MESSAGE_ARCHIVE_BUCKET_NAME": "llm-message-archive-dev",
@@ -20,7 +22,7 @@
         "OPENAI_API_KEY_SECRET_NAME": "dev/tai_service/openai/api_key",
         "AWS_DEFAULT_REGION": "us-east-1",
         "LOG_LEVEL": "DEBUG",
-        "DOC_DB_FULLY_QUALIFIED_DOMAIN_NAME": "tai-service-645860363137.us-east-1.docdb-elastic.amazonaws.com",
+        "DOC_DB_FULLY_QUALIFIED_DOMAIN_NAME": "localhost:17019",
         "DOC_DB_DATABASE_NAME": "class_resources",
         "DOC_DB_CLASS_RESOURCE_COLLECTION_NAME": "class_resource"
       },
@@ -35,7 +37,9 @@
         "--reload",
         "--factory",
         "--port",
-        "8080"
+        "8080",
+        "--reload-dir",
+        "taiservice/searchservice"
       ],
       "env": {
         "PINECONE_DB_INDEX_NAME": "tai-index",
@@ -50,7 +54,7 @@
         "OPENAI_API_KEY_SECRET_NAME": "dev/tai_service/openai/api_key",
         "AWS_DEFAULT_REGION": "us-east-1",
         "LOG_LEVEL": "DEBUG",
-        "DOC_DB_FULLY_QUALIFIED_DOMAIN_NAME": "tai-service-645860363137.us-east-1.docdb-elastic.amazonaws.com",
+        "DOC_DB_FULLY_QUALIFIED_DOMAIN_NAME": "localhost:17019",
         "DOC_DB_DATABASE_NAME": "class_resources",
         "DOC_DB_CLASS_RESOURCE_COLLECTION_NAME": "class_resource"
       },

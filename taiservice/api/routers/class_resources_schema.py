@@ -82,6 +82,14 @@ class BaseClassResource(BasePydanticModel):
             * If this is a website, then this field should be the URL of the website."""
         ),
     )
+    parent_resource_url: Optional[HttpUrl] = Field(
+        default=None,
+        description="The URL of the parent resource. Useful if the resource is a pdf.",
+    )
+    raw_snippet_url: Optional[HttpUrl] = Field(
+        default=None,
+        description="The URL of the raw snippet. An example of this is a youtube video with a timestamp.",
+    )
     preview_image_url: Optional[HttpUrl] = Field(
         default=None,
         description="The URL of the preview image of the class resource.",
