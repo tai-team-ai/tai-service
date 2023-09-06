@@ -20,7 +20,6 @@ USAGE_LOG_FIELD_NAME = "usage_log"
 
 class DocumentDBConfig(BaseModel):
     """Define the document database config."""
-
     username: str = Field(
         ...,
         description="The username of the document db.",
@@ -55,13 +54,12 @@ class DocumentDB:
     """
     Define the document database.
 
-    In order to recover from failures, upsert and delete operations
+    In order to recover from failures, upsert and delete operations 
     follow a FIFO, where for upserts, the chunks are upserted before
     class resources, and for deletes, the chunks are deleted before
     class resources. This ensures that we still have pointers to the
     chunks in the class resources if failure occurs (allows us to retry)
     """
-
     def __init__(self, config: DocumentDBConfig) -> None:
         """Initialize document db."""
         self._client = MongoClient(
@@ -69,7 +67,8 @@ class DocumentDB:
             password=config.password,
             host=config.fully_qualified_domain_name,
             port=config.port,
-            retryWrites=True,
+            tls=True,
+            retryWrites=False,
         )
         self._doc_models = [
             ClassResourceChunkDocument,
@@ -101,8 +100,7 @@ class DocumentDB:
             logger.error(traceback.format_exc())
             raise e
 
-    def get_class_resources(
-        self,
+    def get_class_resources(self,
         ids: Union[list[UUID], UUID],
         DocClass: Type[ClassResourceDocument | ClassResourceChunkDocument],
         from_class_ids: bool = False,
@@ -128,7 +126,7 @@ class DocumentDB:
     def upsert_class_resources(
         self,
         documents: list[ClassResourceDocument],
-        chunk_mapping: Optional[dict[UUID, ClassResourceChunkDocument]] = None,  # pylint: disable=unused-argument
+        chunk_mapping: Optional[dict[UUID, ClassResourceChunkDocument]] = None, # pylint: disable=unused-argument
     ) -> None:
         """Upsert the full class resources."""
         self.upsert_documents(documents)
@@ -190,9 +188,7 @@ class DocumentDB:
         else:
             raise ValueError(f"Invalid document type: {DocClass}")
 
-    def upsert_metric(
-        self, doc_id: UUID, metric: UsageMetric, DocClass: Union[Type[ClassResourceDocument], Type[ClassResourceChunkDocument]]
-    ) -> None:
+    def upsert_metric(self, doc_id: UUID, metric: UsageMetric, DocClass: Union[Type[ClassResourceDocument], Type[ClassResourceChunkDocument]]) -> None:
         """Upsert the metrics of the class resource."""
         collection = self._get_collection(DocClass)
         collection.find_one_and_update(
