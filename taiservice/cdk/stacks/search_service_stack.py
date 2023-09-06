@@ -232,7 +232,7 @@ class TaiSearchServiceStack(Stack):
             task_definition=task_definition,
             security_groups=[security_group, sg_for_connecting_to_db],
             circuit_breaker=DeploymentCircuitBreaker(rollback=True),
-            placement_strategies=[PlacementStrategy.packed_by_memory()],
+            placement_strategies=[PlacementStrategy.spread_across_instances()],
             capacity_provider_strategies=capacity_provider_strategies,
             health_check_grace_period=Duration.seconds(450),
         )
