@@ -17,14 +17,15 @@
       "env": {
         "MESSAGE_ARCHIVE_BUCKET_NAME": "llm-message-archive-dev",
         "DYNAMODB_HOST": "http://localhost:8888",
-        "DOC_DB_CREDENTIALS_SECRET_NAME": "dev/tai_service/document_DB/read_ONLY_user_password",
+        "DOC_DB_CREDENTIALS_SECRET_NAME": "dev/local_mongodb_creds",
         "SEARCH_SERVICE_API_URL": "http://localhost:8080",
         "OPENAI_API_KEY_SECRET_NAME": "dev/tai_service/openai/api_key",
         "AWS_DEFAULT_REGION": "us-east-1",
         "LOG_LEVEL": "DEBUG",
-        "DOC_DB_FULLY_QUALIFIED_DOMAIN_NAME": "localhost:17019",
+        "DOC_DB_FULLY_QUALIFIED_DOMAIN_NAME": "localhost",
         "DOC_DB_DATABASE_NAME": "class_resources",
-        "DOC_DB_CLASS_RESOURCE_COLLECTION_NAME": "class_resource"
+        "DOC_DB_CLASS_RESOURCE_COLLECTION_NAME": "class_resource",
+        "DOC_DB_PORT": "17017"
       },
       "program": "${workspaceFolder}/.venv/bin/uvicorn"
     },
@@ -43,7 +44,7 @@
       ],
       "env": {
         "PINECONE_DB_INDEX_NAME": "tai-index",
-        "DOC_DB_CREDENTIALS_SECRET_NAME": "dev/tai_service/document_DB/read_write_user_password",
+        "DOC_DB_CREDENTIALS_SECRET_NAME": "dev/local_mongodb_creds",
         "DOC_DB_CLASS_RESOURCE_CHUNK_COLLECTION_NAME": "class_resource_chunk",
         "COLD_STORE_BUCKET_NAME": "tai-service-class-resource-cold-store-dev",
         "DOCUMENTS_TO_INDEX_QUEUE": "tai-service-documents-to-index-queue-dev",
@@ -54,7 +55,7 @@
         "OPENAI_API_KEY_SECRET_NAME": "dev/tai_service/openai/api_key",
         "AWS_DEFAULT_REGION": "us-east-1",
         "LOG_LEVEL": "DEBUG",
-        "DOC_DB_FULLY_QUALIFIED_DOMAIN_NAME": "localhost:17019",
+        "DOC_DB_FULLY_QUALIFIED_DOMAIN_NAME": "localhost",
         "DOC_DB_DATABASE_NAME": "class_resources",
         "DOC_DB_CLASS_RESOURCE_COLLECTION_NAME": "class_resource"
       },

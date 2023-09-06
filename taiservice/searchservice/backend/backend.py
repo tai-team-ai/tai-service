@@ -157,11 +157,12 @@ class Backend:
                     tags=metadata.tags,
                     resource_type=metadata.resource_type,
                 ),
-            ).dict()
+            ).dict(exclude={"raw_snippet_url", "parent_resource_url"})
             if isinstance(doc, ClassResourceDocument):
                 output_doc = ClassResource(
                     status=doc.status,
                     raw_snippet_url=doc.raw_chunk_url,
+                    parent_resource_url=doc.parent_resource_url,
                     **base_doc,
                 )
             elif isinstance(doc, ClassResourceChunkDocument):

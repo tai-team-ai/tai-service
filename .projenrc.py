@@ -22,6 +22,7 @@ def convert_dict_env_vars_to_env_vars(env_vars: dict, output: Literal["docker", 
     else:
         raise ValueError(f"Invalid output type: {output}")
 
+
 PACKAGE_NAME = "taiservice"
 
 VENV_DIR = ".venv"
@@ -93,11 +94,12 @@ PINECONE_DB_API_KEY_SECRET_NAME = {"PINECONE_DB_API_KEY_SECRET_NAME": "dev/tai_s
 OPENAI_API_KEY_SECRET_NAME = {"OPENAI_API_KEY_SECRET_NAME": "dev/tai_service/openai/api_key"}
 DOC_DB_READ_ONLY_USER_PASSWORD_SECRET_NAME = "dev/tai_service/document_DB/read_ONLY_user_password"
 DOC_DB_READ_WRITE_USER_PASSWORD_SECRET_NAME = "dev/tai_service/document_DB/read_write_user_password"
-DOC_DB_FULLY_QUALIFIED_DOMAIN_NAME = {"DOC_DB_FULLY_QUALIFIED_DOMAIN_NAME": "localhost:17019"}
+DOC_DB_FULLY_QUALIFIED_DOMAIN_NAME = {"DOC_DB_FULLY_QUALIFIED_DOMAIN_NAME": "localhost"}
 DOC_DB_DATABASE_NAME = {"DOC_DB_DATABASE_NAME": "class_resources"}
 DOC_DB_CLASS_RESOURCE_COLLECTION_NAME = {"DOC_DB_CLASS_RESOURCE_COLLECTION_NAME": "class_resource"}
 AWS_DEFAULT_REGION = {"AWS_DEFAULT_REGION": "us-east-1"}
 LOG_LEVEL = {"LOG_LEVEL": "DEBUG"}
+MONGODB_LOCAL_PORT = {"DOC_DB_PORT": "17017"}
 
 ENV_FILE_VARS = (
     {
@@ -112,13 +114,14 @@ ENV_FILE_VARS = (
     | PINECONE_DB_ENVIRONMENT
     | PINECONE_DB_API_KEY_SECRET_NAME
     | OPENAI_API_KEY_SECRET_NAME
+    | MONGODB_LOCAL_PORT
 )
 
 API_RUNTIME_ENV_VARS = (
     {
         "MESSAGE_ARCHIVE_BUCKET_NAME": "llm-message-archive-dev",
         "DYNAMODB_HOST": "http://localhost:8888",
-        "DOC_DB_CREDENTIALS_SECRET_NAME": DOC_DB_READ_ONLY_USER_PASSWORD_SECRET_NAME,
+        "DOC_DB_CREDENTIALS_SECRET_NAME": "dev/local_mongodb_creds",
     }
     | SEARCH_SERVICE_API_URL
     | OPENAI_API_KEY_SECRET_NAME
@@ -127,12 +130,13 @@ API_RUNTIME_ENV_VARS = (
     | DOC_DB_FULLY_QUALIFIED_DOMAIN_NAME
     | DOC_DB_DATABASE_NAME
     | DOC_DB_CLASS_RESOURCE_COLLECTION_NAME
+    | MONGODB_LOCAL_PORT
 )
 
 SEARCH_SERVICE_RUNTIME_ENV_VARS = (
     {
         "PINECONE_DB_INDEX_NAME": "tai-index",
-        "DOC_DB_CREDENTIALS_SECRET_NAME": DOC_DB_READ_WRITE_USER_PASSWORD_SECRET_NAME,
+        "DOC_DB_CREDENTIALS_SECRET_NAME": "dev/local_mongodb_creds",
         "DOC_DB_CLASS_RESOURCE_CHUNK_COLLECTION_NAME": "class_resource_chunk",
         "COLD_STORE_BUCKET_NAME": "tai-service-class-resource-cold-store-dev",
         "DOCUMENTS_TO_INDEX_QUEUE": "tai-service-documents-to-index-queue-dev",
