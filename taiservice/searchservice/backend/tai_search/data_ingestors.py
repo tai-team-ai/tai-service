@@ -104,7 +104,11 @@ class Ingestor(ABC):
         final_path = urllib.parse.urlparse(url).path.split("/")[-1]
         tmp_path: Path = Path("/tmp") / str(uuid4()) / final_path
         tmp_path.parent.mkdir(parents=True, exist_ok=True)
-        response = requests.get(url, timeout=10)
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537',
+        }
+
+        response = requests.get(url, headers=headers, timeout=10)
         response.raise_for_status()  # Raise an error if the download fails
         with open(tmp_path, "wb") as f:
             f.write(response.content)

@@ -6,6 +6,7 @@ import shutil
 from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Optional, Sequence, Union, Any
+from pydantic import ValidationError
 import urllib.parse
 import boto3
 from keybert import KeyBERT
@@ -16,6 +17,7 @@ import requests
 import fitz
 from selenium import webdriver
 from pydantic import HttpUrl
+from taiservice.searchservice.backend.shared_schemas import ChunkSize
 from taiservice.searchservice.backend.tai_search.data_ingestor_schema import IngestedDocument, InputFormat
 from .data_ingestor_schema import IngestedDocument
 from ..databases.document_db_schemas import ClassResourceDocument, ClassResourceChunkDocument
@@ -196,6 +198,25 @@ class HTMLDocumentUtility(DocumentUtility):
 
     def augment_chunks(self, chunk_docs: list[ClassResourceChunkDocument]) -> list[ClassResourceChunkDocument]:
         """Augment the chunk documents."""
+        # TODO: Figure out how to do this better. It's very good right now.
+        def smart_truncate(text: str, max_length: int) -> str:
+            encoded_text = ""
+            for ch in text:
+                encoded_ch = urllib.parse.quote(ch, safe="~()*!.'[]?#:@&=+$,;/%")
+                if len(encoded_text) + len(encoded_ch) > max_length:
+                    break
+                encoded_text += encoded_ch
+            return encoded_text
+
+        for chunk_doc in chunk_docs:
+            if chunk_doc.full_resource_url and chunk_doc.chunk and chunk_doc.metadata.chunk_size == ChunkSize.SMALL:
+                # max length of url for http is 2083
+                max_url_length = 2083 - len(chunk_doc.full_resource_url) - len("#:~:text=")
+                encoded_text = smart_truncate(chunk_doc.chunk, max_url_length)
+                try:
+                    chunk_doc.raw_chunk_url = f"{chunk_doc.full_resource_url}#:~:text={encoded_text}"
+                except ValidationError:
+                    continue
         return chunk_docs
 
 
@@ -211,7 +232,10 @@ class YouTubeVideoDocumentUtility(DocumentUtility):
         ]
         self._ingested_doc.preview_image_url = urls[0]
         for url in urls:
-            response = requests.get(url, timeout=4)
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537',
+            }
+            response = requests.get(url, headers=headers, timeout=4)
             if response.status_code == 200:
                 self._ingested_doc.preview_image_url = url
                 break
@@ -367,6 +391,7 @@ def resource_utility_factory(bucket_name: str, ingested_doc: IngestedDocument) -
         InputFormat.PDF: PDFDocumentUtility,
         InputFormat.HTML: HTMLDocumentUtility,
         InputFormat.WEB_PAGE: HTMLDocumentUtility,
+        InputFormat.GENERIC_TEXT: HTMLDocumentUtility, # because the output of BS4 is text
         InputFormat.YOUTUBE_VIDEO: YouTubeVideoDocumentUtility,
     }
     Utility = resource_utility_factory_mapping.get(ingested_doc.input_format)

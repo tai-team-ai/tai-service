@@ -1,5 +1,5 @@
 """Define the shared schemas used by the backend."""
-from typing import Optional
+from typing import Optional, Union
 from uuid import UUID
 from pydantic import Field, HttpUrl, validator
 from ..shared_schemas import (
@@ -108,7 +108,7 @@ class ClassResourceChunkDocument(BaseClassResourceDocument):
         ...,
         description="The metadata of the class resource chunk.",
     )
-    raw_chunk_url: Optional[HttpUrl] = Field(
+    raw_chunk_url: Optional[Union[HttpUrl, str]] = Field(
         default=None,
         description="""
             If the chunk hasn't been augmented this likely will point to the raw parent resource, if it has

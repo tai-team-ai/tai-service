@@ -143,6 +143,12 @@ def document_splitter_factory(ingested_document: IngestedDocument, chunk_size: C
         "chunk_overlap": OVERLAP_SIZE_TO_CHAR_COUNT_MAPPING[chunk_size],
     }
     if input_language:
+        # currently only html is converted to generic text (this isn't great to know that here as 
+        # it strongly couples us to know that we are using the BS4 loader)
+        # we make the chunks smaller to allow for highlighting text in the webpage
+        if ingested_document.input_format == InputFormat.GENERIC_TEXT and chunk_size == ChunkSize.SMALL:
+            kwargs["chunk_overlap"] = 50
+            kwargs["chunk_size"] = 150
         splitter = RecursiveCharacterTextSplitter.from_language(language=input_language, **kwargs)
     else:
         Splitter = SPLITTER_STRATEGY_MAPPING.get(ingested_document.input_format)

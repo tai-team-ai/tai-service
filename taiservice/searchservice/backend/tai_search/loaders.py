@@ -242,7 +242,7 @@ def loading_strategy_factory(ingested_doc: IngestedDocument) -> IngestedDocument
     if Loader == PDFLoader:
         secret = runtime_settings.mathpix_api_secret
         kwargs = secret.secret_value if secret else {}
-    elif Loader == BSHTMLLoader:
+    elif Loader == BSHTMLLoader or Loader == WebBaseLoader:
         # the output of the BSHTMLLoader is generic text
         ingested_doc.input_format = InputFormat.GENERIC_TEXT
     loader = Loader(ingested_doc.data_pointer, **kwargs)
