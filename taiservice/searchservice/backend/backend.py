@@ -301,6 +301,7 @@ class Backend:
         resource_docs = [] if for_tai_tutor else self._doc_db.get_class_resources(resource_ids, ClassResourceDocument)
         self._replace_urls_with_chunk_urls(resource_docs, chunk_docs)
         sorted_resources = self._sort_class_resources(resource_docs, chunk_docs)
+        logger.info(f"Got {len(sorted_resources)} similar docs: {[(doc.metadata.title, doc.full_resource_url) for doc in sorted_resources][:4]}...")
 
         search_results = SearchEngineResponse(
             short_snippets=self.to_api_resources(small_chunks),

@@ -251,7 +251,7 @@ class TAISearch:
             class_id=class_id,
             chunk=query,
             full_resource_url="https://www.google.com",  # this is a dummy link as it's not needed for the query
-            id=uuid4(),
+            _id=uuid4(), # using the alias here to calm my static typing
             preview_image_url="https://www.google.com",  # this is a dummy link as it's not needed for the query
             metadata=ChunkMetadata(
                 class_id=class_id,
@@ -285,20 +285,20 @@ class TAISearch:
             doc, query_filter = params
             similar_docs = self._pinecone_db.get_similar_documents(document=doc, doc_to_return=6, filter=query_filter)
             alpha = query_filter.alpha
-            threshold = (
-                alpha * 0.70 + (1 - alpha) * 5.5
-            )  # this is a linear interpolation between 0.6 and 5.0, 5.0 is arbitrary as the is technically not an upper limit
-            docs = [doc for doc in similar_docs.documents if doc.score > threshold]
-            if docs:
-                return docs
-            return [] if for_tai_tutor else similar_docs.documents[:3]
+            # this is a linear interpolation between 0.6 and 5.0, 5.0 is arbitrary as the is technically not an upper limit
+            # when returning docs for the tutor we want to be more conservative and error on the side of 
+            # not return docs that are not relevant
+            if for_tai_tutor:
+                threshold = alpha * 0.70 + (1 - alpha) * 5.5
+            else:
+                threshold = alpha * 0.50 + (1 - alpha) * 2.5
+            return [doc for doc in similar_docs.documents if doc.score > threshold]
 
         with ThreadPoolExecutor(max_workers=len(pinecone_docs)) as executor:
             results = executor.map(compute_similar_documents, zip(pinecone_docs.documents, filters))
         relevant_documents = list(itertools.chain(*results))
         uuids = [doc.metadata.chunk_id for doc in relevant_documents]
         chunk_docs = self._document_db.get_class_resources(uuids, ClassResourceChunkDocument)
-        logger.info(f"Got {len(chunk_docs)} similar docs: {[(doc.metadata.title, doc.full_resource_url) for doc in chunk_docs][:4]}...")
         chunk_docs = [doc for doc in chunk_docs if isinstance(doc, ClassResourceChunkDocument)]
         chunk_docs = self._sort_chunk_docs_by_pinecone_scores(relevant_documents, chunk_docs)
         return chunk_docs

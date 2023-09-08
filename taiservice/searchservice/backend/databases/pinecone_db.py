@@ -142,7 +142,7 @@ class PineconeDB:
         logger.info(f"Found {len(matches)} matches")
         for result in matches:
             doc = PineconeDocument(**result)
-            logger.info(f"Score: {doc.score}")
+            logger.debug(f"Score: {doc.score}")
             docs.documents.append(doc)
         # sort the documents by score
         docs.documents.sort(key=lambda doc: doc.score, reverse=True)

@@ -52,13 +52,12 @@ class Ingestor(ABC):
             """Check if the file type matches given extensions."""
             return path.suffix in [extension.value for extension in extension_enum]
 
-        def get_text_file_type(path: Path, file_contents: str, input_pointer: str) -> InputFormat:
+        def get_text_file_type(path: Path) -> InputFormat:
             """Get the text file type."""
+            with open(path, "r", encoding="utf-8") as f:
+                file_contents = f.read()
             is_html = bool(BeautifulSoup(file_contents, "html.parser").find())
-            is_url = bool(urllib.parse.urlparse(input_pointer).netloc)
-            if is_html and is_url:
-                return InputFormat.WEB_PAGE
-            elif is_html:
+            if is_html:
                 return InputFormat.HTML
             elif check_file_type(path, LatexExtension):
                 return InputFormat.LATEX
@@ -66,18 +65,24 @@ class Ingestor(ABC):
                 return InputFormat.MARKDOWN
             return InputFormat.GENERIC_TEXT
 
-        def get_url_type(url: str) -> InputFormat:
+        def get_url_type(url: str, path: Optional[Path] = None) -> InputFormat:
             parsed_url = urllib.parse.urlparse(url)
             netloc = parsed_url.netloc
+            input_type = None
+            if path:
+                input_type = get_text_file_type(path)
             if netloc in YOUTUBE_NETLOCS:
                 return InputFormat.YOUTUBE_VIDEO
+            # for this case we already know that the url was valid
+            elif input_type and input_type == InputFormat.HTML:
+                return InputFormat.WEB_PAGE
             else:
                 raise ValueError(f"Unsupported url type: {url}")
 
         path = None
         try:
             path = cls._download_from_url(input_pointer)
-            return get_url_type(input_pointer)
+            return get_url_type(input_pointer, path)
         except ValueError as e:
             logger.info(f"Failed to get url type: {e}, retrying with file type.")
         try:
@@ -86,8 +91,7 @@ class Ingestor(ABC):
             if kind:
                 return InputFormat(kind.extension)
             else:
-                with open(path, "r", encoding="utf-8") as f:
-                    return get_text_file_type(path, f.read(), input_pointer)
+                return get_text_file_type(path)
         except (ValueError, UnicodeDecodeError) as e:
             logger.error(traceback.format_exc())
             extension = kind.extension if kind else path.suffix
@@ -168,8 +172,7 @@ class RawUrlIngestor(Ingestor):
         """Check if the url is a raw url."""
         parsed_url = urllib.parse.urlparse(url)
         netloc = parsed_url.netloc
-        path = cls._download_from_url(url)
-        file_type = cls._get_input_format(str(path.resolve()))
+        file_type = cls._get_input_format(url)
         if netloc in YOUTUBE_NETLOCS or file_type == InputFormat.WEB_PAGE:
             return True
         return False
