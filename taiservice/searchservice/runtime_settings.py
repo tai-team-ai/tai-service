@@ -218,7 +218,7 @@ class SearchServiceSettings(BaseSettings):
             f"RUN mkdir -p {self.chrome_driver_path}",
             f"RUN wget -O {self.chrome_driver_path}.zip https://chromedriver.storage.googleapis.com/90.0.4430.24/chromedriver_linux64.zip",
             # unzip to the self._settings.chrome_driver_path directory
-            f"RUN unzip {self.chrome_driver_path}.zip -d {self.chrome_driver_path}",
+            f"RUN unzip {self.chrome_driver_path}.zip -d /usr/local/bin/",
             "\nFROM build AS dependencies",
             "WORKDIR /app",
             "RUN pip install --upgrade pip && pip install nltk projen uvicorn",

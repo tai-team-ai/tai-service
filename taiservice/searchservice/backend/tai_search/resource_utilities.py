@@ -174,6 +174,7 @@ class HTMLDocumentUtility(DocumentUtility):
             options.add_argument("--no-sandbox")
             options.add_argument("--disable-dev-shm-usage")
             options.add_argument("--window-size=768,1024")
+            options.add_argument("--remote-debugging-port=9222")
             driver = webdriver.Chrome(options=options)
             if isinstance(doc.data_pointer, Path):
                 doc.data_pointer = f"file://{doc.data_pointer.absolute()}"

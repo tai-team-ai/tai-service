@@ -6,7 +6,7 @@ RUN apt-get update && \
 	libglib2.0-0 libnss3 libgconf-2-4 libfontconfig1 chromium-browser
 RUN mkdir -p /var/task/chromedriver
 RUN wget -O /var/task/chromedriver.zip https://chromedriver.storage.googleapis.com/90.0.4430.24/chromedriver_linux64.zip
-RUN unzip /var/task/chromedriver.zip -d /var/task/chromedriver
+RUN unzip /var/task/chromedriver.zip -d /usr/local/bin/
 
 FROM build AS dependencies
 WORKDIR /app
