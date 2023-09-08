@@ -19,10 +19,8 @@ from langchain.embeddings import OpenAIEmbeddings
 from langchain.schema import Document
 from pinecone_text.sparse import SpladeEncoder
 from .data_ingestors import (
-    S3ObjectIngestor,
-    WebPageIngestor,
-    Ingestor,
-    RawUrlIngestor,
+    ingest_strategy_factory,
+    ingestor_factory,
 )
 from .loaders import loading_strategy_factory
 from .data_ingestor_schema import (
@@ -290,7 +288,10 @@ class TAISearch:
             threshold = (
                 alpha * 0.70 + (1 - alpha) * 5.5
             )  # this is a linear interpolation between 0.6 and 5.0, 5.0 is arbitrary as the is technically not an upper limit
-            return [doc for doc in similar_docs.documents if doc.score > threshold]
+            docs = [doc for doc in similar_docs.documents if doc.score > threshold]
+            if docs:
+                return docs
+            return [] if for_tai_tutor else similar_docs.documents[:3]
 
         with ThreadPoolExecutor(max_workers=len(pinecone_docs)) as executor:
             results = executor.map(compute_similar_documents, zip(pinecone_docs.documents, filters))
@@ -317,6 +318,7 @@ class TAISearch:
             utility.create_thumbnail()
             logger.info(f"Finished creating thumbnail for document: {ingested_document.id}")
         except Exception as e:
+            logger.warning(e)
             logger.warning(f"Failed to create thumbnail for document: {ingested_document.id}")
         logger.info(f"Uploading resource to cold store: {ingested_document.id}")
         # TODO: this could result in storage leaks in S3 if the upload suceeds but we don't
@@ -554,22 +556,15 @@ class TAISearch:
 
     def ingest_document(self, document: InputDocument) -> IngestedDocument:
         """Ingest a document."""
-        mapping: dict[InputDataIngestStrategy, Ingestor] = {
-            InputDataIngestStrategy.S3_FILE_DOWNLOAD: S3ObjectIngestor,
-            InputDataIngestStrategy.URL_DOWNLOAD: WebPageIngestor,
-            InputDataIngestStrategy.RAW_URL: RawUrlIngestor,
-        }
-        try:
-            ingestor = mapping[document.input_data_ingest_strategy]
-        except KeyError as e:  # pylint: disable=broad-except
-            raise NotImplementedError(f"Unsupported input data ingest strategy: {document.input_data_ingest_strategy}") from e
-        return ingestor.ingest_data(document, self._cold_store_bucket_name)
+        IngestorClass = ingestor_factory(document)
+        return IngestorClass.ingest_data(document, self._cold_store_bucket_name)
 
     @staticmethod
     def get_input_document_ingest_strategy(url: str) -> InputDataIngestStrategy:
-        if re.match(r"https://.*\.s3\.amazonaws\.com/.*", url):
-            return InputDataIngestStrategy.S3_FILE_DOWNLOAD
-        elif RawUrlIngestor.is_raw_url(url):
-            return InputDataIngestStrategy.RAW_URL
-        else:
-            return InputDataIngestStrategy.URL_DOWNLOAD
+        """
+        Get the input document ingest strategy.
+
+        Args:
+            url: The url to get the ingest strategy for.
+        """
+        return ingest_strategy_factory(url)

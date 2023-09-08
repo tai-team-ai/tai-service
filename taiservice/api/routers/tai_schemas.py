@@ -51,8 +51,8 @@ class ClassResourceSnippet(BaseClassResource):
         ...,
         description="The snippet of the class resource. This is analogous to Google search snippets.",
     )
-    raw_snippet_url: str = Field(
-        ...,
+    raw_snippet_url: Optional[str] = Field(
+        default=None,
         description="The url of the raw snippet of the class resource.",
     )
     rank: int = Field(

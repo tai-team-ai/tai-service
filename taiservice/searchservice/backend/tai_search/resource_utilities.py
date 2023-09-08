@@ -33,8 +33,6 @@ def upload_file_to_s3(file_path: Union[str, Path], bucket_name: str, object_key:
 
 def get_local_tmp_directory(doc: IngestedDocument, format: str) -> Path:
     """Get the local path to the thumbnail."""
-    assert isinstance(doc.data_pointer, (Path, str)), f"Data pointer must be a path, not {type(doc.data_pointer)}"
-    doc.data_pointer = Path(doc.data_pointer)
     path = Path("/tmp", str(doc.class_id), doc.hashed_document_contents, format)
     path.mkdir(parents=True, exist_ok=True)
     return path
@@ -368,6 +366,7 @@ def resource_utility_factory(bucket_name: str, ingested_doc: IngestedDocument) -
     resource_utility_factory_mapping: dict[InputFormat, Any] = {
         InputFormat.PDF: PDFDocumentUtility,
         InputFormat.HTML: HTMLDocumentUtility,
+        InputFormat.WEB_PAGE: HTMLDocumentUtility,
         InputFormat.YOUTUBE_VIDEO: YouTubeVideoDocumentUtility,
     }
     Utility = resource_utility_factory_mapping.get(ingested_doc.input_format)

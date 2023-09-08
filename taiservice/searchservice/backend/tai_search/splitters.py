@@ -99,6 +99,7 @@ INPUT_TO_LANGUAGE_MAPPING = {
     InputFormat.LATEX: Language.LATEX,
     InputFormat.MARKDOWN: Language.MARKDOWN,
     InputFormat.HTML: Language.HTML,
+    InputFormat.WEB_PAGE: Language.HTML,
 }
 TOTAL_PAGE_COUNT_STRINGS = [
     "total_pages",

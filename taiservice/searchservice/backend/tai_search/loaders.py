@@ -11,6 +11,7 @@ from langchain.document_loaders import (
     MathpixPDFLoader,
     UnstructuredMarkdownLoader,
     BSHTMLLoader,
+    WebBaseLoader,
 )
 from youtube_transcript_api import (
     NoTranscriptFound,
@@ -226,6 +227,7 @@ LOADING_STRATEGY_MAPPING = {
     InputFormat.LATEX: UnstructuredMarkdownLoader,
     InputFormat.MARKDOWN: UnstructuredMarkdownLoader,
     InputFormat.HTML: BSHTMLLoader,
+    InputFormat.WEB_PAGE: WebBaseLoader,
     InputFormat.YOUTUBE_VIDEO: YoutubeLoader,
 }
 

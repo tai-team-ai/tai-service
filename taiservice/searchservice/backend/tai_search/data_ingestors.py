@@ -1,5 +1,5 @@
 """Define data ingestors used by the tai_search."""
-from typing import Optional, Type
+from typing import Optional, Type, Union
 from abc import ABC, abstractmethod
 from uuid import uuid4
 from enum import Enum
@@ -9,6 +9,7 @@ import urllib.request
 import urllib.parse
 import filetype
 from bs4 import BeautifulSoup
+from pydantic import HttpUrl
 import tiktoken
 from loguru import logger
 import requests
@@ -23,6 +24,7 @@ from .data_ingestor_schema import (
     MarkdownExtension,
     InputDocument,
     InputFormat,
+    InputDataIngestStrategy,
 )
 
 
@@ -42,63 +44,75 @@ class Ingestor(ABC):
     def ingest_data(cls, input_data: InputDocument, bucket_name: str) -> IngestedDocument:
         """Ingest the data."""
 
-    @staticmethod
-    def _get_input_format(input_pointer: str) -> InputFormat:
+    @classmethod
+    def _get_input_format(cls, input_pointer: str) -> InputFormat:
         """Get the file type."""
 
         def check_file_type(path: Path, extension_enum: Type[Enum]) -> bool:
             """Check if the file type matches given extensions."""
             return path.suffix in [extension.value for extension in extension_enum]
 
-        def get_text_file_type(path: Path, file_contents: str) -> InputFormat:
+        def get_text_file_type(path: Path, file_contents: str, input_pointer: str) -> InputFormat:
             """Get the text file type."""
-            if check_file_type(path, LatexExtension):
+            is_html = bool(BeautifulSoup(file_contents, "html.parser").find())
+            is_url = bool(urllib.parse.urlparse(input_pointer).netloc)
+            if is_html and is_url:
+                return InputFormat.WEB_PAGE
+            elif is_html:
+                return InputFormat.HTML
+            elif check_file_type(path, LatexExtension):
                 return InputFormat.LATEX
             elif check_file_type(path, MarkdownExtension):
                 return InputFormat.MARKDOWN
-            elif bool(BeautifulSoup(file_contents, "html.parser").find()):
-                return InputFormat.HTML
             return InputFormat.GENERIC_TEXT
 
         def get_url_type(url: str) -> InputFormat:
             parsed_url = urllib.parse.urlparse(url)
             netloc = parsed_url.netloc
-            path = parsed_url.path
             if netloc in YOUTUBE_NETLOCS:
                 return InputFormat.YOUTUBE_VIDEO
             else:
                 raise ValueError(f"Unsupported url type: {url}")
 
+        path = None
         try:
+            path = cls._download_from_url(input_pointer)
             return get_url_type(input_pointer)
         except ValueError as e:
             logger.info(f"Failed to get url type: {e}, retrying with file type.")
         try:
-            path = Path(input_pointer)
+            path = Path(input_pointer) if not path else path
             kind = filetype.guess(path)
             if kind:
                 return InputFormat(kind.extension)
             else:
                 with open(path, "r", encoding="utf-8") as f:
-                    return get_text_file_type(path, f.read())
+                    return get_text_file_type(path, f.read(), input_pointer)
         except (ValueError, UnicodeDecodeError) as e:
             logger.error(traceback.format_exc())
             extension = kind.extension if kind else path.suffix
             raise ValueError(f"Unsupported file type: {extension}.") from e
 
-    @classmethod
-    def _download_from_url(cls, input_data: InputDocument) -> IngestedDocument:
+    @staticmethod
+    def _download_from_url(url: str) -> Path:
+        """Download the data from the url."""
         # get just the last part of the path without the query param
-        final_path = urllib.parse.urlparse(input_data.full_resource_url).path.split("/")[-1]
+        final_path = urllib.parse.urlparse(url).path.split("/")[-1]
         tmp_path: Path = Path("/tmp") / str(uuid4()) / final_path
         tmp_path.parent.mkdir(parents=True, exist_ok=True)
-        response = requests.get(input_data.full_resource_url, timeout=10)
+        response = requests.get(url, timeout=10)
         response.raise_for_status()  # Raise an error if the download fails
         with open(tmp_path, "wb") as f:
             f.write(response.content)
-        file_type = cls._get_input_format(str(tmp_path.resolve()))
+        return tmp_path
+
+    @classmethod
+    def _download_from_doc(cls, input_data: InputDocument) -> IngestedDocument:
+        # get just the last part of the path without the query param
+        path = cls._download_from_url(input_data.full_resource_url)
+        file_type = cls._get_input_format(str(path.resolve()))
         document = IngestedDocument(
-            data_pointer=tmp_path,
+            data_pointer=path,
             input_format=file_type,
             **input_data.dict(),
         )
@@ -112,11 +126,20 @@ class S3ObjectIngestor(Ingestor):
     This class is used for ingesting data from S3.
     """
 
+    @staticmethod
+    def is_s3_url(url: str) -> bool:
+        """Check if the url is an S3 url."""
+        parsed_url = urllib.parse.urlparse(url)
+        netloc = parsed_url.netloc
+        if netloc == "s3.amazonaws.com":
+            return True
+        return False
+
     @classmethod
     def ingest_data(cls, input_data: InputDocument, bucket_name: str) -> IngestedDocument:
         """Ingest the data from S3."""
         # TODO: add s3 signature
-        return cls._download_from_url(input_data)
+        return cls._download_from_doc(input_data)
 
 
 class WebPageIngestor(Ingestor):
@@ -129,7 +152,7 @@ class WebPageIngestor(Ingestor):
     @classmethod
     def ingest_data(cls, input_data: InputDocument, bucket_name: str) -> IngestedDocument:
         """Ingest the data from a URL."""
-        doc = cls._download_from_url(input_data)
+        doc = cls._download_from_doc(input_data)
         return doc
 
 
@@ -140,12 +163,14 @@ class RawUrlIngestor(Ingestor):
     This class is used for ingesting data from a raw URL.
     """
 
-    @staticmethod
-    def is_raw_url(url: str) -> bool:
+    @classmethod
+    def is_raw_url(cls, url: str) -> bool:
         """Check if the url is a raw url."""
         parsed_url = urllib.parse.urlparse(url)
         netloc = parsed_url.netloc
-        if netloc in YOUTUBE_NETLOCS:
+        path = cls._download_from_url(url)
+        file_type = cls._get_input_format(str(path.resolve()))
+        if netloc in YOUTUBE_NETLOCS or file_type == InputFormat.WEB_PAGE:
             return True
         return False
 
@@ -163,3 +188,24 @@ class RawUrlIngestor(Ingestor):
             **input_data.dict(),
         )
         return document
+
+def ingest_strategy_factory(url: str) -> InputDataIngestStrategy:
+    """Get the ingest strategy."""
+    if S3ObjectIngestor.is_s3_url(url):
+        return InputDataIngestStrategy.S3_FILE_DOWNLOAD
+    elif RawUrlIngestor.is_raw_url(url):
+        return InputDataIngestStrategy.RAW_URL
+    else:
+        return InputDataIngestStrategy.URL_DOWNLOAD
+
+
+def ingestor_factory(document: InputDocument) -> Ingestor:
+    mapping: dict[InputDataIngestStrategy, Ingestor] = {
+        InputDataIngestStrategy.S3_FILE_DOWNLOAD: S3ObjectIngestor,
+        InputDataIngestStrategy.URL_DOWNLOAD: WebPageIngestor,
+        InputDataIngestStrategy.RAW_URL: RawUrlIngestor,
+    }
+    IngestorClass = mapping.get(document.input_data_ingest_strategy)
+    if IngestorClass:
+        return IngestorClass
+    raise NotImplementedError(f"Unsupported input data ingest strategy: {document.input_data_ingest_strategy}") from e
