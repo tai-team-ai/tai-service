@@ -64,7 +64,7 @@ class Ingestor(ABC):
             parsed_url = urllib.parse.urlparse(url)
             netloc = parsed_url.netloc
             path = parsed_url.path
-            if netloc in YOUTUBE_NETLOCS and path.startswith("/watch"):
+            if netloc in YOUTUBE_NETLOCS:
                 return InputFormat.YOUTUBE_VIDEO
             else:
                 raise ValueError(f"Unsupported url type: {url}")

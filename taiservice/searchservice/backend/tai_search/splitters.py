@@ -51,7 +51,7 @@ class YouTubeTranscriptSplitter(RecursiveCharacterTextSplitter):
         aggregate_start = metadatas[0]["start"]
         overlap_buffer = ""
         overlap_duration = 0
-        timestamp_overlap = 15
+        timestamp_overlap = 10
 
         for i, text in enumerate(texts):
             if self._length_function(text) > self._chunk_size:

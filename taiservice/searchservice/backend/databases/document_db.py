@@ -62,12 +62,16 @@ class DocumentDB:
     """
     def __init__(self, config: DocumentDBConfig) -> None:
         """Initialize document db."""
+        if config.fully_qualified_domain_name == "localhost":
+            tls=False
+        else:
+            tls=True
         self._client = MongoClient(
             username=config.username,
             password=config.password,
             host=config.fully_qualified_domain_name,
             port=config.port,
-            tls=True,
+            tls=tls,
             retryWrites=False,
         )
         self._doc_models = [

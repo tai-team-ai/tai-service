@@ -27,6 +27,7 @@ class ClassResourceType(str, Enum):
     STUDY_GUIDE = "study guide"
     LECTURE = "lecture"
     ARTICLE = "article"
+    CLASS_INFORMATION = "class information"
 
 
 class ClassResourceProcessingStatus(str, Enum):

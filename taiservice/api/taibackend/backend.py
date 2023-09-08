@@ -389,7 +389,7 @@ class Backend:
             except ValueError:  
                 # Catch the ValueError (of which JSONDecodeError is a subclass) and log the response
                 error_message = 'Failed to decode response. Raw response: {}'.format(response.text)
-            
+
             logger.error(error_message)
             self._add_failed_resource(
                 failed_resources=failed_resources,

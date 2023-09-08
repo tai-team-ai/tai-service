@@ -272,8 +272,6 @@ class TaiSearchServiceStack(Stack):
                     name,
                     auto_scaling_group=asg,
                     capacity_provider_name=name,
-                    enable_managed_scaling=True,
-                    enable_managed_termination_protection=True,
                 )
             )
         return cluster, capacity_provider_mapping
@@ -301,7 +299,7 @@ class TaiSearchServiceStack(Stack):
         else:
             instance_type = ec2.InstanceType.of(
                 instance_class=ec2.InstanceClass.R6A,
-                instance_size=ec2.InstanceSize.XLARGE2,
+                instance_size=ec2.InstanceSize.XLARGE,
             )
             ami = EcsOptimizedImage.amazon_linux2(hardware_type=AmiHardwareType.STANDARD)
         asg = AutoScalingGroup(
@@ -311,13 +309,12 @@ class TaiSearchServiceStack(Stack):
             vpc=self.vpc,
             instance_type=instance_type,
             machine_image=ami,
-            max_capacity=2,
+            max_capacity=4,
             min_capacity=0,
             # spot_price="0.35",
             block_devices=block_devices,
             max_instance_lifetime=Duration.days(10),
             user_data=user_data,
-            new_instances_protected_from_scale_in=True,
         )
         WarmPool(
             self,
