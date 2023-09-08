@@ -314,7 +314,10 @@ class Backend:
             'from_class_ids': from_class_ids
         }
         try:
-            response = requests.get(url, params=params, timeout=7)
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537',
+            }
+            response = requests.get(url, params=params, headers=headers, timeout=7)
             if response.status_code != 200:
                 logger.info(f"Failed to retrieve class resources from {url}. Status code: {response.status_code}")
             else:
@@ -347,7 +350,11 @@ class Backend:
     ) -> APIFrequentlyAccessedResources:
         """Get the most frequently accessed class resources from the tai search service."""
         url = f"{self._runtime_settings.search_service_api_url}/frequently-accessed-resources/{class_id}"
-        response = requests.get(url, timeout=10)
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537',
+        }
+
+        response = requests.get(url, headers=headers, timeout=10)
         if response.status_code == 200:
             try:
                 data = response.json()

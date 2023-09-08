@@ -18,6 +18,7 @@ class InputFormat(str, Enum):
     LATEX = "latex"
     MARKDOWN = "markdown"
     HTML = "html"
+    WEB_PAGE = "web_page"
     RAW_URL = "raw_url"
     YOUTUBE_VIDEO = "youtube_video"
 
