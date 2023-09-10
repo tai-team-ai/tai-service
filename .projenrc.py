@@ -1,3 +1,4 @@
+import json
 from typing import Literal, Union
 from projen.awscdk import AwsCdkPythonApp
 from projen.python import VenvOptions
@@ -16,7 +17,7 @@ from projen import (
 def convert_dict_env_vars_to_env_vars(env_vars: dict, output: Literal["docker", "list"] = "docker") -> Union[str, list]:
     """Convert a dictionary of environment variables to a string or list of strings."""
     if output == "docker":
-        return " ".join([f'-e {key}="{value}"' for key, value in env_vars.items()])
+        return " ".join([f'-e {key}="{json.dumps(value)}"' for key, value in env_vars.items()])
     elif output == "list":
         return [f'{key}="{value}"' for key, value in env_vars.items()]
     else:
@@ -141,7 +142,7 @@ SEARCH_SERVICE_RUNTIME_ENV_VARS = (
         "COLD_STORE_BUCKET_NAME": "tai-service-class-resource-cold-store-dev",
         "DOCUMENTS_TO_INDEX_QUEUE": "tai-service-documents-to-index-queue-dev",
         "NLTK_DATA": "/tmp/nltk_data",
-        "MATHPIX_API_SECRET": '{\\"secret_name\\": \\"dev/tai_service/mathpix_api_secret\\"}',
+        "MATHPIX_API_SECRET": '{"secret_name": "dev/tai_service/mathpix_api_secret"}',
     }
     | PINECONE_DB_API_KEY_SECRET_NAME
     | PINECONE_DB_ENVIRONMENT

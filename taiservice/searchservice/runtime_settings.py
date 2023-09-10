@@ -210,7 +210,7 @@ class SearchServiceSettings(BaseSettings):
                 \n\tapt-get install -y nodejs poppler-utils wget unzip\\\
                 \n\tlibxss1 libappindicator1 libindicator7",  # chrome deps
             "RUN wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb",
-            "RUN apt install ./google-chrome*.deb",
+            "RUN apt-get install -y ./google-chrome*.deb",
             "\nFROM build AS dependencies",
             "WORKDIR /app",
             "RUN pip install --upgrade pip && pip install nltk projen uvicorn",

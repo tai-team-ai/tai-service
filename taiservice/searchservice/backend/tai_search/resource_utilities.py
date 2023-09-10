@@ -18,7 +18,6 @@ import fitz
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service as ChromeService
 from webdriver_manager.chrome import ChromeDriverManager
-from webdriver_manager.core.utils import ChromeType
 from pydantic import HttpUrl
 from taiservice.searchservice.backend.shared_schemas import ChunkSize
 from taiservice.searchservice.backend.tai_search.data_ingestor_schema import IngestedDocument, InputFormat
@@ -26,13 +25,22 @@ from .data_ingestor_schema import IngestedDocument
 from ..databases.document_db_schemas import ClassResourceDocument, ClassResourceChunkDocument
 
 
-def upload_file_to_s3(file_path: Union[str, Path], bucket_name: str, object_key: str) -> str:
+def upload_file_to_s3(file_path: Union[str, Path], bucket_name: str, object_key: str, media_type: Optional[str] = None) -> str:
     file_path = Path(file_path)
+    
     s3 = boto3.resource("s3")
-    bucket = s3.Bucket(bucket_name)
-    bucket.upload_file(str(file_path.resolve()), object_key)
+
+    # Define extra arguments for upload to set metadata
+    extra_args = {}
+    if media_type:
+        extra_args = {'Metadata': {'ContentType': media_type}}
+
+    # Upload the file with the extra args
+    s3.Bucket(bucket_name).upload_file(str(file_path.resolve()), object_key, ExtraArgs=extra_args)
+
     safe_object_key = urllib.parse.quote(object_key, safe="~()*!.'")
     url = f"https://{bucket_name}.s3.amazonaws.com/{safe_object_key}"
+
     return url
 
 
@@ -119,12 +127,12 @@ class PDFDocumentUtility(DocumentUtility):
             thumbnail_path.rename(new_path)
             thumbnail_path = new_path
         s3_key = get_s3_object_key(self._ingested_doc, thumbnail_path.name)
-        self._ingested_doc.preview_image_url = upload_file_to_s3(thumbnail_path, self._bucket_name, s3_key)
+        self._ingested_doc.preview_image_url = upload_file_to_s3(thumbnail_path, self._bucket_name, s3_key, media_type="image/png")
 
     def upload_resource(self) -> None:
         """Upload the resource to the cloud and pass out a copy of the document with the cloud url."""
         s3_key = get_s3_object_key(self._ingested_doc, self._ingested_doc.data_pointer.name)
-        url = upload_file_to_s3(self._ingested_doc.data_pointer, self._bucket_name, s3_key)
+        url = upload_file_to_s3(self._ingested_doc.data_pointer, self._bucket_name, s3_key, media_type="application/pdf")
         self._ingested_doc.full_resource_url = url
 
     def highlight_section_in_pdf(self, pdf_path: Union[str, Path], chunk_keywords: list[str]) -> Path:
@@ -156,7 +164,7 @@ class PDFDocumentUtility(DocumentUtility):
             keywords = [keyword for keyword, _ in keyword_score_pairs]
             path = self.highlight_section_in_pdf(new_file_path, keywords)
             s3_key = get_s3_key_for_chunk(chunk.id, self._ingested_doc, path.name)
-            chunk.raw_chunk_url = upload_file_to_s3(path, self._bucket_name, s3_key)
+            chunk.raw_chunk_url = upload_file_to_s3(path, self._bucket_name, s3_key, media_type="application/pdf")
         return chunk_docs
 
 
@@ -178,10 +186,6 @@ class HTMLDocumentUtility(DocumentUtility):
             options.add_argument("--disable-dev-shm-usage")
             options.add_argument("--window-size=768,1024")
             options.add_argument("--remote-debugging-port=9222")
-            # lis the contents of usr/lib
-            logger.info("Listing contents of /usr/lib")
-            for path in Path("/usr/lib").iterdir():
-                logger.info(path)
             driver = webdriver.Chrome(options=options)
             if isinstance(doc.data_pointer, Path):
                 doc.data_pointer = f"file://{doc.data_pointer.absolute()}"
@@ -190,13 +194,13 @@ class HTMLDocumentUtility(DocumentUtility):
             driver.get_screenshot_as_file(thumbnail_path)
             driver.close()
         s3_key = get_s3_object_key(self._ingested_doc, thumbnail_path.name)
-        self._ingested_doc.preview_image_url = upload_file_to_s3(thumbnail_path, self._bucket_name, s3_key)
+        self._ingested_doc.preview_image_url = upload_file_to_s3(thumbnail_path, self._bucket_name, s3_key, media_type="image/png")
 
     def upload_resource(self) -> None:
         """Upload the resource to the cloud and pass out a copy of the document with the cloud url."""
         if isinstance(self._ingested_doc.data_pointer, Path):
             url = upload_file_to_s3(
-                self._ingested_doc.data_pointer, self._bucket_name, self._ingested_doc.data_pointer.name
+                self._ingested_doc.data_pointer, self._bucket_name, self._ingested_doc.data_pointer.name, media_type="text/html"
             )
         elif isinstance(self._ingested_doc.data_pointer, HttpUrl):
             url = str(self._ingested_doc.data_pointer)
