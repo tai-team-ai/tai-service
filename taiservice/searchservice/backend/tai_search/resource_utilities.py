@@ -33,7 +33,7 @@ def upload_file_to_s3(file_path: Union[str, Path], bucket_name: str, object_key:
     # Define extra arguments for upload to set metadata
     extra_args = {}
     if media_type:
-        extra_args = {'Metadata': {'ContentType': media_type}}
+        extra_args = {'ContentType': media_type}
 
     # Upload the file with the extra args
     s3.Bucket(bucket_name).upload_file(str(file_path.resolve()), object_key, ExtraArgs=extra_args)
