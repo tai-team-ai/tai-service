@@ -168,6 +168,10 @@
       "type": "runtime"
     },
     {
+      "name": "webdriver-manager",
+      "type": "runtime"
+    },
+    {
       "name": "youtube-transcript-api",
       "type": "runtime"
     },

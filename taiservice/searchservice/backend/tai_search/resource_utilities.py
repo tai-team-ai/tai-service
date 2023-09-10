@@ -16,6 +16,9 @@ from loguru import logger
 import requests
 import fitz
 from selenium import webdriver
+from selenium.webdriver.chrome.service import Service as ChromeService
+from webdriver_manager.chrome import ChromeDriverManager
+from webdriver_manager.core.utils import ChromeType
 from pydantic import HttpUrl
 from taiservice.searchservice.backend.shared_schemas import ChunkSize
 from taiservice.searchservice.backend.tai_search.data_ingestor_schema import IngestedDocument, InputFormat
@@ -175,6 +178,10 @@ class HTMLDocumentUtility(DocumentUtility):
             options.add_argument("--disable-dev-shm-usage")
             options.add_argument("--window-size=768,1024")
             options.add_argument("--remote-debugging-port=9222")
+            # lis the contents of usr/lib
+            logger.info("Listing contents of /usr/lib")
+            for path in Path("/usr/lib").iterdir():
+                logger.info(path)
             driver = webdriver.Chrome(options=options)
             if isinstance(doc.data_pointer, Path):
                 doc.data_pointer = f"file://{doc.data_pointer.absolute()}"

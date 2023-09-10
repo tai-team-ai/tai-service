@@ -11,6 +11,7 @@ from pydantic import BaseModel, Field
 import pinecone
 from pinecone_text.hybrid import hybrid_convex_scale
 from .pinecone_db_schemas import PineconeDocuments, PineconeDocument
+from ..shared_schemas import ChunkSize
 
 
 class Environment(str, Enum):
@@ -119,9 +120,9 @@ class PineconeDB:
             sparse = None
         and_filter: list[dict] = [{"chunk_size": document.metadata.chunk_size}]
         or_filter: list[dict] = []
-        if filter.filter_by_chapters and document.metadata.chapters:
+        if filter.filter_by_chapters and document.metadata.chapters and document.metadata.chunk_size == ChunkSize.SMALL:
             or_filter.append({"chapters": {"$in": document.metadata.chapters}})
-        if filter.filter_by_sections and document.metadata.sections:
+        if filter.filter_by_sections and document.metadata.sections and document.metadata.chunk_size == ChunkSize.SMALL:
             or_filter.append({"sections": {"$in": document.metadata.sections}})
         if filter.filter_by_resource_type and document.metadata.resource_type:
             and_filter.append({"resource_type": document.metadata.resource_type})

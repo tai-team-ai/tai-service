@@ -157,10 +157,6 @@ class SearchServiceSettings(BaseSettings):
         default="tai-service-documents-to-index-queue",
         description="The name of the data to index transfer bucket. Documents should be uploaded to this bucket.",
     )
-    chrome_driver_path: Path = Field(
-        default=Path("/var/task/chromedriver"),
-        description="The path to the chrome driver.",
-    )
     class_resource_processing_timeout: int = Field(
         default=900,
         ge=300,
@@ -212,13 +208,9 @@ class SearchServiceSettings(BaseSettings):
             # poppler-utils is used for the python pdf to image package
             "RUN apt-get update && \\\
                 \n\tapt-get install -y nodejs poppler-utils wget unzip\\\
-                \n\tlibglib2.0-0 libnss3 libgconf-2-4 libfontconfig1 chromium-browser",  # chrome deps
-            # install chrome driver for selenium use
-            # install extra dependencies for chrome driver
-            f"RUN mkdir -p {self.chrome_driver_path}",
-            f"RUN wget -O {self.chrome_driver_path}.zip https://chromedriver.storage.googleapis.com/90.0.4430.24/chromedriver_linux64.zip",
-            # unzip to the self._settings.chrome_driver_path directory
-            f"RUN unzip {self.chrome_driver_path}.zip -d /usr/local/bin/",
+                \n\tlibxss1 libappindicator1 libindicator7",  # chrome deps
+            "RUN wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb",
+            "RUN apt install ./google-chrome*.deb",
             "\nFROM build AS dependencies",
             "WORKDIR /app",
             "RUN pip install --upgrade pip && pip install nltk projen uvicorn",
@@ -236,7 +228,7 @@ class SearchServiceSettings(BaseSettings):
             "# The --max-request is to restart workers to help clear the memory used by pytorch",
             f'CMD ["gunicorn", "-w", "{worker_count}", "-k", "uvicorn.workers.UvicornWorker", '
             f'"{fully_qualified_handler_path}", "--bind", "0.0.0.0:{port}", "--worker-tmp-dir", "/dev/shm", '
-            '"--graceful-timeout", "900", "--timeout", "1800", "--max-requests", "10"]',
+            '"--graceful-timeout", "7200", "--timeout", "7200", "--max-requests", "10"]',
             # f'CMD [".venv/bin/python", "-m", "uvicorn", "{fully_qualified_handler_path}", "--host", "0.0.0.0", "--port", "{port}", "--factory"]',
         ]
         return "\n".join(docker_file)

@@ -86,10 +86,6 @@ class IndexerConfig(BaseModel):
         ...,
         description="The name of the cold store bucket.",
     )
-    chrome_driver_path: Path = Field(
-        ...,
-        description="The path to the chrome driver.",
-    )
 
 
 class ResourceLimits(BaseModel):
@@ -177,7 +173,6 @@ class TAISearch:
         self._batch_size = tai_search_config.openai_config.batch_size
         self._cold_store_bucket_name = tai_search_config.cold_store_bucket_name
         self._s3_prefix = ""
-        os.environ["PATH"] += f":{tai_search_config.chrome_driver_path}"
 
     def index_resource(self, ingested_document: IngestedDocument) -> ClassResourceDocument:
         """Index a document."""

@@ -77,6 +77,7 @@ project: Project = AwsCdkPythonApp(
         "youtube-transcript-api",
         "pytube",
         "keybert",
+        "webdriver-manager",
     ],
     dev_deps=[
         "black",
@@ -140,7 +141,7 @@ SEARCH_SERVICE_RUNTIME_ENV_VARS = (
         "COLD_STORE_BUCKET_NAME": "tai-service-class-resource-cold-store-dev",
         "DOCUMENTS_TO_INDEX_QUEUE": "tai-service-documents-to-index-queue-dev",
         "NLTK_DATA": "/tmp/nltk_data",
-        "MATHPIX_API_SECRET": '{"secret_name": "dev/tai_service/mathpix_api_secret"}',
+        "MATHPIX_API_SECRET": '{\\"secret_name\\": \\"dev/tai_service/mathpix_api_secret\\"}',
     }
     | PINECONE_DB_API_KEY_SECRET_NAME
     | PINECONE_DB_ENVIRONMENT

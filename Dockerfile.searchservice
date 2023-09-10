@@ -3,10 +3,9 @@ RUN rm /etc/apt/sources.list.d/cuda.list && apt-get update && apt-get install -y
 RUN curl -sL https://deb.nodesource.com/setup_18.x | bash
 RUN apt-get update && \                
 	apt-get install -y nodejs poppler-utils wget unzip\                
-	libglib2.0-0 libnss3 libgconf-2-4 libfontconfig1 chromium-browser
-RUN mkdir -p /var/task/chromedriver
-RUN wget -O /var/task/chromedriver.zip https://chromedriver.storage.googleapis.com/90.0.4430.24/chromedriver_linux64.zip
-RUN unzip /var/task/chromedriver.zip -d /usr/local/bin/
+	libxss1 libappindicator1 libindicator7
+RUN wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
+RUN apt install ./google-chrome*.deb
 
 FROM build AS dependencies
 WORKDIR /app
@@ -21,4 +20,4 @@ WORKDIR /app
 COPY . .
 EXPOSE 8080
 # The --max-request is to restart workers to help clear the memory used by pytorch
-CMD ["gunicorn", "-w", "16", "-k", "uvicorn.workers.UvicornWorker", "taiservice.searchservice.main:create_app", "--bind", "0.0.0.0:8080", "--worker-tmp-dir", "/dev/shm", "--graceful-timeout", "900", "--timeout", "1800", "--max-requests", "10"]
+CMD ["gunicorn", "-w", "16", "-k", "uvicorn.workers.UvicornWorker", "taiservice.searchservice.main:create_app", "--bind", "0.0.0.0:8080", "--worker-tmp-dir", "/dev/shm", "--graceful-timeout", "7200", "--timeout", "7200", "--max-requests", "10"]

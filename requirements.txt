@@ -36,4 +36,5 @@ tai-aws-account-bootstrap
 tiktoken
 unstructured
 uvicorn[standard]
+webdriver-manager
 youtube-transcript-api

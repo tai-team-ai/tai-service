@@ -87,7 +87,6 @@ class Backend:
             document_db_config=self._doc_db_config,
             openai_config=openAI_config,
             cold_store_bucket_name=runtime_settings.cold_store_bucket_name,
-            chrome_driver_path=runtime_settings.chrome_driver_path,
         )
         self._tai_search = tai_search.TAISearch(self._tai_search_config)
         self._metrics = Metrics(

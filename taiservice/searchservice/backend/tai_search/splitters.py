@@ -148,7 +148,7 @@ def document_splitter_factory(ingested_document: IngestedDocument, chunk_size: C
         # we make the chunks smaller to allow for highlighting text in the webpage
         if ingested_document.input_format == InputFormat.GENERIC_TEXT and chunk_size == ChunkSize.SMALL:
             kwargs["chunk_overlap"] = 50
-            kwargs["chunk_size"] = 150
+            kwargs["chunk_size"] = 200
         splitter = RecursiveCharacterTextSplitter.from_language(language=input_language, **kwargs)
     else:
         Splitter = SPLITTER_STRATEGY_MAPPING.get(ingested_document.input_format)
