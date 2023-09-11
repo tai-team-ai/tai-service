@@ -35,6 +35,7 @@ class LogLevel(str, Enum):
 
 class Secret(BaseSettings):
     """Define the secret model."""
+
     secret_name: str = Field(
         ...,
         description="The name of the secret.",
@@ -63,6 +64,7 @@ class Secret(BaseSettings):
 
 class Secrets(BaseSettings):
     """Define the secrets model."""
+
     secrets: list[Secret] = Field(
         ...,
         description="The list of secrets.",
@@ -170,6 +172,14 @@ class SearchServiceSettings(BaseSettings):
     mathpix_api_secret: Optional[Secret] = Field(
         default=None,
         description="The secrets for the Mathpix API.",
+    )
+    port_for_all_cache_hosts: int = Field(
+        default=6379,
+        description="The port for all cache hosts.",
+    )
+    cache_host_name: Optional[str] = Field(
+        default=None,
+        description="The host name of the cache.",
     )
 
     class Config:

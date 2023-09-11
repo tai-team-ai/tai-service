@@ -4,9 +4,10 @@ from hashlib import sha1
 from uuid import UUID
 from uuid import uuid4
 from enum import Enum
-from typing import Any, Optional, Union
+from typing import Any, Callable, Optional, Union
 from pathlib import Path
 from pydantic import BaseModel, Field, Extra, HttpUrl, root_validator
+from redis.commands.core import BasicKeyCommands
 
 
 HASH_FIELD_OBJECT = Field(
@@ -274,3 +275,22 @@ class BaseOpenAIConfig(BaseModel):
         le=60,
         description="The timeout for requests to the OpenAI API.",
     )
+
+
+class Cache(BaseModel):
+    """Define the cache model."""
+    instance: BasicKeyCommands = Field(
+        ...,
+        description="The instance of the cache.",
+    )
+    hash_func: Callable[[bytes], str] = Field(
+        default=lambda x: sha1(x).hexdigest(),
+        const=True,
+        description="The hash function to use for cache keys",
+    )
+
+    class Config:
+        """Define the model configuration."""
+
+        arbitrary_types_allowed = True
+        validate_assignment = True

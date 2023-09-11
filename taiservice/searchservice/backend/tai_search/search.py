@@ -36,6 +36,7 @@ from ..shared_schemas import (
     ChunkSize,
     StatefulClassResourceDocument,
     Metadata,
+    Cache,
 )
 from ..databases.pinecone_db import PineconeDBConfig, PineconeDB, PineconeQueryFilter
 from ..databases.pinecone_db_schemas import (
@@ -86,7 +87,15 @@ class IndexerConfig(BaseModel):
         ...,
         description="The name of the cold store bucket.",
     )
+    cache: Cache = Field(
+        ...,
+        description="The Redis cluster caching documents.",
+    )
 
+    class Config:
+        """Define the Pydantic model configuration."""
+
+        arbitrary_types_allowed = True
 
 class ResourceLimits(BaseModel):
     """Define the custom parameters for resource usage."""
@@ -170,6 +179,7 @@ class TAISearch:
             openai_api_key=tai_search_config.openai_config.api_key,
             request_timeout=tai_search_config.openai_config.request_timeout,
         )
+        self._cache = tai_search_config.cache
         self._batch_size = tai_search_config.openai_config.batch_size
         self._cold_store_bucket_name = tai_search_config.cold_store_bucket_name
         self._s3_prefix = ""
@@ -406,7 +416,7 @@ class TAISearch:
         # TODO: it's probably a good idea to add this to the resource utilities classes as the chunk urls
         # may need to be dynamically updated, like in the case of YouTube where we need to add a timestamp
         split_docs: list[Document] = []
-        document = loading_strategy_factory(document)
+        document = loading_strategy_factory(document, cache=self._cache)
         loaded_docs = document.loader.load()
 
         chunk_documents: list[ClassResourceChunkDocument] = []

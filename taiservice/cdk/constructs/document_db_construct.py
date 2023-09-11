@@ -85,8 +85,8 @@ class ElasticDocumentDBConfigModel(BaseModel):
         default=ec2.SubnetType.PRIVATE_ISOLATED,
         description="The subnet type to use for the cluster.",
     )
-    security_groups: Optional[list[ec2.SecurityGroup]] = Field(
-        default=[],
+    security_groups: list[ec2.SecurityGroup] = Field(
+        default_factory=list,
         description="The security groups to use for the cluster.",
     )
 

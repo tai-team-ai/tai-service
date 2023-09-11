@@ -9,8 +9,6 @@ from aws_cdk import (
     aws_ec2 as ec2,
     aws_iam as iam,
     Duration,
-    aws_ecs as ecs,
-    aws_autoscaling as autoscaling,
     aws_elasticloadbalancingv2 as elbv2,
 )
 from aws_cdk.aws_ecs_patterns import ApplicationLoadBalancedServiceBase
@@ -52,6 +50,10 @@ from ..constructs.document_db_construct import (
     DocumentDatabase,
     ElasticDocumentDBConfigModel,
     DocumentDBSettings,
+)
+from ..constructs.elasticache_construct import (
+    ElastiCacheConfigModel,
+    ElastiCache,
 )
 from ..constructs.construct_helpers import get_vpc
 from ..constructs.pinecone_db_construct import PineconeDatabase
@@ -109,13 +111,18 @@ class TaiSearchServiceStack(Stack):
         self._subnet_type_for_doc_db = ec2.SubnetType.PRIVATE_WITH_EGRESS
         self.vpc = get_vpc(scope=self, vpc=vpc)
         self.document_db = self._get_document_db(doc_db_settings=doc_db_settings)
+        self.cache = self._get_cache()
         self.pinecone_db = self._get_pinecone_db()
         self._security_group_for_connecting_to_doc_db = self.document_db.security_group_for_connecting_to_cluster
         # these needs to occur before creating the search service so that the search service points to the correct bucket
         name_with_suffix = (search_service_settings.cold_store_bucket_name + config.stack_suffix)[:63]
         search_service_settings.doc_db_fully_qualified_domain_name = self.document_db.fully_qualified_domain_name
         search_service_settings.cold_store_bucket_name = name_with_suffix
-        self.search_services: list[Ec2Service] = self._get_search_services(self._security_group_for_connecting_to_doc_db)
+        search_service_settings.cache_host_name = self.cache.fully_qualified_domain_name
+        self.search_services: list[Ec2Service] = self._get_search_services([
+            self._security_group_for_connecting_to_doc_db,
+            self.cache.security_group_for_connecting_to_cluster,
+        ])
         self._cold_store_bucket: VersionedBucket = VersionedBucket.create_bucket(
             scope=self,
             bucket_name=search_service_settings.cold_store_bucket_name,
@@ -145,6 +152,11 @@ class TaiSearchServiceStack(Stack):
         return self._security_group_for_connecting_to_doc_db
 
     @property
+    def security_group_for_connecting_to_cache(self) -> ec2.SecurityGroup:
+        """Return the security group for connecting to the cache."""
+        return self.cache.security_group_for_connecting_to_cluster
+
+    @property
     def documents_to_index_queue(self) -> VersionedBucket:
         """Return the bucket for transferring documents to index."""
         return self._documents_to_index_queue
@@ -153,6 +165,21 @@ class TaiSearchServiceStack(Stack):
     def service_url(self) -> Optional[str]:
         """Return the service url."""
         return self._service_url
+
+    def _get_cache(self) -> ElastiCache:
+        config = ElastiCacheConfigModel(
+            cluster_name=self._namer("cache"),
+            cluster_description="The cache for the search service.",
+            num_shards=2,
+            vpc=self.vpc,
+            subnet_type=ec2.SubnetType.PRIVATE_WITH_EGRESS,
+        )
+        cache = ElastiCache(
+            scope=self,
+            id=self._namer("cache"),
+            db_config=config,
+        )
+        return cache
 
     def _get_document_db(self, doc_db_settings: DocumentDBSettings) -> DocumentDatabase:
         db_config = ElasticDocumentDBConfigModel(
@@ -177,11 +204,11 @@ class TaiSearchServiceStack(Stack):
         )
         return db
 
-    def _get_search_services(self, sg_for_connecting_to_db: ec2.SecurityGroup) -> list[Ec2Service]:
+    def _get_search_services(self, security_groups: list[ec2.SecurityGroup]) -> list[Ec2Service]:
         target_port = 80
         container_port = 8080
         self._create_docker_file(container_port)
-        service: Ec2Service = self._create_ecs_service(container_port, target_port, sg_for_connecting_to_db)
+        service: Ec2Service = self._create_ecs_service(container_port, target_port, security_groups)
         services = [service]
         self._get_target_group(services, target_port, target_protocol=ApplicationProtocol.HTTP)
         for service in services:
@@ -192,7 +219,7 @@ class TaiSearchServiceStack(Stack):
         self,
         container_port: int,
         target_port: int,
-        sg_for_connecting_to_db: ec2.SecurityGroup,
+        security_groups: list[ec2.SecurityGroup],
     ) -> Ec2Service:
         """Create an ECS service."""
         task_definition: Ec2TaskDefinition = Ec2TaskDefinition(
@@ -230,7 +257,7 @@ class TaiSearchServiceStack(Stack):
             min_healthy_percent=50,
             max_healthy_percent=200,
             task_definition=task_definition,
-            security_groups=[security_group, sg_for_connecting_to_db],
+            security_groups=[security_group] + security_groups,
             circuit_breaker=DeploymentCircuitBreaker(rollback=True),
             placement_strategies=[PlacementStrategy.spread_across_instances()],
             capacity_provider_strategies=capacity_provider_strategies,

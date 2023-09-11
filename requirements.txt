@@ -30,6 +30,7 @@ PyPDF2
 pytest
 pytest-cov
 pytube
+redis
 requests
 selenium
 tai-aws-account-bootstrap

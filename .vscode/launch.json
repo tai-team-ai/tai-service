@@ -50,6 +50,7 @@
         "DOCUMENTS_TO_INDEX_QUEUE": "tai-service-documents-to-index-queue-dev",
         "NLTK_DATA": "/tmp/nltk_data",
         "MATHPIX_API_SECRET": "{\"secret_name\": \"dev/tai_service/mathpix_api_secret\"}",
+        "CACHE_HOST_NAME": "localhost",
         "PINECONE_DB_API_KEY_SECRET_NAME": "dev/tai_service/pinecone_db/api_key",
         "PINECONE_DB_ENVIRONMENT": "us-east-1-aws",
         "OPENAI_API_KEY_SECRET_NAME": "dev/tai_service/openai/api_key",

@@ -79,6 +79,7 @@ project: Project = AwsCdkPythonApp(
         "pytube",
         "keybert",
         "webdriver-manager",
+        "redis",
     ],
     dev_deps=[
         "black",
@@ -143,6 +144,7 @@ SEARCH_SERVICE_RUNTIME_ENV_VARS = (
         "DOCUMENTS_TO_INDEX_QUEUE": "tai-service-documents-to-index-queue-dev",
         "NLTK_DATA": "/tmp/nltk_data",
         "MATHPIX_API_SECRET": '{"secret_name": "dev/tai_service/mathpix_api_secret"}',
+        "CACHE_HOST_NAME": "localhost",
     }
     | PINECONE_DB_API_KEY_SECRET_NAME
     | PINECONE_DB_ENVIRONMENT
@@ -304,6 +306,18 @@ make_file.add_rule(
     targets=["mongodb-stop"],
     recipe=[
         "docker stop mongodb",
+    ],
+)
+make_file.add_rule(
+    targets=["redis-start"],
+    recipe=[
+        "kill $(lsof -t -i:6379); docker run --rm --name redis-stack-server -p 6379:6379 redis/redis-stack-server:latest",
+    ],
+)
+make_file.add_rule(
+    targets=["redis-stop"],
+    recipe=[
+        "docker stop redis-stack-server",
     ],
 )
 

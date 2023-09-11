@@ -144,6 +144,10 @@
       "type": "runtime"
     },
     {
+      "name": "redis",
+      "type": "runtime"
+    },
+    {
       "name": "requests",
       "type": "runtime"
     },

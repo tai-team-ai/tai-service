@@ -1,4 +1,6 @@
 """Define custom loaders for loading documents."""
+from hashlib import sha1
+import json
 from typing import TypedDict, Union, Any, Optional, Sequence, List
 import re
 import copy
@@ -22,6 +24,7 @@ from pytube import YouTube
 from loguru import logger
 from taiservice.searchservice.runtime_settings import SearchServiceSettings
 from .data_ingestor_schema import InputFormat, IngestedDocument
+from ..shared_schemas import Cache
 
 
 # we have chosen to use the BaseLoader as the parent class (instead of the
@@ -32,11 +35,12 @@ from .data_ingestor_schema import InputFormat, IngestedDocument
 class PDFLoader(BaseLoader):
     """Loader for PDF documents."""
 
-    def __init__(self, pdf_path: Union[Path, str], **kwargs):
+    def __init__(self, pdf_path: Union[Path, str], cache: Optional[Cache] = None, **kwargs):
         """Initialize the loader."""
         path = Path(pdf_path)
+        self._pdf_path = path
+        self._doc_hash = cache.hash_func(path.read_bytes()) if cache else ""
         path = str(path.resolve())
-        self.pdf_path = path
         self._pymu_pdf_loader = PyMuPDFLoader(path)
         self._math_pix_pdf_loader = MathpixPDFLoader(
             file_path=path,
@@ -44,23 +48,57 @@ class PDFLoader(BaseLoader):
             processed_file_format="md",
             **kwargs,
         )
+        self._doc_cache_instance = cache.instance if cache else None
 
     def _extract_links(self, text: str) -> list[str]:
         """Extract the links from the text."""
         links = re.findall(r"\[(.*?)\]\((.*?)\)", text)
         return [link[1] for link in links]
 
-    def load(self) -> list[Document]:
+    def _get_doc_from_cache(self) -> Optional[list[Document]]:
+        """Get the document from the cache."""
+        try:
+            if self._doc_cache_instance:
+                cache: str = self._doc_cache_instance.get(self._doc_hash) # type: ignore
+                assert cache is not None
+                loaded_docs: list[dict] = json.loads(cache)
+                cached_docs = [Document(**doc) for doc in loaded_docs]
+                return cached_docs
+        except Exception as e:  # pylint: disable=broad-except
+            logger.warning(f"Cache miss for '{self._pdf_path}'")
+        return None
+
+    def _get_doc_hash(self) -> str:
+        """Get the document hash."""
+        return sha1(self._pdf_path.read_bytes()).hexdigest()
+
+    def _save_doc_to_cache(self, documents: list[Document]) -> None:
+        """Save the document to the cache."""
+        try:
+            if self._doc_cache_instance:
+                exported_documents = [doc.dict() for doc in documents]
+                self._doc_cache_instance.set(self._doc_hash, json.dumps(exported_documents)) # type: ignore
+        except Exception as e:
+            logger.warning(e)
+            logger.warning("Failed to save document to cache.")
+
+    def load(self) -> List[Document]:
         """Load PDF documents."""
+        cached_docs = self._get_doc_from_cache()
+        if cached_docs:
+            logger.info(f"Cache hit for '{self._pdf_path}'")
+            return cached_docs
+
         try:
             documents = self._math_pix_pdf_loader.load()
             for document in documents:
                 links = self._extract_links(document.page_content)
                 document.metadata["links"] = links
+            self._save_doc_to_cache(documents)
             return documents
         except Exception as e:  # pylint: disable=broad-except
             logger.warning(e)
-            logger.warning(f"Mathpix failed to load {self.pdf_path}. Falling back to PyMuPDF.")
+            logger.warning(f"Mathpix failed to load {self._pdf_path}. Falling back to PyMuPDF.")
             return self._pymu_pdf_loader.load()
 
 
@@ -232,7 +270,7 @@ LOADING_STRATEGY_MAPPING = {
 }
 
 
-def loading_strategy_factory(ingested_doc: IngestedDocument) -> IngestedDocument:
+def loading_strategy_factory(ingested_doc: IngestedDocument, cache: Optional[Cache] = None) -> IngestedDocument:
     """Return a copy of the ingested document with the appropriate loader."""
     Loader = LOADING_STRATEGY_MAPPING.get(ingested_doc.input_format)
     runtime_settings = SearchServiceSettings()
@@ -245,7 +283,7 @@ def loading_strategy_factory(ingested_doc: IngestedDocument) -> IngestedDocument
     elif Loader == BSHTMLLoader or Loader == WebBaseLoader:
         # the output of the BSHTMLLoader is generic text
         ingested_doc.input_format = InputFormat.GENERIC_TEXT
-    loader = Loader(ingested_doc.data_pointer, **kwargs)
+    loader = Loader(ingested_doc.data_pointer, cache=cache, **kwargs)
     copy_of_ingested_doc = copy.deepcopy(ingested_doc)
     copy_of_ingested_doc.loader = loader
     return copy_of_ingested_doc

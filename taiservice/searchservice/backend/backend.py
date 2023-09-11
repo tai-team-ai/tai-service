@@ -1,5 +1,6 @@
 """Define the backend for handling requests to the TAI Search Service."""
 from datetime import date, datetime, timedelta
+from hashlib import sha1
 import json
 import traceback
 from uuid import uuid4
@@ -9,7 +10,12 @@ import psutil
 import boto3
 from botocore.exceptions import ClientError
 from loguru import logger
-
+from redis import (
+    RedisCluster,
+    Redis,
+    retry as redis_retry,
+    backoff as redis_backoff,
+)
 from taiservice.api.taibackend.shared_schemas import SearchEngineResponse
 from taiservice.api.routers.class_resources_schema import (
     ClassResource,
@@ -48,6 +54,7 @@ from .shared_schemas import (
     Metadata as DBResourceMetadata,
     ClassResourceProcessingStatus,
     ChunkSize,
+    Cache,
 )
 from .tai_search import search as tai_search
 
@@ -75,6 +82,21 @@ class Backend:
             class_resource_collection_name=runtime_settings.doc_db_class_resource_collection_name,
             class_resource_chunk_collection_name=runtime_settings.doc_db_class_resource_chunk_collection_name,
         )
+        ClusterClass = Redis if runtime_settings.cache_host_name == "localhost" else RedisCluster
+        # the backoff is configured with the fact that the checking interval for the mathpix api is 5 seconds
+        cache_instance = ClusterClass(
+            host=runtime_settings.cache_host_name,
+            port=runtime_settings.port_for_all_cache_hosts,
+            decode_responses=True,
+            retry=redis_retry.Retry(
+                retries=5,
+                backoff=redis_backoff.ExponentialBackoff(
+                    base=0.1,
+                    cap=1,
+                ),
+            ),
+        )
+        cache = Cache(instance=cache_instance)
         self._doc_db = DocumentDB(self._doc_db_config)
         self._openai_api_key = self._get_secret_value(runtime_settings.openAI_api_key_secret_name)
         openAI_config = tai_search.OpenAIConfig(
@@ -87,6 +109,7 @@ class Backend:
             document_db_config=self._doc_db_config,
             openai_config=openAI_config,
             cold_store_bucket_name=runtime_settings.cold_store_bucket_name,
+            cache=cache,
         )
         self._tai_search = tai_search.TAISearch(self._tai_search_config)
         self._metrics = Metrics(
@@ -165,9 +188,7 @@ class Backend:
                     **base_doc,
                 )
             elif isinstance(doc, ClassResourceChunkDocument):
-                output_doc = APIClassResourceSnippet(
-                    resource_snippet=doc.chunk, raw_snippet_url=doc.raw_chunk_url, **base_doc
-                )
+                output_doc = APIClassResourceSnippet(resource_snippet=doc.chunk, raw_snippet_url=doc.raw_chunk_url, **base_doc)
             else:
                 raise RuntimeError(f"Unknown document type: {doc}")
             output_documents.append(output_doc)
@@ -232,9 +253,7 @@ class Backend:
 
     def get_class_resources(self, ids: list[UUID], from_class_ids: bool = False) -> list[ClassResource]:
         """Get the class resources."""
-        docs = self._doc_db.get_class_resources(
-            ids, ClassResourceDocument, from_class_ids=from_class_ids
-        )
+        docs = self._doc_db.get_class_resources(ids, ClassResourceDocument, from_class_ids=from_class_ids)
         for doc in docs:
             if self._is_resource_stuck_processing(doc.id):
                 self._coerce_and_update_status(doc, ClassResourceProcessingStatus.FAILED)
@@ -300,7 +319,9 @@ class Backend:
         resource_docs = [] if for_tai_tutor else self._doc_db.get_class_resources(resource_ids, ClassResourceDocument)
         self._replace_urls_with_chunk_urls(resource_docs, chunk_docs)
         sorted_resources = self._sort_class_resources(resource_docs, chunk_docs)
-        logger.info(f"Got {len(sorted_resources)} similar docs: {[(doc.metadata.title, doc.full_resource_url) for doc in sorted_resources][:4]}...")
+        logger.info(
+            f"Got {len(sorted_resources)} similar docs: {[(doc.metadata.title, doc.full_resource_url) for doc in sorted_resources][:4]}..."
+        )
 
         search_results = SearchEngineResponse(
             short_snippets=self.to_api_resources(small_chunks),
@@ -320,7 +341,9 @@ class Backend:
 
         return search_results, update_metric
 
-    def _replace_urls_with_chunk_urls(self, resource_docs: list[ClassResourceDocument], chunk_docs: list[ClassResourceChunkDocument]) -> None:
+    def _replace_urls_with_chunk_urls(
+        self, resource_docs: list[ClassResourceDocument], chunk_docs: list[ClassResourceChunkDocument]
+    ) -> None:
         resource_dict = {resource.id: resource for resource in resource_docs}
         resources_docs_already_replaced = set()
         for chunk_doc in chunk_docs:
@@ -386,10 +409,12 @@ class Backend:
         except json.JSONDecodeError:
             return secret
 
-    def _able_to_create_resource(self, new_doc: tai_search.IngestedDocument, class_resource_docs: Optional[list[ClassResourceDocument]] = None) -> bool:
+    def _able_to_create_resource(
+        self, new_doc: tai_search.IngestedDocument, class_resource_docs: Optional[list[ClassResourceDocument]] = None
+    ) -> bool:
         """Check if the class resource is stuck uploading."""
         if not class_resource_docs:
-            class_resource_docs: list[ClassResourceDocument] = self._doc_db.get_class_resources( # type: ignore
+            class_resource_docs: list[ClassResourceDocument] = self._doc_db.get_class_resources(  # type: ignore
                 new_doc.class_id,
                 ClassResourceDocument,
                 from_class_ids=True,
@@ -421,14 +446,18 @@ class Backend:
                 return True
         return False
 
-    def _is_duplicate_class_resource(self, new_doc: tai_search.IngestedDocument, class_resource_docs: Optional[list[ClassResourceDocument]] = None) -> tuple[bool, Optional[ClassResourceDocument]]:
+    def _is_duplicate_class_resource(
+        self, new_doc: tai_search.IngestedDocument, class_resource_docs: Optional[list[ClassResourceDocument]] = None
+    ) -> tuple[bool, Optional[ClassResourceDocument]]:
         if not class_resource_docs:
-            class_resource_docs: list[ClassResourceDocument] = self._doc_db.get_class_resources( # type: ignore
+            class_resource_docs: list[ClassResourceDocument] = self._doc_db.get_class_resources(  # type: ignore
                 new_doc.class_id,
                 ClassResourceDocument,
                 from_class_ids=True,
             )
-        doc_hashes = {class_resource_doc.hashed_document_contents: class_resource_doc for class_resource_doc in class_resource_docs}
+        doc_hashes = {
+            class_resource_doc.hashed_document_contents: class_resource_doc for class_resource_doc in class_resource_docs
+        }
         doc_titles = {class_resource_doc.metadata.title: class_resource_doc for class_resource_doc in class_resource_docs}
         existing_doc = doc_hashes.get(new_doc.hashed_document_contents) or doc_titles.get(new_doc.metadata.title)
         if existing_doc:
@@ -446,7 +475,6 @@ class Backend:
         stateful_resources = [ClassResourceDocument(**doc.dict()) for doc in docs]
         self._coerce_status_to(stateful_resources, status)
         self._doc_db.update_statuses(stateful_resources)
-        
 
     def _coerce_status_to(
         self, class_resources: list[StatefulClassResourceDocument], status: ClassResourceProcessingStatus
