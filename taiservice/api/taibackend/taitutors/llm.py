@@ -1,4 +1,5 @@
 """Define the llms interface used for the TAI chat backend."""
+import copy
 import json
 from datetime import timedelta
 from typing import Any, Dict, Optional
@@ -119,14 +120,14 @@ class TaiLLM:
     def __init__(self, config: ChatOpenAIConfig):
         """Initialize the LLMs interface."""
         self._config = config
-        base_config = {
-            "openai_api_key": config.api_key,
-            "streaming": config.stream_response,
-        }
         self._user_data: UserDB = DynamoDB(
             reset_interval=config.token_reset_interval,
             max_tokens_per_interval=config.token_limit_per_interval,
         )
+        base_config = {
+            "openai_api_key": config.api_key,
+            "streaming": config.stream_response,
+        }
         self.basic_chat_model: BaseChatModel = ChatOpenAI(
             model=config.basic_model_name,
             request_timeout=config.request_timeout,
@@ -279,10 +280,15 @@ class TaiLLM:
         # IMPORTANT: langchain does the above line for us, but it's left here for reference
         self._append_model_response(chat_session, chunks=relevant_chunks, model_name=model_name, **llm_kwargs)
 
+    def summarize_session(self, chat_session: TaiChatSession) -> None:
+        chat_session = copy.deepcopy(chat_session)
+        chat_session.remove_unrendered_messages(num_unrendered_blocks_to_keep=2)
+        
+
     def _append_model_response(
         self,
         chat_session: BaseLLMChatSession,
-        chunks: list[ClassResourceSnippet] = None,
+        chunks: Optional[list[ClassResourceSnippet]] = None,
         model_name: Optional[ModelName] = None,
         **kwargs: Dict[str, Any],
     ) -> None:
@@ -294,13 +300,13 @@ class TaiLLM:
             return len(tokens)
         if not model_name:
             model_name = ModelName.GPT_TURBO
-        ModelToUse = self._name_to_model_mapping.get(model_name)
-        if not ModelToUse:
+        chat_model = self._name_to_model_mapping.get(model_name)
+        if not chat_model:
             raise ValueError(f"Invalid model name: {model_name}")
         if self._user_data.is_user_over_token_limit(chat_session.user_id):
             raise UserTokenLimitError(chat_session.user_id)
         try:
-            chat_message = ModelToUse(messages=chat_session.messages, **kwargs)
+            chat_message = chat_model(messages=chat_session.messages, **kwargs)
         except InvalidRequestError as e:
             logger.error(e)
             if e.code == "context_length_exceeded":

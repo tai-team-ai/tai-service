@@ -3,7 +3,7 @@ import copy
 from datetime import datetime
 import re
 from textwrap import dedent
-from typing import Any, Optional, Union
+from typing import Any, Callable, Optional, Type, Union
 from enum import Enum
 from uuid import UUID
 from uuid import uuid4
@@ -15,6 +15,7 @@ from langchain.schema import (
     SystemMessage as langchainSystemMessage,
     BaseMessage as langchainBaseMessage,
 )
+from langchain.chat_models.base import BaseChatModel
 # first imports for local development, second imports for deployment
 try:
     from ...routers.tai_schemas import ClassResourceSnippet, ClassResource
@@ -159,7 +160,7 @@ class SystemMessage(langchainSystemMessage, BaseMessage):
     def from_prompt(prompt: str) -> "SystemMessage":
         """Create a system message from a prompt."""
         return SystemMessage(
-            text=prompt,
+            content=prompt,
             role=ChatRole.TAI_TUTOR,
             render_chat=False,
         )
@@ -177,6 +178,70 @@ class FunctionMessage(langchainFunctionMessage, BaseMessage):
         const=True,
         description="Function messages are never rendered. Therefore this field is always false.",
     )
+
+
+class ValidatedFormatString(BasePydanticModel):
+    """Define the model for the key safe format string."""
+    format_string: str = Field(
+        ...,
+        description="The format string.",
+    )
+    kwargs: dict[str, str] = Field(
+        ...,
+        description="The keys in the format string.",
+    )
+
+    @validator("kwargs")
+    def validate_keys(cls, keys: dict[str, str], values: dict) -> dict[str, str]:
+        """Validate the keys and ensure all are in the format string and there are no extra keys in format string."""
+        format_string_keys = re.findall(r"\{([a-zA-Z0-9_]+)\}", values["format_string"])
+        for key in keys:
+            if key not in format_string_keys:
+                raise ValueError(f"Key {key} in keys not found in format string.")
+        for key in format_string_keys:
+            if key not in keys:
+                raise ValueError(f"Key {key} in format string not found in keys.")
+        return keys
+
+    def format(self) -> str:
+        """Format the format string."""
+        return self.format_string.format(**self.kwargs)
+
+
+SUMMARIZE_CHAT_SESSION_SYSTEM_PROMPT = """\
+You are an excellent summarizer. You will be given a chat session and your job is to summarize the chat session \
+in {start}-{stop} sentences. You should be sure to outline the important points of the chat session and \
+should provide a title for the session using the following format:
+    ## <title>
+    <summary>
+
+Here's the first chat session that I would like you to summarize:
+"""
+
+
+class TextNumber(str, Enum):
+    """Define the number of sentences to use when summarizing."""
+
+    THREE = "three"
+    FOUR = "four"
+    FIVE = "five"
+    SIX = "six"
+
+
+def range_to_num_sentences(sentence_range: range) -> tuple[TextNumber, TextNumber]:
+    """Convert a range to a number of sentences into the format <start>-<end>."""
+    assert sentence_range.start < sentence_range.stop, f"Invalid range {sentence_range}. Start must be less than stop."
+    mapping = {
+        3: TextNumber.THREE,
+        4: TextNumber.FOUR,
+        5: TextNumber.FIVE,
+        6: TextNumber.SIX,
+    }
+    start = mapping.get(sentence_range.start, None)
+    assert start is not None, f"Invalid start {sentence_range.start}. Must be {mapping.keys()}."
+    end = mapping.get(sentence_range.stop, None)
+    assert end is not None, f"Invalid end {sentence_range.stop}. Must be {mapping.keys()}."
+    return start, end
 
 
 class BaseLLMChatSession(BasePydanticModel):
@@ -295,16 +360,73 @@ class BaseLLMChatSession(BasePydanticModel):
         self.messages = new_messages
 
 
-    def get_token_count(self, token_function: callable) -> int:
+    def get_token_count(self, token_function: Callable) -> int:
         """Return the tokens used since the last student message."""
         count = 0
         for message in self:
             count += token_function(message.content)
         return count
 
+    def __str__(self) -> str:
+        """Return the string representation of the chat session."""
+        # iterate over messages and create a conversation with roles and content of messages
+        conversation = ""
+        for message in self.messages:
+            if isinstance(message, SystemMessage):
+                continue
+            conversation += f"{message.role}: {message.content}\n"
+        return conversation
+
+    def _get_summarization_chat_session(self, system_prompt: str, sentence_range: Optional[range] = None) -> "BaseLLMChatSession":
+        """Get a summarization chat session."""
+        if not sentence_range:
+            sentence_range = range(3, 5)
+        start, stop = range_to_num_sentences(sentence_range)
+        system_prompt_format_str = ValidatedFormatString(
+            format_string=system_prompt,
+            kwargs={
+                "start": start,
+                "stop": stop,
+            },
+        )
+        system_prompt_message = SystemMessage.from_prompt(system_prompt_format_str.format())
+        summarization_chat_session = BaseLLMChatSession(
+            id=self.id,
+            messages=[
+                system_prompt_message,
+            ],
+        )
+        summarization_chat_session.append_chat_messages(
+            new_messages=StudentMessage(
+                content=str(self),
+                role=ChatRole.STUDENT,
+            )
+        )
+        return summarization_chat_session
+
+    def summarize(self, model: BaseChatModel, sentence_range: Optional[range] = None, **model_kwargs) -> str:
+        """Summarize the chat session."""
+        summarization_chat_session = self._get_summarization_chat_session(
+            system_prompt=SUMMARIZE_CHAT_SESSION_SYSTEM_PROMPT,
+            sentence_range=sentence_range,
+        )
+        response = model(messages=summarization_chat_session.messages, **model_kwargs)
+        return response.content
+
     def __iter__(self):
         """Iterate over the messages in the chat session."""
         return iter(self.messages)
+
+
+TUTOR_SUMMARIZE_CHAT_SESSION_PROMPT = """\
+Hey {name}! The chat session is getting kinda long. Can you summarize the chat session for me? \
+Please use the following format:
+## <title>
+### <summary>
+
+Please be sure to highlight all the important points, especially and technical material. \
+"""
+
 
 class TaiChatSession(BaseLLMChatSession):
     """Define the model for the TAI chat session. Compatible with LangChain."""
@@ -330,34 +452,26 @@ class TaiChatSession(BaseLLMChatSession):
         description="The description of the course that the chat session is for.",
     )
 
-
-class ValidatedFormatString(BasePydanticModel):
-    """Define the model for the key safe format string."""
-    format_string: str = Field(
-        ...,
-        description="The format string.",
-    )
-    kwargs: dict[str, str] = Field(
-        ...,
-        description="The keys in the format string.",
-    )
-
-    @validator("kwargs")
-    def validate_keys(cls, keys: dict[str, str], values: dict) -> dict[str, str]:
-        """Validate the keys and ensure all are in the format string and there are no extra keys in format string."""
-        format_string_keys = re.findall(r"\{([a-zA-Z0-9_]+)\}", values["format_string"])
-        for key in keys:
-            if key not in format_string_keys:
-                raise ValueError(f"Key {key} in keys not found in format string.")
-        for key in format_string_keys:
-            if key not in keys:
-                raise ValueError(f"Key {key} in format string not found in keys.")
-        return keys
-
-    def format(self) -> str:
-        """Format the format string."""
-        return self.format_string.format(**self.kwargs)
-
+    def summarize(self, model: BaseChatModel, sentence_range: range | None = None, **model_kwargs) -> str:
+        chat_session = copy.deepcopy(self)
+        last_tutor_name = ""
+        for message in reversed(chat_session.messages):
+            if isinstance(message, TaiTutorMessage):
+                last_tutor_name = message.tai_tutor_name
+                break
+        prompt_format_str = ValidatedFormatString(
+            format_string=TUTOR_SUMMARIZE_CHAT_SESSION_PROMPT,
+            kwargs={
+                "name": last_tutor_name,
+            },
+        )
+        chat_session.append_chat_messages(
+            new_messages=StudentMessage(
+                content=prompt_format_str.format(),
+                role=ChatRole.STUDENT,
+            )
+        )
+        return model(messages=chat_session.messages, **model_kwargs).content
 
 MARKDOWN_PROMPT = """\
 Respond in markdown format with inline LaTeX support using these delimiters:
@@ -439,7 +553,7 @@ disclaim that I am not an expert in the requested subject matter so I don't misl
 
 BASE_SYSTEM_MESSAGE = f"""\
 You are a friendly tutor named {{name}} that tutors for a class called '{{class_name}}'. As {{name}}, {{persona}}. \
-You are to be a good listener and ask how you can help the student and be there for them. \
+You are to be a good listener, ask how you can help the student, and inspire them on their academic journey. \
 You MUST get to know them as a human being and understand their needs in order to be successful. \
 To do this, you need to ask questions to understand the student as best as possible. \
 {MARKDOWN_PROMPT}
