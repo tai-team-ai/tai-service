@@ -327,7 +327,7 @@ class Backend:
         large_chunks = self._get_chunks(chunk_docs, ChunkSize.LARGE)
         resource_ids = self._get_resource_ids_from_chunks(chunk_docs)
         # When retrieving for TAI tutor, the class resources are never used, so we don't need to retrieve them to improve response time
-        resource_docs = [] if for_tai_tutor else self._doc_db.get_class_resources(resource_ids, ClassResourceDocument)
+        resource_docs = self._doc_db.get_class_resources(resource_ids, ClassResourceDocument)
         self._replace_urls_with_chunk_urls(resource_docs, chunk_docs)
         sorted_resources = self._sort_class_resources(resource_docs, chunk_docs)
 

@@ -320,7 +320,7 @@ class TaiLLM:
         tutor_response = TaiTutorMessage(
             content=chat_message.content,
             render_chat=True,
-            class_resource_chunks=chunks if chunks else [],
+            class_resource_snippets=chunks if chunks else [],
             function_call=function_call,
             **chat_session.last_human_message.dict(exclude={"role", "render_chat", "content"}),
         )

@@ -17,10 +17,10 @@ from langchain.schema import (
 )
 # first imports for local development, second imports for deployment
 try:
-    from ...routers.tai_schemas import ClassResourceSnippet
+    from ...routers.tai_schemas import ClassResourceSnippet, ClassResource
     from ..shared_schemas import BasePydanticModel
 except (KeyError, ImportError):
-    from routers.tai_schemas import ClassResourceSnippet
+    from routers.tai_schemas import ClassResourceSnippet, ClassResource
     from taibackend.shared_schemas import BasePydanticModel
 
 class TaiTutorName(str, Enum):
@@ -131,6 +131,10 @@ class TaiTutorMessage(AIMessage, TutorAndStudentBaseMessage):
     class_resource_snippets: list[ClassResourceSnippet] = Field(
         default=[],
         description="The class resource chunks that were used to generate this message, if any.",
+    )
+    class_resources: list[ClassResource] = Field(
+        default_factory=list,
+        description="The class resources that were used to generate this message, if any.",
     )
     function_call: Optional[AIResponseCallingFunction] = Field(
         default=None,
@@ -430,7 +434,7 @@ Thought: I don't know anything about what the user is asking because I am a tuto
 I must be honest with the student and tell them that I don't know about that concept \
 because it is not related to '{class_name}' and I should suggest that they use Google to find more info or instruct them to ask \
 their Instructor or TA for further help. I can also give the answer my best shot, but I must \
-disclaim that I am not an expert in this area so I don't lead the student astray. \
+disclaim that I am not an expert in the requested subject matter so I don't mislead the student. \
 """
 
 BASE_SYSTEM_MESSAGE = f"""\
@@ -444,7 +448,7 @@ Remember, you should explain things in a way that a {{technical_level}} would un
 Remember, your name is {{name}} and {{persona}}. At times, you may not know the answer to a question \
 because you are a tutor only for '{{class_name}}'. That's okay! If this occurs you should prompt the student \
 to reach out to their professor or TA and give your best shot at the answer, but provide a disclaimer that the \
-subject is not your expertise.\
+subject is not your expertise and that your answer may not be correct.\
 """
 
 MILO = {

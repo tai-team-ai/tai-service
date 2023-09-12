@@ -16,6 +16,7 @@ except (ImportError, KeyError):
     from routers.base_schema import BasePydanticModel, EXAMPLE_UUID
     from routers.class_resources_schema import BaseClassResource, ClassResourceType, ClassResource
 
+
 class TaiTutorName(str, Enum):
     """Define the supported TAI tutors."""
 
@@ -44,6 +45,7 @@ class ResponseTechnicalLevel(str, Enum):
     EXPLAIN_LIKE_IM_IN_COLLEGE = "likeCollege"
     EXPLAIN_LIKE_IM_AN_EXPERT_IN_THE_FIELD = "likeExpertInTheField"
 
+
 class ClassResourceSnippet(BaseClassResource):
     """Define the request model for the class resource snippet."""
 
@@ -67,7 +69,8 @@ class ClassResourceSnippet(BaseClassResource):
     @property
     def simplified_string(self) -> str:
         """Return the simplified schema."""
-        simplified_schema = dedent(f"""\
+        simplified_schema = dedent(
+            f"""\
         Title:
             {self.metadata.title}
         ID:
@@ -76,12 +79,14 @@ class ClassResourceSnippet(BaseClassResource):
             {self.resource_snippet}
         Resource Type:
             {self.metadata.resource_type}
-        """)
+        """
+        )
         return str(simplified_schema)
 
 
 class Chat(BasePydanticModel):
     """Define the model for the chat message."""
+
     role: ChatRole = Field(
         ...,
         description="The role of the creator of the chat message.",
@@ -117,11 +122,13 @@ class FunctionChat(Chat):
 
 class BaseStudentChat(Chat):
     """Define the base model for the student chat message."""
+
     role: ChatRole = Field(
         default=ChatRole.STUDENT,
         const=True,
         description="The role of the creator of the chat message.",
     )
+
 
 class StudentChat(BaseStudentChat):
     """Define the model for the student chat message."""
@@ -148,6 +155,7 @@ class AIResponseCallingFunction(BasePydanticModel):
         description="The arguments to pass to the function.",
     )
 
+
 class TaiTutorChat(Chat):
     """Define the model for the TAI Tutor chat message."""
 
@@ -166,6 +174,10 @@ class TaiTutorChat(Chat):
     )
     class_resource_snippets: list[ClassResourceSnippet] = Field(
         ...,
+        description="The class resources that were used to generate the response.",
+    )
+    class_resources: list[ClassResource] = Field(
+        default_factory=list,
         description="The class resources that were used to generate the response.",
     )
     function_call: Optional[AIResponseCallingFunction] = Field(
@@ -207,6 +219,7 @@ class BaseChatSession(BasePydanticModel):
         description="The chat session message history.",
     )
 
+
 EXAMPLE_CHAT_SESSION_REQUEST = {
     "id": EXAMPLE_UUID,
     "userId": EXAMPLE_UUID,
@@ -237,7 +250,7 @@ EXAMPLE_CLASS_RESOURCE_SNIPPET = {
         "title": "Molecules",
         "description": "Molecules are made up of atoms.",
         "tags": ["molecules", "atoms"],
-        "resourceType": ClassResourceType.TEXTBOOK
+        "resourceType": ClassResourceType.TEXTBOOK,
     },
 }
 EXAMPLE_CHAT_SESSION_RESPONSE["chats"].append(
@@ -253,8 +266,10 @@ EXAMPLE_CHAT_SESSION_RESPONSE["chats"].append(
     },
 )
 
+
 class ChatSessionRequest(BaseChatSession):
     """Define the request model for the chat endpoint."""
+
     chats: list[Union[StudentChat, TaiTutorChat, FunctionChat]] = Field(
         ...,
         description="The chat session message history.",
@@ -262,6 +277,7 @@ class ChatSessionRequest(BaseChatSession):
 
     class Config:
         """Define the configuration for the chat session."""
+
         schema_extra = {
             "example": EXAMPLE_CHAT_SESSION_REQUEST,
         }
@@ -295,7 +311,6 @@ class ChatSessionResponse(BaseChatSession):
         schema_extra = {
             "example": EXAMPLE_CHAT_SESSION_RESPONSE,
         }
-
 
 
 EXAMPLE_SEARCH_QUERY = {
@@ -334,6 +349,7 @@ EXAMPLE_SEARCH_ANSWER.update(
 
 class SearchFilters(BasePydanticModel):
     """Define the search filters."""
+
     resource_types: list[ClassResourceType] = Field(
         default_factory=lambda: [resource_type for resource_type in ClassResourceType],
         description="The resource types to filter by.",
@@ -342,6 +358,7 @@ class SearchFilters(BasePydanticModel):
 
 class SearchQuery(BasePydanticModel):
     """Define the request model for the search endpoint."""
+
     id: UUID = Field(
         default_factory=uuid4,
         description="The ID of the search.",
@@ -362,6 +379,7 @@ class SearchQuery(BasePydanticModel):
 
     class Config:
         """Define the configuration for the search query."""
+
         schema_extra = {
             "example": EXAMPLE_SEARCH_QUERY,
         }
@@ -377,6 +395,7 @@ class ResourceSearchQuery(SearchQuery):
 
     class Config:
         """Define the configuration for the search query."""
+
         schema_extra = {
             "example": EXAMPLE_RESOURCE_SEARCH_QUERY,
         }
@@ -384,6 +403,7 @@ class ResourceSearchQuery(SearchQuery):
 
 class SearchResults(ResourceSearchQuery):
     """Define the response model for the search endpoint."""
+
     suggested_resources: list[ClassResource] = Field(
         ...,
         description="The suggested resources that should appear at the top of the search results.",
@@ -395,6 +415,7 @@ class SearchResults(ResourceSearchQuery):
 
     class Config:
         """Define the configuration for the search response."""
+
         schema_extra = {
             "example": EXAMPLE_BASE_SEARCH_RESPONSE,
         }

@@ -204,6 +204,7 @@ class Backend:
                 tai_tutor=chat_message.tai_tutor_name,
                 technical_level=chat_message.technical_level,
                 class_resource_snippets=chat_message.class_resource_snippets,
+                class_resources=chat_message.class_resources,
                 function_call=chat_message.function_call,
                 **msg.dict(exclude={"render_chat"}),
             )
@@ -260,6 +261,8 @@ class Backend:
         docs_to_use = search_results.long_snippets[:1] + search_results.short_snippets[:2]
         chat_session.remove_unrendered_messages(num_unrendered_blocks_to_keep=1)
         tai_llm.add_tai_tutor_chat_response(chat_session, docs_to_use)
+        assert isinstance(chat_session.last_chat_message, BETaiTutorMessage)
+        chat_session.last_chat_message.class_resources = search_results.class_resources
         return self.to_api_chat_session(chat_session)
 
     # TODO: Add a test to verify the archive method is called
