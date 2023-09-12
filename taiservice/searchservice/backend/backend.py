@@ -31,6 +31,7 @@ from taiservice.api.routers.common_resources_schema import (
 from taiservice.api.routers.tai_schemas import (
     ClassResourceSnippet as APIClassResourceSnippet,
     ResourceSearchQuery,
+    SearchQuery,
 )
 from .errors import ServerOverloadedError
 from ..runtime_settings import SearchServiceSettings
@@ -310,13 +311,17 @@ class Backend:
         )
         return resources
 
-    def search(self, search_query: ResourceSearchQuery, for_tai_tutor: bool) -> tuple[SearchEngineResponse, Optional[Callable]]:
+    def search(self, search_query: SearchQuery, for_tai_tutor: bool) -> tuple[SearchEngineResponse, Optional[Callable]]:
         """Search for class resources."""
+        if isinstance(search_query, ResourceSearchQuery):
+            resource_types = search_query.filters.resource_types
+        else:
+            resource_types = None
         chunk_docs = self._tai_search.get_relevant_class_resources(
             search_query.query,
             search_query.class_id,
             for_tai_tutor,
-            resource_types=search_query.filters.resource_types,
+            resource_types=resource_types,
         )
         small_chunks = self._get_chunks(chunk_docs, ChunkSize.SMALL)
         large_chunks = self._get_chunks(chunk_docs, ChunkSize.LARGE)
@@ -325,9 +330,6 @@ class Backend:
         resource_docs = [] if for_tai_tutor else self._doc_db.get_class_resources(resource_ids, ClassResourceDocument)
         self._replace_urls_with_chunk_urls(resource_docs, chunk_docs)
         sorted_resources = self._sort_class_resources(resource_docs, chunk_docs)
-        logger.info(
-            f"Got {len(sorted_resources)} similar docs: {[(doc.metadata.title, doc.full_resource_url) for doc in sorted_resources][:4]}..."
-        )
 
         search_results = SearchEngineResponse(
             short_snippets=self.to_api_resources(small_chunks),

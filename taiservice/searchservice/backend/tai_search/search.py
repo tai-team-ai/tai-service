@@ -312,6 +312,7 @@ class TAISearch:
         chunk_docs = self._document_db.get_class_resources(uuids, ClassResourceChunkDocument)
         chunk_docs = [doc for doc in chunk_docs if isinstance(doc, ClassResourceChunkDocument)]
         chunk_docs = self._sort_chunk_docs_by_pinecone_scores(relevant_documents, chunk_docs)
+        logger.info(f"Found {len(chunk_docs)} relevant class resources for query: {query}")
         return chunk_docs
 
     def _augment_chunks(self, ingested_document: IngestedDocument, chunks: list[ClassResourceChunkDocument]) -> None:
