@@ -151,7 +151,7 @@ class TaiLLM:
 
     def add_tai_tutor_chat_response(
         self,
-        chat_session: BaseLLMChatSession,
+        chat_session: TaiChatSession,
         relevant_chunks: Optional[list[ClassResourceSnippet]] = None,
         return_without_system_prompt: bool = True,
     ) -> None:
@@ -331,7 +331,7 @@ class TaiLLM:
         chat_session: TaiChatSession,
         function_to_call: callable,
         function_kwargs: dict,
-        relevant_chunks: list[ClassResourceSnippet] = None,
+        relevant_chunks: Optional[list[ClassResourceSnippet]] = None,
     ) -> None:
         """Append the context chat to the chat session."""
         last_student_chat = chat_session.last_student_message
@@ -349,10 +349,10 @@ class TaiLLM:
 
     def _function_msg_from_chunks(self, chunks: list[ClassResourceSnippet]) -> FunctionMessage:
         """Create a function message from the chunks."""
-        chunks = "\n".join([chunk.simplified_string for chunk in chunks])
+        chunk_str = "\n\n".join([chunk.simplified_string for chunk in chunks])
         msg = FunctionMessage(
             name="find_relevant_chunks",
             render_chat=False,
-            content=chunks,
+            content=chunk_str,
         )
         return msg

@@ -70,6 +70,8 @@ class ClassResourceSnippet(BaseClassResource):
         simplified_schema = dedent(f"""\
         Title:
             {self.metadata.title}
+        ID:
+            {self.id}
         Resource Snippet:
             {self.resource_snippet}
         Resource Type:

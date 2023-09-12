@@ -268,18 +268,13 @@ class Backend:
         """Search for class resources."""
         student_message = BEStudentMessage(content=query.query)
         self._archive_message(student_message, query.class_id)
-        search_query = SearchQuery(
-            id=query.id,
-            class_id=query.class_id,
-            query=query.query,
-        )
-        search_results = self._get_search_results(search_query, "search-engine")
+        search_results = self._get_search_results(query, "search-engine")
         if search_results and result_type == 'summary':
             docs_to_summarize = search_results.long_snippets[:1] + search_results.short_snippets[:2]
             tai_llm = TaiLLM(self._get_tai_llm_config())
             snippet = tai_llm.create_search_result_summary_snippet(
-                user_id=search_query.user_id,
-                search_query=search_query.query,
+                user_id=query.user_id,
+                search_query=query.query,
                 chunks=docs_to_summarize,
             )
             return snippet

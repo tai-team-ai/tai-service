@@ -60,6 +60,10 @@ class Metadata(BasePydanticModel):
         ...,
         description=f"The type of the class resource. Valid values are: {', '.join([role.value for role in ClassResourceType])}",
     )
+    page_number: Optional[int] = Field(
+        default=None,
+        description="The page number of the class resource. This is only applicable for paginated resources like pdfs.",
+    )
 
 
 class BaseClassResource(BasePydanticModel):

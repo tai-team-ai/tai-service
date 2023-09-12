@@ -178,6 +178,7 @@ class Backend:
                     description=metadata.description,
                     tags=metadata.tags,
                     resource_type=metadata.resource_type,
+                    page_number=metadata.page_number,
                 ),
             ).dict(exclude={"raw_snippet_url", "parent_resource_url"})
             if isinstance(doc, ClassResourceDocument):
@@ -311,7 +312,12 @@ class Backend:
 
     def search(self, search_query: ResourceSearchQuery, for_tai_tutor: bool) -> tuple[SearchEngineResponse, Optional[Callable]]:
         """Search for class resources."""
-        chunk_docs = self._tai_search.get_relevant_class_resources(search_query.query, search_query.class_id, for_tai_tutor)
+        chunk_docs = self._tai_search.get_relevant_class_resources(
+            search_query.query,
+            search_query.class_id,
+            for_tai_tutor,
+            resource_types=search_query.filters.resource_types,
+        )
         small_chunks = self._get_chunks(chunk_docs, ChunkSize.SMALL)
         large_chunks = self._get_chunks(chunk_docs, ChunkSize.LARGE)
         resource_ids = self._get_resource_ids_from_chunks(chunk_docs)

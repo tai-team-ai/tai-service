@@ -234,7 +234,13 @@ class TAISearch:
         self._document_db.upsert_class_resources(class_resource_docs)
         return parent_class_resource
 
-    def get_relevant_class_resources(self, query: str, class_id: UUID, for_tai_tutor: bool) -> list[ClassResourceChunkDocument]:
+    def get_relevant_class_resources(
+        self,
+        query: str,
+        class_id: UUID,
+        for_tai_tutor: bool,
+        resource_types: Optional[list[ClassResourceType]] = None,
+    ) -> list[ClassResourceChunkDocument]:
         """
         Get the most relevant class resources.
 
@@ -277,11 +283,11 @@ class TAISearch:
             PineconeQueryFilter(
                 filter_by_chapters=True,
                 filter_by_sections=True,
-                filter_by_resource_type=False,
+                resource_types=resource_types,
                 alpha=0.7 if for_tai_tutor else 0.6,
             ),
             PineconeQueryFilter(
-                filter_by_resource_type=False,
+                resource_types=resource_types,
                 alpha=0.7 if for_tai_tutor else 0.6,
             ),
         ]

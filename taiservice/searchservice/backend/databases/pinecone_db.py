@@ -1,17 +1,16 @@
 """Define the pinecone database."""
-from concurrent.futures import ThreadPoolExecutor, Future
 from dataclasses import dataclass
 from multiprocessing.pool import ApplyResult
 from enum import Enum
 import os
-from typing import List, Union
+from typing import List, Optional
 from uuid import UUID
 from loguru import logger
 from pydantic import BaseModel, Field
 import pinecone
 from pinecone_text.hybrid import hybrid_convex_scale
 from .pinecone_db_schemas import PineconeDocuments, PineconeDocument
-from ..shared_schemas import ChunkSize
+from ..shared_schemas import ChunkSize, ClassResourceType
 
 
 class Environment(str, Enum):
@@ -42,7 +41,7 @@ class PineconeQueryFilter:
     alpha: float = 0.8
     filter_by_chapters: bool = False
     filter_by_sections: bool = False
-    filter_by_resource_type: bool = False
+    resource_types: Optional[list[ClassResourceType]] = None
 
 
 class PineconeDB:
@@ -124,8 +123,8 @@ class PineconeDB:
             or_filter.append({"chapters": {"$in": document.metadata.chapters}})
         if filter.filter_by_sections and document.metadata.sections and document.metadata.chunk_size == ChunkSize.SMALL:
             or_filter.append({"sections": {"$in": document.metadata.sections}})
-        if filter.filter_by_resource_type and document.metadata.resource_type:
-            and_filter.append({"resource_type": document.metadata.resource_type})
+        if filter.resource_types:
+            and_filter.append({"resource_type": {"$in": [resource_type.value for resource_type in filter.resource_types]}})
         if or_filter:
             and_filter.append({"$or": or_filter})
         meta_data_filter = {"$and": and_filter} if and_filter else {}
