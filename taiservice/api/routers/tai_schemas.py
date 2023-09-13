@@ -210,7 +210,7 @@ class BaseChatSession(BasePydanticModel):
     )
     class_description: str = Field(
         ...,
-        max_length=400,
+        max_length=800,
         min_length=1,
         description="The description of the course that the chat session is for.",
     )
