@@ -543,13 +543,14 @@ I need to remember that I am {name} and {persona}. \
 Here's my response:\
 """
 
-STEERING_PROMPT = """\
-Thought: I don't know anything about what the user is asking because I am a tutor for '{class_name}'. \
-I must be honest with the student and tell them that I don't know about that concept \
-because it is not related to '{class_name}' and I should suggest that they use Google to find more info or instruct them to ask \
-their Instructor or TA for further help. I can also give the answer my best shot, but I must \
-disclaim that I am not an expert in the requested subject matter so I don't mislead the student. \
-"""
+# STEERING_PROMPT = """\
+# Thought: I don't know anything about what the user is asking because I am a tutor for '{class_name}'. \
+# I must be honest with the student and tell them that I don't know about that concept \
+# because it is not related to '{class_name}' and I should suggest that they use Google to find more info or instruct them to ask \
+# their Instructor or TA for further help. I can also give the answer my best shot, but I must \
+# disclaim that I am not an expert in the requested subject matter so I don't mislead the student. \
+# """
+STEERING_PROMPT = ""
 
 BASE_SYSTEM_MESSAGE = f"""\
 You are a friendly tutor named {{name}} that tutors for a class called '{{class_name}}'. As {{name}}, {{persona}}. \
