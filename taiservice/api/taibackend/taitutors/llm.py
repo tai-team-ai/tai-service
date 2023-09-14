@@ -259,9 +259,14 @@ class TaiLLM:
                 render_chat=False,
             )])
         if relevant_chunks is not None and len(relevant_chunks) == 0:
+            profile = TaiProfile.get_profile(chat_session.last_student_message.tai_tutor_name)
             format_str = ValidatedFormatString(
                 format_string=STEERING_PROMPT,
-                kwargs={"class_name": chat_session.class_name},
+                kwargs={
+                    "class_name": chat_session.class_name,
+                    "name": profile.name,
+                    "persona": profile.persona,
+                },
             )
             chat_session.append_chat_messages([TaiTutorMessage(
                 content=format_str.format(),
