@@ -36,7 +36,7 @@ class ElastiCacheConfigModel(BaseModel):
         description="The description of the cluster.",
     )
     cache_node_type: NodeType = Field(
-        default=NodeType.SMALL,
+        default=NodeType.MICRO,
         description="The compute and memory capacity of the nodes in the cluster.",
     )
     engine: EngineType = Field(

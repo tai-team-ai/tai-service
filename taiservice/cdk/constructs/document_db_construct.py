@@ -12,6 +12,8 @@ from aws_cdk import (
     CustomResource,
     Duration,
     Size as StorageSize,
+    RemovalPolicy,
+    SecretValue,
 )
 from .construct_helpers import (
     validate_vpc,
@@ -49,28 +51,19 @@ class AuthType(str, Enum):
     SECRET_ARN_PASSWORD = "SECRET_ARN"
 
 
-class ElasticDocumentDBConfigModel(BaseModel):
-    """Define the configuration for the ElasticDB construct."""
+class BaseDocumentDBConfigModel(BaseModel):
+    """Define the base configuration for the DocumentDB construct."""
 
     cluster_name: str = Field(
         ...,
         description="The name of the DocumentDB cluster. Note, this is not the fully qualified domain name.",
         regex=VALID_CLUSTER_NAME_PATTERN,
     )
-    auth_type: AuthType = Field(
-        default=AuthType.PLAINTEXT_PASSWORD,
-        const=True,
-        description="The authentication type for the DocumentDB cluster.",
-    )
     shard_count: int = Field(
         default=1,
         description="The number of shards to create in the cluster.",
         ge=VALID_SHARD_COUNT_RANGE.start,
         le=VALID_SHARD_COUNT_RANGE.stop,
-    )
-    shard_capacity: int = Field(
-        default=2,
-        description="The capacity of each shard in the cluster.",
     )
     maintenance_window: str = Field(
         default="Mon:00:00-Mon:01:00",
@@ -95,6 +88,25 @@ class ElasticDocumentDBConfigModel(BaseModel):
 
         arbitrary_types_allowed = True
 
+    @validator("vpc")
+    def validate_vpc(cls, vpc) -> Optional[Union[ec2.IVpc, str]]:
+        """Validate the VPC."""
+        return validate_vpc(vpc)
+
+
+class ElasticDocumentDBConfigModel(BaseDocumentDBConfigModel):
+    """Define the configuration for the ElasticDB construct."""
+
+    auth_type: AuthType = Field(
+        default=AuthType.PLAINTEXT_PASSWORD,
+        const=True,
+        description="The authentication type for the DocumentDB cluster.",
+    )
+    shard_capacity: int = Field(
+        default=2,
+        description="The capacity of each shard in the cluster.",
+    )
+
     @root_validator
     def validate_secret_arn_password(cls, values) -> dict:
         """Validate that if the auth_type is SECRET_ARN_PASSWORD, the admin_password is not None."""
@@ -109,14 +121,33 @@ class ElasticDocumentDBConfigModel(BaseModel):
             return shard_capacity
         raise ValueError(f"shard_capacity must be one of {VALID_SHARD_CAPACITIES}. You provided {shard_capacity}")
 
-    @validator("vpc")
-    def validate_vpc(cls, vpc) -> Optional[Union[ec2.IVpc, str]]:
-        """Validate the VPC."""
-        return validate_vpc(vpc)
 
 
-class DocumentDBConfigModel(BaseModel):
+class InstanceType(str, Enum):
+    """Define valid instance types for the DocumentDB cluster."""
+    SMALL = "db.t3.medium"
+    MEDIUM = "db.r6g.large"
+    LARGE = "db.r6g.xlarge"
+
+
+class DocumentDBConfigModel(BaseDocumentDBConfigModel):
     """Define the configuration for the DocumentDB construct."""
+    instance_type: InstanceType = Field(
+        default=InstanceType.SMALL,
+        description="The instance type to use."
+    )
+    deletion_protection: bool = Field(
+        default=True,
+        description="Indicates whether the DB cluster has deletion protection enabled."
+    )
+    enable_performance_insights: bool = Field(
+        default=False,
+        description="Indicates whether Performance Insights is enabled for the DB instance."
+    )
+    removal_policy: Optional[RemovalPolicy] = Field(
+        default=None,
+        description="The AWS CDK RemovalPolicy to apply to the DB Cluster."
+    )
 
 
 class DocumentDatabase(Construct):
@@ -198,13 +229,42 @@ class DocumentDatabase(Construct):
     def _create_cluster(self) -> Union[docdb_elastic.CfnCluster, docdb.DatabaseCluster]:
         """Create the DocumentDB cluster."""
         if isinstance(self._config, DocumentDBConfigModel):
-            return self._create_standard_cluster()
-        return self._create_elastic_cluster()
+            return self._create_standard_cluster(self._config)
+        elif isinstance(self._config, ElasticDocumentDBConfigModel):
+            return self._create_elastic_cluster(self._config)
+        raise ValueError(f"Invalid config type: {type(self._config)}")
 
-    def _create_standard_cluster(self) -> docdb.DatabaseCluster:
-        raise NotImplementedError("Standard clusters are not yet supported.")
+    def _create_standard_cluster(self, config: DocumentDBConfigModel) -> docdb.DatabaseCluster:
+        """Create the DocumentDB (standard) cluster."""
+        
+        admin_secret_json = retrieve_secret(self._settings.secret_name)
+        username = admin_secret_json[self._settings.username_secret_field_name]
 
-    def _create_elastic_cluster(self) -> docdb_elastic.CfnCluster:
+        cluster = docdb.DatabaseCluster(
+            self,
+            id=self._namer("cluster"),
+            instance_type=ec2.InstanceType(config.instance_type),
+            master_user=docdb.Login(
+                username=username,
+                password=SecretValue.secrets_manager(
+                    secret_id=self._settings.secret_name,
+                    json_field=self._settings.password_secret_field_name,
+                ),
+            ),
+            vpc=config.vpc,
+            db_cluster_name=config.cluster_name,
+            deletion_protection=config.deletion_protection,
+            enable_performance_insights=config.enable_performance_insights,
+            instances=config.shard_count,
+            port=self._settings.cluster_port,
+            preferred_maintenance_window=config.maintenance_window,
+            removal_policy=config.removal_policy,
+            security_group=self._db_security_group,
+            vpc_subnets=ec2.SubnetSelection(subnet_type=config.subnet_type),
+        )
+        return cluster
+
+    def _create_elastic_cluster(self, config: ElasticDocumentDBConfigModel) -> docdb_elastic.CfnCluster:
         """Create the DocumentDB cluster."""
         admin_secret_json = retrieve_secret(self._settings.secret_name)
         username = admin_secret_json[self._settings.username_secret_field_name]
@@ -213,15 +273,15 @@ class DocumentDatabase(Construct):
         cluster = docdb_elastic.CfnCluster(
             self,
             id=self._namer("cluster"),
-            cluster_name=self._config.cluster_name,
+            cluster_name=config.cluster_name,
             admin_user_name=username,
             admin_user_password=admin_password,
-            auth_type=self._config.auth_type.value,
-            shard_count=self._config.shard_count,
-            shard_capacity=self._config.shard_capacity,
+            auth_type=config.auth_type.value,
+            shard_count=config.shard_count,
+            shard_capacity=config.shard_capacity,
             preferred_maintenance_window=self._config.maintenance_window,
             subnet_ids=subnet_ids,
-            vpc_security_group_ids=[security_group.security_group_id for security_group in self._config.security_groups],
+            vpc_security_group_ids=[security_group.security_group_id for security_group in config.security_groups],
         )
         return cluster
 

@@ -31,6 +31,7 @@ try:
         TaiChatSession as BEChatSession,
         FunctionMessage as BEFunctionMessage,
         SystemMessage as BESystemMessage,
+        ModelName,
     )
     from ..runtime_settings import TaiApiSettings
     from ..routers.class_resources_schema import (
@@ -70,6 +71,7 @@ except (KeyError, ImportError):
         TaiChatSession as BEChatSession,
         FunctionMessage as BEFunctionMessage,
         SystemMessage as BESystemMessage,
+        ModelName,
     )
     from runtime_settings import TaiApiSettings
     from routers.common_resources_schema import (
@@ -158,6 +160,7 @@ class Backend:
                 tai_tutor_name=chat_message.tai_tutor,
                 technical_level=chat_message.technical_level,
                 class_resource_snippets=chat_message.class_resource_snippets,
+                class_resources=chat_message.class_resources,
                 **msg.dict(exclude={"render_chat"}),
             )
         elif isinstance(chat_message, APIFunctionChat):
@@ -246,7 +249,12 @@ class Backend:
         return api_questions
 
     # TODO: Add a test to verify the archive method is called
-    def get_tai_response(self, chat_session: APIChatSession, stream: bool=False) -> APIChatSession:
+    def get_tai_response(
+        self,
+        chat_session: APIChatSession,
+        stream: bool = False,
+        auto_summarize: bool = True,
+    ) -> APIChatSession:
         """Get and add the tai tutor response to the chat session."""
         chat_session: BEChatSession = self.to_backend_chat_session(chat_session)
         self._archive_message(chat_session.last_human_message, chat_session.class_id)
@@ -254,16 +262,36 @@ class Backend:
             id=chat_session.id,
             class_id=chat_session.class_id,
             query=chat_session.last_student_message.content,
-            
         )
         search_results = self._get_search_results(search_query, "tutor-search")
         tai_llm = TaiLLM(self._get_tai_llm_config(stream))
         docs_to_use = search_results.long_snippets[:1] + search_results.short_snippets[:2]
         chat_session.remove_unrendered_messages(num_unrendered_blocks_to_keep=1)
-        tai_llm.add_tai_tutor_chat_response(chat_session, docs_to_use)
+        if auto_summarize:
+            try:
+                self._summarize_chat_session(chat_session, model_name=self._runtime_settings.basic_model_name)
+            except: # pylint: disable=bare-except
+                logger.error(traceback.format_exc())
+        tai_llm.add_tai_tutor_chat_response(chat_session, docs_to_use, model_name=self._runtime_settings.basic_model_name)
         assert isinstance(chat_session.last_chat_message, BETaiTutorMessage)
         chat_session.last_chat_message.class_resources = search_results.class_resources
         return self.to_api_chat_session(chat_session)
+
+    def _summarize_chat_session(self, chat_session: BEChatSession, model_name: ModelName) -> None:
+        avg_tokens = chat_session.average_tokens_per_message(exclude_system_prompt=True)
+        num_tokens = chat_session.get_token_count(model_name=model_name)
+        max_tokens = chat_session.max_tokens_allowed_in_session(model_name=model_name)
+        # we want to summarize if we only have approximately 4 messages left
+        if avg_tokens * 4 > max_tokens - num_tokens:
+            llm = TaiLLM(self._get_tai_llm_config())
+            summary = llm.summarize_chat_session(chat_session, model_name=model_name)
+            last_student_msg = chat_session.last_student_message
+            chat_session.messages = [
+                BETaiTutorMessage(
+                    content=summary,
+                ),
+                last_student_msg,
+            ]
 
     # TODO: Add a test to verify the archive method is called
     # TODO: need to refactor this so it doesn't use the api layer sshema

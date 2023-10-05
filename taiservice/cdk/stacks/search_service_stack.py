@@ -171,8 +171,10 @@ class TaiSearchServiceStack(Stack):
             cluster_name=self._namer("cache"),
             cluster_description="The cache for the search service.",
             num_shards=2,
+            replicas_per_shard=1,
             vpc=self.vpc,
             subnet_type=ec2.SubnetType.PRIVATE_WITH_EGRESS,
+            multi_az_enabled=True,
         )
         cache = ElastiCache(
             scope=self,
@@ -282,11 +284,11 @@ class TaiSearchServiceStack(Stack):
             self._namer("cluster"),
             vpc=self.vpc,
         )
-        no_gpu_asg = self._get_auto_scaling_group(ECSServiceType.NO_GPU, cluster)
-        gpu_asg = self._get_auto_scaling_group(ECSServiceType.GPU, cluster)
+        no_gpu_asg = self._get_auto_scaling_group(ECSServiceType.NO_GPU)
+        # gpu_asg = self._get_auto_scaling_group(ECSServiceType.GPU)
         asgs_and_types = [
             (no_gpu_asg, ECSServiceType.NO_GPU),
-            (gpu_asg, ECSServiceType.GPU),
+            # (gpu_asg, ECSServiceType.GPU),
         ]
         capacity_provider_mapping = {}
         for asg, service_type in asgs_and_types:
@@ -303,14 +305,14 @@ class TaiSearchServiceStack(Stack):
             )
         return cluster, capacity_provider_mapping
 
-    def _get_auto_scaling_group(self, service_type: ECSServiceType, cluster: Cluster) -> AutoScalingGroup:
+    def _get_auto_scaling_group(self, service_type: ECSServiceType) -> AutoScalingGroup:
         block_devices = [
             BlockDevice(
                 device_name="/dev/xvda",
                 volume=BlockDeviceVolume.ebs(
                     volume_type=EbsDeviceVolumeType.GP3,
                     delete_on_termination=True,
-                    volume_size=200,
+                    volume_size=100,
                 ),
             ),
         ]
@@ -336,7 +338,7 @@ class TaiSearchServiceStack(Stack):
             vpc=self.vpc,
             instance_type=instance_type,
             machine_image=ami,
-            max_capacity=4,
+            max_capacity=3,
             min_capacity=0,
             # spot_price="0.35",
             block_devices=block_devices,
@@ -380,15 +382,15 @@ class TaiSearchServiceStack(Stack):
         return target_sg
 
     def _get_scalable_task(self, service: Ec2Service) -> ScalableTaskCount:
-        min_task_count = 5
-        max_task_count = 8
+        min_task_count = 2
+        max_task_count = 4
         scaling_task = service.auto_scale_task_count(
             min_capacity=min_task_count,
             max_capacity=max_task_count,
         )
         scaling_task.scale_on_cpu_utilization(
             id=self._namer("task-cpu-scaling"),
-            target_utilization_percent=50,
+            target_utilization_percent=40,
             scale_out_cooldown=Duration.seconds(300),  # we should be fast because of the warm pool
             disable_scale_in=False,
         )
@@ -402,13 +404,13 @@ class TaiSearchServiceStack(Stack):
         # )
         scaling_task.scale_on_schedule(
             id=self._namer("scale-up"),
-            schedule=Schedule.cron(hour="14", minute="0", week_day="*"),  # 8am MST
+            schedule=Schedule.cron(hour="12", minute="0", week_day="*"),  # 6am MST
             min_capacity=min_task_count,
             max_capacity=max_task_count,
         )
         scaling_task.scale_on_schedule(
             self._namer("scale-down"),
-            schedule=Schedule.cron(hour="5", minute="0", week_day="*"),  # 11pm MST
+            schedule=Schedule.cron(hour="6", minute="0", week_day="*"),  # 12am MST
             min_capacity=1,
             max_capacity=max_task_count,
         )
@@ -437,17 +439,3 @@ class TaiSearchServiceStack(Stack):
             ),
         )
         return target_group
-
-    def get_search_service_NEW(self, sg_for_connecting_to_db: ec2.SecurityGroup) -> ApplicationLoadBalancedServiceBase:
-        alb: ApplicationLoadBalancer = ApplicationLoadBalancer(
-            self, id=self._namer("alb"), load_balancer_name=self._namer("alb"), vpc=self.vpc, internet_facing=True
-        )
-        self._service_url = alb.load_balancer_dns_name
-        protocol = ApplicationProtocol.HTTPS
-        service = ApplicationLoadBalancedServiceBase(
-            scope=self,
-            id=self._namer("service"),
-            circuit_breaker=DeploymentCircuitBreaker(rollback=True),
-            cluster=self._get_cluster(),
-            listener_port=PROTOCOL_TO_LISTENER_PORT[protocol],
-        )

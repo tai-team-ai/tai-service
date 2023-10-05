@@ -2,12 +2,12 @@
 import copy
 from datetime import datetime
 import re
-from textwrap import dedent
 from typing import Any, Callable, Optional, Type, Union
 from enum import Enum
 from uuid import UUID
 from uuid import uuid4
 from pydantic import Field, BaseModel, validator
+import tiktoken
 from langchain.schema import (
     AIMessage,
     FunctionMessage as langchainFunctionMessage,
@@ -56,6 +56,13 @@ class ModelName(str, Enum):
     GPT_TURBO = "gpt-3.5-turbo"
     GPT_TURBO_LARGE_CONTEXT = "gpt-3.5-turbo-16k"
     GPT_4 = "gpt-4"
+
+
+MODEL_TO_TOKEN_WINDOW_SIZE_MAPPING = {
+    ModelName.GPT_TURBO: 4097,
+    ModelName.GPT_TURBO_LARGE_CONTEXT: 16385,
+    ModelName.GPT_4: 8192,
+}
 
 
 class BaseMessage(langchainBaseMessage):
@@ -359,13 +366,40 @@ class BaseLLMChatSession(BasePydanticModel):
         
         self.messages = new_messages
 
+    def get_token_count(
+        self,
+        model_name: ModelName,
+        exclude_system_prompt: bool = False
+    ) -> int:
+        """Return the tokens used in the chat."""
+        def count_tokens_tiktoken(text: str) -> int:
+            encoding = tiktoken.encoding_for_model(model_name.value)
+            tokens = encoding.encode(text)
+            return len(tokens)
 
-    def get_token_count(self, token_function: Callable) -> int:
-        """Return the tokens used since the last student message."""
         count = 0
+        if model_name == ModelName.GPT_TURBO or model_name == ModelName.GPT_TURBO_LARGE_CONTEXT \
+            or model_name == ModelName.GPT_4:
+            token_function = count_tokens_tiktoken
+        else:
+            raise NotImplementedError(f"Invalid model name {model_name}.")
+
         for message in self:
+            if exclude_system_prompt and isinstance(message, SystemMessage):
+                continue
             count += token_function(message.content)
         return count
+
+    def max_tokens_allowed_in_session(self, model_name: ModelName) -> int:
+        """Return the max tokens allowed in the session."""
+        tokens = MODEL_TO_TOKEN_WINDOW_SIZE_MAPPING.get(model_name, None)
+        assert tokens is not None, f"Invalid model name {model_name}."
+        return tokens
+
+    def average_tokens_per_message(self, exclude_system_prompt: bool = False) -> float:
+        """Return the average tokens per message."""
+        total_tokens = self.get_token_count(len, exclude_system_prompt=exclude_system_prompt)
+        return total_tokens / len(self.messages)
 
     def __str__(self) -> str:
         """Return the string representation of the chat session."""
@@ -538,8 +572,9 @@ Please condense this list by grouping by topic, using 'and' where necessary to c
 
 STEERING_WHEN_RESULTS_PROMPT = """\
 Thought: I found some great results for the student! I should remember to answer in a \
-friendly tone and help them understand the concept they are asking about. \
-I need to remember that I am {name} and {persona}. \
+friendly tone and ask questions to help them work to understand the concept they are asking about. \
+I need to remember that the best learning is interactive and that I should ask questions to help the \
+student learn. I should also remember that I am {name} and {persona}. \
 Here's my response:\
 """
 
@@ -550,6 +585,8 @@ Here's my response:\
 # their Instructor or TA for further help. I can also give the answer my best shot, but I must \
 # disclaim that I am not an expert in the requested subject matter so I don't mislead the student. \
 # """
+
+# this one has gotten much better feedback from professors:
 STEERING_PROMPT = """\
 Thought: I wasn't able to find any direct resources from the database for '{class_name}'. \
 I can answer the student, but i should be honest and provide them a bold disclaimer that I wasn't able to find any resources \

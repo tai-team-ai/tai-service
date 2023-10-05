@@ -155,6 +155,7 @@ class TaiLLM:
         chat_session: TaiChatSession,
         relevant_chunks: Optional[list[ClassResourceSnippet]] = None,
         return_without_system_prompt: bool = True,
+        model_name: ModelName = ModelName.GPT_TURBO,
     ) -> None:
         """Get the response from the LLMs."""
         student_msg = chat_session.last_student_message
@@ -167,10 +168,19 @@ class TaiLLM:
         self._add_tai_tutor_chat_response(
             chat_session,
             relevant_chunks=relevant_chunks,
-            model_name=ModelName.GPT_TURBO,
+            model_name=model_name,
         )
         if return_without_system_prompt:
             chat_session.remove_system_prompt()
+
+    def summarize_chat_session(
+        self,
+        chat_session: BaseLLMChatSession,
+        model_name: ModelName = ModelName.GPT_4
+    ) -> str:
+        """Summarize the chat session"""
+        summary = chat_session.summarize(model=self._name_to_model_mapping[model_name])
+        return summary
 
     def create_search_result_summary_snippet(
         self,
@@ -298,11 +308,6 @@ class TaiLLM:
         **kwargs: Dict[str, Any],
     ) -> None:
         """Get the response from the LLMs."""
-        def count_tokens(text: str) -> int:
-            """Count the number of tokens in the text."""
-            encoding = tiktoken.encoding_for_model(model_name.value)
-            tokens = encoding.encode(text)
-            return len(tokens)
         if not model_name:
             model_name = ModelName.GPT_TURBO
         chat_model = self._name_to_model_mapping.get(model_name)
@@ -320,7 +325,7 @@ class TaiLLM:
         if chat_session.user_id:
             self._user_data.update_token_count(
                 user_id=chat_session.user_id,
-                amount=chat_session.get_token_count(count_tokens)
+                amount=chat_session.get_token_count(model_name=model_name),
             )
         function_call: dict = chat_message.additional_kwargs.get("function_call")
         if function_call:

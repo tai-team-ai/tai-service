@@ -90,7 +90,7 @@ class BaseClassResource(BasePydanticModel):
         default=None,
         description="The URL of the parent resource. Useful if the resource is a pdf.",
     )
-    raw_snippet_url: Optional[HttpUrl] = Field(
+    raw_snippet_url: Optional[str] = Field(
         default=None,
         description="The URL of the raw snippet. An example of this is a youtube video with a timestamp.",
     )

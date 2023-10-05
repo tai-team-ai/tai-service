@@ -54,7 +54,7 @@ class ClassResourceDocument(StatefulClassResourceDocument):
         default=None,
         description="The URL of the next document. Useful if the resource is a pdf.",
     )
-    raw_chunk_url: Optional[HttpUrl] = Field(
+    raw_chunk_url: Optional[Union[HttpUrl, str]] = Field(
         default=None,
         description="The URL of the raw chunk. Useful if the resource is a pdf.",
     )
