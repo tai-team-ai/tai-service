@@ -15,9 +15,7 @@ from pydantic import BaseSettings, Field
 from tai_aws_account_bootstrap.stack_config_models import StackConfigBaseModel
 from tai_aws_account_bootstrap.stack_helpers import add_tags
 from ...api.runtime_settings import TaiApiSettings
-from .stack_config_models import StackConfigBaseModel
-from .stack_helpers  import add_tags
-from ..constructs.python_lambda_construct import (
+from ..constructs.lambda_construct import (
     DockerLambda,
     DockerLambdaConfigModel,
     BaseLambdaConfigModel,
@@ -89,19 +87,22 @@ class TaiApiStack(Stack):
         self._api_settings = api_settings
         self._dynamodb_settings = dynamodb_settings
         self._removal_policy = config.removal_policy
-        api_settings.cold_store_bucket_name = (api_settings.cold_store_bucket_name + config.stack_suffix)[:63]
-        self._cold_store_bucket: VersionedBucket = self._create_bucket(
-            name=api_settings.cold_store_bucket_name,
-            public_read_access=True,
+        self._stack_suffix = config.stack_suffix
+        name_with_suffix = (api_settings.message_archive_bucket_name + self._stack_suffix)[:63]
+        api_settings.message_archive_bucket_name = name_with_suffix
+        vpc = get_vpc(scope=self, vpc=vpc)
+        self._python_lambda: DockerLambda = self._create_lambda_function(security_group_for_connecting_to_doc_db, vpc)
+        self._dynamodb_table = self._create_dynamodb_table()
+        self._dynamodb_table.grant_read_write_data(self._python_lambda.role)
+        lambda_role = self._python_lambda.role
+        self._message_archive_bucket: VersionedBucket = VersionedBucket.create_bucket(
+            scope=self,
+            bucket_name=api_settings.message_archive_bucket_name,
+            public_read_access=False,
+            role=lambda_role,
+            permissions=Permissions.READ_WRITE,
+            removal_policy=self._removal_policy,
         )
-        self._python_lambda: DockerLambda = self._create_lambda_function(security_group_allowing_db_connections)
-        self._cold_store_bucket.grant_write_access(self._python_lambda.role)
-        api_settings.frontend_data_transfer_bucket_name = (api_settings.frontend_data_transfer_bucket_name + config.stack_suffix)[:63]
-        self._frontend_transfer_bucket: VersionedBucket = self._create_bucket(
-            name=api_settings.frontend_data_transfer_bucket_name,
-            public_read_access=True,
-        )
-        self._frontend_transfer_bucket.grant_read_access(self._python_lambda.role)
         add_tags(self, config.tags)
         CfnOutput(
             self,
@@ -115,23 +116,17 @@ class TaiApiStack(Stack):
         """Return the lambda function."""
         return self._python_lambda.lambda_function
 
-    @property
-    def frontend_transfer_bucket(self) -> VersionedBucket:
-        """Return the frontend transfer bucket."""
-        return self._frontend_transfer_bucket
-
-    def _create_bucket(self, name: str, public_read_access: bool) -> VersionedBucket:
-        config = VersionedBucketConfigModel(
-            bucket_name=name,
-            public_read_access=public_read_access,
+    def _create_dynamodb_table(self) -> dynamodb.Table:
+        table = dynamodb.Table(
+            self,
+            self._namer(self._dynamodb_settings.table_name),
+            table_name=self._dynamodb_settings.table_name,
+            partition_key=self._dynamodb_settings.partition_key,
+            sort_key=self._dynamodb_settings.sort_key,
+            billing_mode=self._dynamodb_settings.billing_mode,
             removal_policy=self._removal_policy,
         )
-        bucket = VersionedBucket(
-            scope=self,
-            construct_id=f"{config.bucket_name}-bucket",
-            config=config,
-        )
-        return bucket
+        return table
 
     def _create_lambda_function(self, sg_for_connecting_to_doc_db: ec2.SecurityGroup, vpc: ec2.IVpc) -> DockerLambda:
         config = self._get_lambda_config(sg_for_connecting_to_doc_db, vpc)
