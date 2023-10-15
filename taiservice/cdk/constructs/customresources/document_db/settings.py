@@ -18,6 +18,13 @@ class BuiltInMongoDBRoles(str, Enum):
     ROOT = "root"
 
 
+class ClusterType(str, Enum):
+    """Define the cluster type."""
+
+    ELASTIC = "elastic"
+    STANDARD = "standard"
+
+
 class BaseDocumentDBSettings(BaseDeploymentSettings):
     """Define the base settings for the document database."""
 
@@ -32,6 +39,10 @@ class BaseDocumentDBSettings(BaseDeploymentSettings):
     db_name: str = Field(
         ...,
         description="The name of the database.",
+    )
+    cluster_type: ClusterType = Field(
+        default=ClusterType.ELASTIC,
+        description="The type of cluster to create.",
     )
 
     class Config:

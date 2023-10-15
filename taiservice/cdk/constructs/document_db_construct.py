@@ -125,9 +125,10 @@ class ElasticDocumentDBConfigModel(BaseDocumentDBConfigModel):
 
 class InstanceType(str, Enum):
     """Define valid instance types for the DocumentDB cluster."""
-    SMALL = "db.t3.medium"
-    MEDIUM = "db.r6g.large"
-    LARGE = "db.r6g.xlarge"
+    MICRO = "t4g.medium"
+    SMALL = "t3.medium"
+    MEDIUM = "r6g.large"
+    LARGE = "r6g.xlarge"
 
 
 class DocumentDBConfigModel(BaseDocumentDBConfigModel):
@@ -194,6 +195,8 @@ class DocumentDatabase(Construct):
     @property
     def fully_qualified_domain_name(self) -> str:
         """Return the fully qualified domain name for the DocumentDB cluster."""
+        if isinstance(self._db_cluster, docdb.DatabaseCluster):
+            return self._db_cluster.cluster_endpoint.hostname
         return self._db_cluster.attr_cluster_endpoint
 
     @property
@@ -329,7 +332,7 @@ class DocumentDatabase(Construct):
 
     def _get_lambda_config(self) -> BaseLambdaConfigModel:
         runtime_settings = RuntimeDocumentDBSettings(
-            cluster_host_name=self.db_cluster.attr_cluster_endpoint,
+            cluster_host_name=self.fully_qualified_domain_name,
             **self._settings.dict(),
         )
         security_group = create_restricted_security_group(
@@ -345,8 +348,9 @@ class DocumentDatabase(Construct):
         )
         assert vpc_interface_exists(ec2.InterfaceVpcEndpointAwsService.SECRETS_MANAGER, self._config.vpc),\
             "The VPC must have an interface endpoint for Secrets Manager."
+        name = "document-db-custom-resource-" + self._config.cluster_name
         lambda_config = BaseLambdaConfigModel(
-            function_name="document-db-custom-resource",
+            function_name=name,
             description="Custom resource for performing CRUD operations on the document database",
             code_path=DOCUMENT_DB_CUSTOM_RESOURCE_DIR,
             handler_module_name="main",

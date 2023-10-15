@@ -4,7 +4,7 @@ from loguru import logger
 import pymongo
 from pymongo.database import Database
 from pymongo.errors import OperationFailure
-from settings import RuntimeDocumentDBSettings, MongoDBUser
+from settings import RuntimeDocumentDBSettings, MongoDBUser, ClusterType
 # first imports are for local development, second imports are for deployment
 try:
     from ..custom_resource_interface import CustomResourceInterface
@@ -29,8 +29,11 @@ class DocumentDBCustomResource(CustomResourceInterface):
     def _connect_to_database(self) -> pymongo.MongoClient:
         logger.info("Creating MongoDB client")
         settings = self._settings
-        uri = f"mongodb://{self._admin_username}:{self._admin_password}@{settings.cluster_host_name}:{settings.cluster_port}/?tls=true&retryWrites=false"
-        logger.info(f"Connecting to cluster at {settings.cluster_host_name}:{settings.cluster_port}")
+        if settings.cluster_type == ClusterType.ELASTIC:
+            query_params = "tls=true&retryWrites=false"
+        elif settings.cluster_type == ClusterType.STANDARD:
+            query_params = "tls=true&tlsCAFile=global-bundle.pem&replicaSet=rs0&readPreference=secondaryPreferred&retryWrites=false"
+        uri = f"mongodb://{self._admin_username}:{self._admin_password}@{settings.cluster_host_name}:{settings.cluster_port}/?{query_params}"
         mongo_client = pymongo.MongoClient(
             uri,
             serverSelectionTimeoutMS=settings.server_selection_timeout_MS,

@@ -50,6 +50,7 @@ from ..constructs.document_db_construct import (
     DocumentDatabase,
     ElasticDocumentDBConfigModel,
     DocumentDBSettings,
+    DocumentDBConfigModel,
 )
 from ..constructs.elasticache_construct import (
     ElastiCacheConfigModel,
@@ -195,6 +196,19 @@ class TaiSearchServiceStack(Stack):
             db_setup_settings=doc_db_settings,
             db_config=db_config,
         )
+        db_config = DocumentDBConfigModel(
+            cluster_name=self._doc_db_settings.cluster_name + "-standard",
+            vpc=self.vpc,
+            subnet_type=self._subnet_type_for_doc_db,
+            removal_policy=self._config.removal_policy,
+        )
+        self._doc_db_settings.cluster_type = "standard"
+        new_db = DocumentDatabase(
+            scope=self,
+            construct_id=self._namer("docdb"),
+            db_setup_settings=self._doc_db_settings,
+            db_config=db_config,
+        )
         return db
 
     def _get_pinecone_db(self) -> PineconeDatabase:
@@ -326,9 +340,13 @@ class TaiSearchServiceStack(Stack):
             )
             ami = EcsOptimizedImage.amazon_linux2(hardware_type=AmiHardwareType.GPU)
         else:
+            # instance_type = ec2.InstanceType.of(
+            #     instance_class=ec2.InstanceClass.R6A,
+            #     instance_size=ec2.InstanceSize.XLARGE,
+            # )
             instance_type = ec2.InstanceType.of(
-                instance_class=ec2.InstanceClass.R6A,
-                instance_size=ec2.InstanceSize.XLARGE,
+                instance_class=ec2.InstanceClass.M6A,
+                instance_size=ec2.InstanceSize.LARGE,
             )
             ami = EcsOptimizedImage.amazon_linux2(hardware_type=AmiHardwareType.STANDARD)
         asg = AutoScalingGroup(
@@ -338,7 +356,7 @@ class TaiSearchServiceStack(Stack):
             vpc=self.vpc,
             instance_type=instance_type,
             machine_image=ami,
-            max_capacity=3,
+            max_capacity=2,
             min_capacity=0,
             # spot_price="0.35",
             block_devices=block_devices,
@@ -360,7 +378,7 @@ class TaiSearchServiceStack(Stack):
             environment=self._search_service_settings.dict(for_environment=True, export_aws_vars=True),
             logging=LogDriver.aws_logs(stream_prefix=self._namer("log")),
             gpu_count=0,
-            memory_reservation_mib=15000,
+            memory_reservation_mib=8000,
             stop_timeout=Duration.seconds(600),
         )
         container.add_port_mappings(
@@ -382,8 +400,8 @@ class TaiSearchServiceStack(Stack):
         return target_sg
 
     def _get_scalable_task(self, service: Ec2Service) -> ScalableTaskCount:
-        min_task_count = 2
-        max_task_count = 4
+        min_task_count = 1
+        max_task_count = 2
         scaling_task = service.auto_scale_task_count(
             min_capacity=min_task_count,
             max_capacity=max_task_count,
@@ -403,15 +421,15 @@ class TaiSearchServiceStack(Stack):
         #     disable_scale_in=False,
         # )
         scaling_task.scale_on_schedule(
-            id=self._namer("scale-up"),
-            schedule=Schedule.cron(hour="12", minute="0", week_day="*"),  # 6am MST
-            min_capacity=min_task_count,
+            self._namer("scale-down"),
+            schedule=Schedule.cron(hour="6", minute="0", week_day="*"),  # 12am MST
+            min_capacity=0,
             max_capacity=max_task_count,
         )
         scaling_task.scale_on_schedule(
-            self._namer("scale-down"),
-            schedule=Schedule.cron(hour="6", minute="0", week_day="*"),  # 12am MST
-            min_capacity=1,
+            id=self._namer("scale-up"),
+            schedule=Schedule.cron(hour="12", minute="0", week_day="*"),  # 6am MST
+            min_capacity=min_task_count,
             max_capacity=max_task_count,
         )
         return scaling_task
