@@ -43,22 +43,12 @@ MODULES_TO_COPY_INTO_API_DIR = [
 class DynamoDBSettings(BaseSettings):
     """Define settings for instantiating the DynamoDB table."""
 
-    table_name: str = Field(
-        ...,
-        description="The name of the DynamoDB table."
-    )
+    table_name: str = Field(..., description="The name of the DynamoDB table.")
     billing_mode: dynamodb.BillingMode = Field(
-        default=dynamodb.BillingMode.PAY_PER_REQUEST,
-        description="The billing mode for the DynamoDB table."
+        default=dynamodb.BillingMode.PAY_PER_REQUEST, description="The billing mode for the DynamoDB table."
     )
-    partition_key: dynamodb.Attribute = Field(
-        ...,
-        description="The partition key attribute definition."
-    )
-    sort_key: Optional[dynamodb.Attribute] = Field(
-        default=None,
-        description="The sort key attribute definition."
-    )
+    partition_key: dynamodb.Attribute = Field(..., description="The partition key attribute definition.")
+    sort_key: Optional[dynamodb.Attribute] = Field(default=None, description="The sort key attribute definition.")
 
 
 class TaiApiStack(Stack):
@@ -70,8 +60,8 @@ class TaiApiStack(Stack):
         config: StackConfigBaseModel,
         api_settings: TaiApiSettings,
         dynamodb_settings: DynamoDBSettings,
-        security_group_for_connecting_to_doc_db: ec2.SecurityGroup,
         vpc: Any,
+        security_group_for_connecting_to_doc_db: ec2.SecurityGroup = None,
     ) -> None:
         """Initialize the stack for the TAI API service."""
         super().__init__(
@@ -136,7 +126,9 @@ class TaiApiStack(Stack):
             construct_id=f"{name}-lambda",
             config=config,
         )
-        python_lambda.add_read_only_secrets_manager_access(arns=[get_secret_arn_from_name(secret) for secret in self._api_settings.secret_names])
+        python_lambda.add_read_only_secrets_manager_access(
+            arns=[get_secret_arn_from_name(secret) for secret in self._api_settings.secret_names]
+        )
         python_lambda.allow_public_invoke_of_function()
         return python_lambda
 
@@ -174,7 +166,7 @@ class TaiApiStack(Stack):
                 auth_type=_lambda.FunctionUrlAuthType.NONE,
             ),
             run_as_webserver=True,
-            security_groups=[security_group, sg_for_connecting_to_doc_db],
+            security_groups=[security_group],
             vpc=vpc,
             subnet_selection=ec2.SubnetSelection(subnet_type=ec2.SubnetType.PRIVATE_WITH_EGRESS),
         )

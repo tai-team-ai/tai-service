@@ -1,4 +1,5 @@
 """Define the pinecone database."""
+from pathlib import Path
 import traceback
 from typing import Any, Callable, Optional, Union, Type
 from uuid import UUID
@@ -66,6 +67,13 @@ class DocumentDB:
             tls=False
         else:
             tls=True
+        kwargs = {}
+        if "docdb.amazonaws.com" in config.fully_qualified_domain_name:
+            kwargs = {
+                "tlsCAFile": str((Path(__file__).parent / "global-bundle.pem").resolve()),
+                "replicaSet": "rs0",
+                "readPreference": "secondaryPreferred",
+            }
         self._client = MongoClient(
             username=config.username,
             password=config.password,
@@ -73,6 +81,7 @@ class DocumentDB:
             port=config.port,
             tls=tls,
             retryWrites=False,
+            **kwargs,
         )
         self._doc_models = [
             ClassResourceChunkDocument,

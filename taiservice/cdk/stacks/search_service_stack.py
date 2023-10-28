@@ -1,7 +1,7 @@
 """Define the search database stack."""
 from enum import Enum
 import os
-from typing import Optional, Any
+from typing import Optional, Any, Literal
 from constructs import Construct
 from loguru import logger
 from aws_cdk import (
@@ -111,19 +111,22 @@ class TaiSearchServiceStack(Stack):
         self._namer = lambda name: f"{config.stack_name}-{name}"
         self._subnet_type_for_doc_db = ec2.SubnetType.PRIVATE_WITH_EGRESS
         self.vpc = get_vpc(scope=self, vpc=vpc)
-        self.document_db = self._get_document_db(doc_db_settings=doc_db_settings)
+        self.document_db = self._get_document_db(doc_db_settings=doc_db_settings, cluster_type="elastic")
+        self.document_db_standard = self._get_document_db(doc_db_settings=doc_db_settings, cluster_type="std")
         self.cache = self._get_cache()
         self.pinecone_db = self._get_pinecone_db()
-        self._security_group_for_connecting_to_doc_db = self.document_db.security_group_for_connecting_to_cluster
+        self._security_group_for_connecting_to_doc_db = self.document_db_standard.security_group_for_connecting_to_cluster
         # these needs to occur before creating the search service so that the search service points to the correct bucket
         name_with_suffix = (search_service_settings.cold_store_bucket_name + config.stack_suffix)[:63]
-        search_service_settings.doc_db_fully_qualified_domain_name = self.document_db.fully_qualified_domain_name
+        search_service_settings.doc_db_fully_qualified_domain_name = self.document_db_standard.fully_qualified_domain_name
         search_service_settings.cold_store_bucket_name = name_with_suffix
         search_service_settings.cache_host_name = self.cache.fully_qualified_domain_name
-        self.search_services: list[Ec2Service] = self._get_search_services([
-            self._security_group_for_connecting_to_doc_db,
-            self.cache.security_group_for_connecting_to_cluster,
-        ])
+        self.search_services: list[Ec2Service] = self._get_search_services(
+            [
+                self._security_group_for_connecting_to_doc_db,
+                self.cache.security_group_for_connecting_to_cluster,
+            ]
+        )
         self._cold_store_bucket: VersionedBucket = VersionedBucket.create_bucket(
             scope=self,
             bucket_name=search_service_settings.cold_store_bucket_name,
@@ -184,32 +187,34 @@ class TaiSearchServiceStack(Stack):
         )
         return cache
 
-    def _get_document_db(self, doc_db_settings: DocumentDBSettings) -> DocumentDatabase:
-        db_config = ElasticDocumentDBConfigModel(
-            cluster_name=self._doc_db_settings.cluster_name,
-            vpc=self.vpc,
-            subnet_type=self._subnet_type_for_doc_db,
-        )
-        db = DocumentDatabase(
-            scope=self,
-            construct_id=self._namer("document-db"),
-            db_setup_settings=doc_db_settings,
-            db_config=db_config,
-        )
-        db_config = DocumentDBConfigModel(
-            cluster_name=self._doc_db_settings.cluster_name + "-standard",
-            vpc=self.vpc,
-            subnet_type=self._subnet_type_for_doc_db,
-            removal_policy=self._config.removal_policy,
-        )
-        self._doc_db_settings.cluster_type = "standard"
-        new_db = DocumentDatabase(
-            scope=self,
-            construct_id=self._namer("docdb"),
-            db_setup_settings=self._doc_db_settings,
-            db_config=db_config,
-        )
-        return db
+    def _get_document_db(self, doc_db_settings: DocumentDBSettings, cluster_type: Literal["std", "elastic"]) -> DocumentDatabase:
+        if cluster_type == "elastic":
+            db_config = ElasticDocumentDBConfigModel(
+                cluster_name=self._doc_db_settings.cluster_name,
+                vpc=self.vpc,
+                subnet_type=self._subnet_type_for_doc_db,
+            )
+            return DocumentDatabase(
+                scope=self,
+                construct_id=self._namer("document-db"),
+                db_setup_settings=doc_db_settings,
+                db_config=db_config,
+            )
+        elif cluster_type == "std":
+            db_config = DocumentDBConfigModel(
+                cluster_name=self._doc_db_settings.cluster_name + "-standard",
+                vpc=self.vpc,
+                subnet_type=self._subnet_type_for_doc_db,
+                removal_policy=self._config.removal_policy,
+            )
+            self._doc_db_settings.cluster_type = "standard"
+            return DocumentDatabase(
+                scope=self,
+                construct_id=self._namer("db"),
+                db_setup_settings=self._doc_db_settings,
+                db_config=db_config,
+            )
+        raise ValueError(f"Invalid cluster type: {cluster_type}")
 
     def _get_pinecone_db(self) -> PineconeDatabase:
         db = PineconeDatabase(
@@ -346,7 +351,7 @@ class TaiSearchServiceStack(Stack):
             # )
             instance_type = ec2.InstanceType.of(
                 instance_class=ec2.InstanceClass.M6A,
-                instance_size=ec2.InstanceSize.LARGE,
+                instance_size=ec2.InstanceSize.XLARGE,
             )
             ami = EcsOptimizedImage.amazon_linux2(hardware_type=AmiHardwareType.STANDARD)
         asg = AutoScalingGroup(
@@ -378,7 +383,7 @@ class TaiSearchServiceStack(Stack):
             environment=self._search_service_settings.dict(for_environment=True, export_aws_vars=True),
             logging=LogDriver.aws_logs(stream_prefix=self._namer("log")),
             gpu_count=0,
-            memory_reservation_mib=8000,
+            memory_reservation_mib=15000,
             stop_timeout=Duration.seconds(600),
         )
         container.add_port_mappings(
@@ -401,7 +406,7 @@ class TaiSearchServiceStack(Stack):
 
     def _get_scalable_task(self, service: Ec2Service) -> ScalableTaskCount:
         min_task_count = 1
-        max_task_count = 2
+        max_task_count = 1
         scaling_task = service.auto_scale_task_count(
             min_capacity=min_task_count,
             max_capacity=max_task_count,

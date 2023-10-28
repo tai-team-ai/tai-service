@@ -1,5 +1,5 @@
 """Define the runtime settings for the TAI API."""
-from typing import Optional
+from typing import Optional, Any
 from enum import Enum
 from pydantic import Field, BaseSettings
 # first imports are for local development, second imports are for deployment
@@ -116,6 +116,8 @@ class TaiApiSettings(BaseSettings):
         default=LogLevel.INFO,
         description="The log level for the service.",
     )
+    test: str = ""
+    test_2: Any = ""
 
     @property
     def secret_names(self) -> list[str]:

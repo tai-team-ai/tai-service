@@ -300,7 +300,7 @@ class TAISearch:
             # when returning docs for the tutor we want to be more conservative and error on the side of 
             # not return docs that are not relevant
             if for_tai_tutor:
-                threshold = alpha * 0.70 + (1 - alpha) * 5.5
+                threshold = alpha * 0.75 + (1 - alpha) * 6.0
             else:
                 threshold = alpha * 0.50 + (1 - alpha) * 2.5
             return [doc for doc in similar_docs.documents if doc.score > threshold]

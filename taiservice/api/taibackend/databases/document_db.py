@@ -152,13 +152,25 @@ class DocumentDB:
     """
     def __init__(self, config: DocumentDBConfig) -> None:
         """Initialize document db."""
+        if config.fully_qualified_domain_name == "localhost":
+            tls=False
+        else:
+            tls=True
+        kwargs = {}
+        if "docdb.amazonaws.com" in config.fully_qualified_domain_name:
+            kwargs = {
+                "tlsCAFile": str((Path(__file__).parent / "global-bundle.pem").resolve()),
+                "replicaSet": "rs0",
+                "readPreference": "secondaryPreferred",
+            }
         self._client = MongoClient(
             username=config.username,
             password=config.password,
             host=config.fully_qualified_domain_name,
             port=config.port,
-            tls=True,
+            tls=tls,
             retryWrites=False,
+            **kwargs,
         )
         db = self._client[config.database_name]
         self._class_resource_collection = db[config.class_resource_collection_name]
